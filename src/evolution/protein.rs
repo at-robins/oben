@@ -1,3 +1,4 @@
+//! The `protein` module contains the executive part of the evolutionary network.
 extern crate bitvec;
 
 use std::rc::Rc;
