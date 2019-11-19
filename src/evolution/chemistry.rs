@@ -156,7 +156,7 @@ impl State {
     /// If the number of substrates is not exactly equal to the required one. 
     pub fn detect(&self, substrates: &[&BitBox]) -> bool {
         assert_eq!(substrates.len(), self.get_substrate_number(), 
-            "The number of required substrates is {}, but {} substrates were supplied", 
+            "The number of required substrates is {}, but {} substrates were supplied.", 
             self.get_substrate_number(), substrates.len());
 
         match self {
@@ -192,5 +192,92 @@ impl State {
 }
 
 pub enum Reaction {
+    And,
+    Or,
+    XOr,
+    ShiftRight,
+    ShiftLeft,
+    Add,
+    Append,
+    Inverse,
+    Reverse,
+    Duplicate,
+}
+
+impl Reaction {
+    /// Performs the specified reaction and returns the products.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `educts` - the educts to convert into products
+    /// 
+    /// # Panics
+    /// 
+    /// If the number of supplied educts and created products is not 
+    /// exactly equal to the required one.
+    pub fn react(&self, educts: &[&BitBox]) -> Vec<BitBox> {
+        assert_eq!(educts.len(), self.get_educt_number(), 
+            "The number of required educts is {}, but {} educts were supplied.", 
+            self.get_educt_number(), educts.len());
+        
+        let products = match self {
+            Reaction::And => vec!(educts[0].clone() & educts[1]),
+            Reaction::Or => vec!(educts[0].clone() | educts[1]),
+            Reaction::XOr => vec!(educts[0].clone() ^ educts[1]),
+            Reaction::ShiftRight => vec!(educts[0].clone() >> educts[1].len()),
+            Reaction::ShiftLeft => vec!(educts[0].clone() << educts[1].len()),
+            Reaction::Add => vec!(educts[0].clone() + educts[1].clone()),
+            Reaction::Append => {
+                let mut a = BitVec::from_boxed_bitslice(educts[0].clone());
+                let mut b = BitVec::from_boxed_bitslice(educts[1].clone());
+                a.append(&mut b);
+                vec!(a.into_boxed_bitslice())
+            },
+            Reaction::Inverse => vec!(!educts[0].clone()),
+            Reaction::Reverse => {
+                let mut a = educts[0].clone();
+                a.reverse();
+                vec!(a)
+            },
+            Reaction::Duplicate => vec!(educts[0].clone()),
+        };
+        
+        assert_eq!(products.len(), self.get_product_number(), 
+            "The number of required products is {}, but {} products were created.", 
+            self.get_product_number(), products.len());
+        
+        products
+    }
     
+    /// Returns the number of educts required to perform the reaction.
+    pub fn get_educt_number(&self) -> usize {
+        match self {
+            Reaction::And => 2,
+            Reaction::Or => 2,
+            Reaction::XOr => 2,
+            Reaction::ShiftRight => 2,
+            Reaction::ShiftLeft => 2,
+            Reaction::Add => 2,
+            Reaction::Append => 2,
+            Reaction::Inverse => 1,
+            Reaction::Reverse => 1,
+            Reaction::Duplicate => 1,
+        }
+    }
+    
+    /// Returns the number of products required to perform the reaction.
+    pub fn get_product_number(&self) -> usize {
+        match self {
+            Reaction::And => 1,
+            Reaction::Or => 1,
+            Reaction::XOr => 1,
+            Reaction::ShiftRight => 1,
+            Reaction::ShiftLeft => 1,
+            Reaction::Add => 1,
+            Reaction::Append => 1,
+            Reaction::Inverse => 1,
+            Reaction::Reverse => 1,
+            Reaction::Duplicate => 1,
+        }
+    }
 }
