@@ -38,7 +38,7 @@ impl Substrate {
 /// [`Reaction`]: ../chemistry/struct.Substrate.html 
 pub struct Receptor {
     substrates: Vec<Rc<Substrate>>,
-    enzym: Protein,
+    enzym: CatalyticCentre,
 }
 
 /// A `Protein` produces products from educt [`Substrate`]s 
@@ -46,13 +46,13 @@ pub struct Receptor {
 /// 
 /// [`Substrate`]: ./struct.Substrate.html 
 /// [`Reaction`]: ../chemistry/struct.Substrate.html 
-pub struct Protein {
+pub struct CatalyticCentre {
     educts: Vec<Rc<Substrate>>,
     products: Vec<Rc<RefCell<Substrate>>>,
     reaction: Reaction,
 }
 
-impl Protein {
+impl CatalyticCentre {
     pub fn catalyse(&self) {
         // TODO: insert check of product and educt number
         let educts: Vec<&BitBox> = self.educts.iter()
