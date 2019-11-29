@@ -10,13 +10,13 @@ use super::chemistry::{Reaction, State};
 /// [`Receptor`]s of the substrate will be notified.
 /// 
 /// [`Receptor`]: ./struct.Receptor.html
+#[derive(Clone)]
 pub struct Substrate {
     value: BitBox,
     receptors: Vec<Rc<Receptor>>,
 }
 
 impl Substrate {
-    
     /*pub fn new(value: BitBox) -> Self {
         
     }*/
@@ -46,6 +46,7 @@ impl Substrate {
 /// 
 /// [`Substrate`]: ./struct.Substrate.html 
 /// [`Reaction`]: ../chemistry/struct.Reaction.html 
+#[derive(Clone)]
 pub struct Receptor {
     substrates: Vec<Rc<Substrate>>,
     state: State,
@@ -79,6 +80,7 @@ impl Receptor {
 /// 
 /// [`Substrate`]: ./struct.Substrate.html 
 /// [`Reaction`]: ../chemistry/struct.Substrate.html 
+#[derive(Clone)]
 pub struct CatalyticCentre {
     educts: Vec<Rc<Substrate>>,
     products: Vec<Rc<RefCell<Substrate>>>,
