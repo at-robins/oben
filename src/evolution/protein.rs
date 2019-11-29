@@ -4,7 +4,7 @@ extern crate bitvec;
 use core::cell::RefCell;
 use std::rc::Rc;
 use bitvec::boxed::BitBox;
-use super::chemistry::Reaction;
+use super::chemistry::{Reaction, State};
 
 /// A `Substrate` represents a chemical entity of a specific value. Upon change
 /// [`Receptor`]s of the substrate will be notified.
@@ -16,18 +16,26 @@ pub struct Substrate {
 }
 
 impl Substrate {
-    /// Set the value of this substrate.alloc
+    /// Set the value of this substrate and notify all corresponding receptors.
     /// 
     /// # Parameters
     /// 
     /// * `value` - the new value of the substrate
     pub fn set_value(&mut self, value: BitBox) {
         self.value = value;
+        self.notify_receptors();
     }
     
     /// Returns the binary value of this substrate.
     pub fn value(&self) -> &BitBox {
         &self.value
+    }
+    
+    /// Causes all receptors detecting this substrate to reevaluate.
+    pub fn notify_receptors(&self) {
+        for receptor in &self.receptors {
+            receptor.detect();
+        }
     }
 }
 
@@ -38,7 +46,20 @@ impl Substrate {
 /// [`Reaction`]: ../chemistry/struct.Substrate.html 
 pub struct Receptor {
     substrates: Vec<Rc<Substrate>>,
+    state: State,
     enzym: CatalyticCentre,
+}
+
+impl Receptor {
+    pub fn detect(&self) {
+        // TODO: insert check of substrate number
+        let substrates: Vec<&BitBox> = self.substrates.iter()
+            .map(|sub| sub.value())
+            .collect();
+        if self.state.detect(&substrates) {
+            self.enzym.catalyse();
+        }
+    }
 }
 
 /// A `Protein` produces products from educt [`Substrate`]s 
