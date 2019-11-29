@@ -142,6 +142,18 @@ pub enum State {
     /// assert!(State::None.detect(&[&a]));
     /// ```
     None,
+    /// A state operation always returning `true`.
+    /// 
+    /// # Example
+    /// ```
+    /// extern crate bitvec;
+    /// 
+    /// use bitvec::boxed::BitBox;
+    /// use oben::evolution::chemistry::State;
+    /// 
+    /// assert!(State::Always.detect(&[]));
+    /// ```
+    Always,
 }
 
 impl State {
@@ -170,6 +182,7 @@ impl State {
             State::Some => substrates[0].some(),
             State::None => substrates[0].not_any(),
             State::NotAll => substrates[0].not_all(),
+            State::Always => true,
         }
     }
     
@@ -186,6 +199,7 @@ impl State {
             State::Some => 1,
             State::NotAll => 1,
             State::None => 1,
+            State::Always => 0,
         }
     }
     
