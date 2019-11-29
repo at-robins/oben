@@ -16,6 +16,11 @@ pub struct Substrate {
 }
 
 impl Substrate {
+    
+    /*pub fn new(value: BitBox) -> Self {
+        
+    }*/
+    
     /// Set the value of this substrate and notify all corresponding receptors.
     /// 
     /// # Parameters
@@ -23,7 +28,6 @@ impl Substrate {
     /// * `value` - the new value of the substrate
     pub fn set_value(&mut self, value: BitBox) {
         self.value = value;
-        self.notify_receptors();
     }
     
     /// Returns the binary value of this substrate.
@@ -31,11 +35,9 @@ impl Substrate {
         &self.value
     }
     
-    /// Causes all receptors detecting this substrate to reevaluate.
-    pub fn notify_receptors(&self) {
-        for receptor in &self.receptors {
-            receptor.detect();
-        }
+    /// Returns all receptors detecting this substrate.
+    pub fn receptors(&self) -> Vec<Rc<Receptor>> {
+        self.receptors.iter().map(Rc::clone).collect()
     }
 }
 
@@ -43,7 +45,7 @@ impl Substrate {
 /// for [`Reaction`]s.
 /// 
 /// [`Substrate`]: ./struct.Substrate.html 
-/// [`Reaction`]: ../chemistry/struct.Substrate.html 
+/// [`Reaction`]: ../chemistry/struct.Reaction.html 
 pub struct Receptor {
     substrates: Vec<Rc<Substrate>>,
     state: State,
@@ -51,18 +53,28 @@ pub struct Receptor {
 }
 
 impl Receptor {
-    pub fn detect(&self) {
+    /// Detects the [`State`] of its substrates and triggers a 
+    /// [`CatalyticCentre`]'s reaction if appropriate. Subsequent ("cascading") 
+    /// receptors, which are supposed to be checked after the reaction was triggered, 
+    /// are returned.
+    /// 
+    /// [`State`]: ../chemistry/struct.State.html 
+    /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html 
+    pub fn detect(&self) -> Vec<Rc<Receptor>> {
         // TODO: insert check of substrate number
         let substrates: Vec<&BitBox> = self.substrates.iter()
             .map(|sub| sub.value())
             .collect();
         if self.state.detect(&substrates) {
             self.enzym.catalyse();
+            self.enzym.cascading_receptors()
+        } else {
+            vec!()
         }
     }
 }
 
-/// A `Protein` produces products from educt [`Substrate`]s 
+/// A `CatalyticCentre` produces products from educt [`Substrate`]s 
 /// by performing a [`Reaction`].
 /// 
 /// [`Substrate`]: ./struct.Substrate.html 
@@ -74,6 +86,9 @@ pub struct CatalyticCentre {
 }
 
 impl CatalyticCentre {
+    /// Catalyses the [`Reaction`] specific for this catalytic centre.
+    /// 
+    /// [`Reaction`]: ../chemistry/struct.Substrate.html 
     pub fn catalyse(&self) {
         // TODO: insert check of product and educt number
         let educts: Vec<&BitBox> = self.educts.iter()
@@ -84,5 +99,13 @@ impl CatalyticCentre {
             // TODO: maybe switch to VecDeque and use pop_first()
             product.borrow_mut().set_value(product_values.remove(0));
         }
+    }
+    
+    /// Returns all receptors that detect the product [`Substrate`]s 
+    /// of the catalytic centre.
+    ///
+    /// [`Substrate`]: ./struct.Substrate.html
+    pub fn cascading_receptors(&self) -> Vec<Rc<Receptor>> {
+        self.products.iter().flat_map(|product| product.borrow().receptors()).collect()
     }
 }
