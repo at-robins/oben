@@ -154,6 +154,18 @@ pub enum State {
     /// assert!(State::Always.detect(&[]));
     /// ```
     Always,
+    /// A state operation always returning `false`.
+    /// 
+    /// # Example
+    /// ```
+    /// extern crate bitvec;
+    /// 
+    /// use bitvec::boxed::BitBox;
+    /// use oben::evolution::chemistry::State;
+    /// 
+    /// assert!(!State::Never.detect(&[]));
+    /// ```
+    Never,
 }
 
 impl State {
@@ -183,6 +195,7 @@ impl State {
             State::None => substrates[0].not_any(),
             State::NotAll => substrates[0].not_all(),
             State::Always => true,
+            State::Never => false,
         }
     }
     
@@ -200,6 +213,7 @@ impl State {
             State::NotAll => 1,
             State::None => 1,
             State::Always => 0,
+            State::Never => 0,
         }
     }
     
@@ -216,6 +230,7 @@ pub enum Reaction {
     Inverse,
     Reverse,
     Duplicate,
+    Misfunction,
 }
 
 impl Reaction {
@@ -254,6 +269,7 @@ impl Reaction {
                 vec!(a)
             },
             Reaction::Duplicate => vec!(educts[0].clone()),
+            Reaction::Misfunction => vec!(),
         };
         
         assert_eq!(products.len(), self.get_product_number(), 
@@ -276,6 +292,7 @@ impl Reaction {
             Reaction::Inverse => 1,
             Reaction::Reverse => 1,
             Reaction::Duplicate => 1,
+            Reaction::Misfunction => 0,
         }
     }
     
@@ -292,6 +309,7 @@ impl Reaction {
             Reaction::Inverse => 1,
             Reaction::Reverse => 1,
             Reaction::Duplicate => 1,
+            Reaction::Misfunction => 0,
         }
     }
 }
