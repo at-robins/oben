@@ -4,7 +4,8 @@ extern crate bitvec;
 
 use bitvec::{boxed::BitBox, vec::BitVec};
 
-/// A `State` is an elementary operation for comparing two substrates.
+/// A `State` is an elementary operation for comparing binary substrates.
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub enum State {
     /// A state operation comparing two substrates for equality.
     /// 
@@ -219,17 +220,30 @@ impl State {
     
 }
 
+/// A `Reaction` represents an elementary operation for modification of binary substrates.
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub enum Reaction {
+    /// A binary `AND` operation.
     And,
+    /// A binary `OR` operation.
     Or,
+    /// A binary `XOR` operation.
     XOr,
+    /// A binary right shift operation.
     ShiftRight,
+    /// A binary left shift operation.
     ShiftLeft,
+    /// A binary addition.
     Add,
+    /// An operation, appending a binary value to another one.
     Append,
+    /// A binary inversion.
     Inverse,
+    /// A binary reverse.
     Reverse,
+    /// A duplication of a binary value.
     Duplicate,
+    /// No function.
     Misfunction,
 }
 
