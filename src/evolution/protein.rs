@@ -6,8 +6,8 @@ use std::rc::Rc;
 use bitvec::boxed::BitBox;
 use super::chemistry::{Reaction, State};
 
-/// A `Substrate` represents a chemical entity of a specific value. Upon change
-/// [`Receptor`]s of the substrate will be notified.
+/// A `Substrate` represents a chemical entity of a specific value. Additionally 
+/// a `Substrate` is aware of all [`Receptor`]s detecting its changes.
 /// 
 /// [`Receptor`]: ./struct.Receptor.html
 #[derive(Clone)]
@@ -21,11 +21,14 @@ impl Substrate {
         
     }*/
     
-    /// Set the value of this substrate and notify all corresponding receptors.
+    /// Set the value of this substrate. 
+    /// This method will not notify the corresponding [`Receptor`]s.
     /// 
     /// # Parameters
     /// 
     /// * `value` - the new value of the substrate
+    /// 
+    /// [`Receptor`]: ./struct.Receptor.html
     pub fn set_value(&mut self, value: BitBox) {
         self.value = value;
     }
