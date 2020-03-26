@@ -1,6 +1,7 @@
 //! The `chemistry` module contains elementary bit actions 
 //! for the evolutionary network.
 extern crate bitvec;
+extern crate rand;
 
 use bitvec::{boxed::BitBox, vec::BitVec};
 
@@ -245,6 +246,8 @@ pub enum Reaction {
     Duplicate,
     /// No function.
     Misfunction,
+    /// A random binary number.
+    Random,
 }
 
 impl Reaction {
@@ -271,10 +274,10 @@ impl Reaction {
             Reaction::ShiftLeft => vec!(educts[0].clone() << educts[1].len()),
             Reaction::Add => vec!(educts[0].clone() + educts[1].clone()),
             Reaction::Append => {
-                let mut a = BitVec::from_boxed_bitslice(educts[0].clone());
-                let mut b = BitVec::from_boxed_bitslice(educts[1].clone());
+                let mut a = BitVec::from(educts[0].clone());
+                let mut b = BitVec::from(educts[1].clone());
                 a.append(&mut b);
-                vec!(a.into_boxed_bitslice())
+                vec!(a.into())
             },
             Reaction::Inverse => vec!(!educts[0].clone()),
             Reaction::Reverse => {
@@ -284,6 +287,10 @@ impl Reaction {
             },
             Reaction::Duplicate => vec!(educts[0].clone()),
             Reaction::Misfunction => vec!(),
+            Reaction::Random => vec!(BitVec::from(
+                // Generates a sequence of random bits. Its length is equal to the educt length.
+                (0..educts[0].len()).map(|_| rand::random()).collect::<Vec<u8>>()
+            ).into()),
         };
         
         assert_eq!(products.len(), self.get_product_number(), 
@@ -307,6 +314,7 @@ impl Reaction {
             Reaction::Reverse => 1,
             Reaction::Duplicate => 1,
             Reaction::Misfunction => 0,
+            Reaction::Random => 1,
         }
     }
     
@@ -324,6 +332,7 @@ impl Reaction {
             Reaction::Reverse => 1,
             Reaction::Duplicate => 1,
             Reaction::Misfunction => 0,
+            Reaction::Random => 1,
         }
     }
 }
