@@ -17,7 +17,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
     /// let b: BitBox = a.clone();
     /// assert!(State::Equals.detect(&[&a,&b]));
     /// ```
@@ -31,7 +31,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
     /// let b: BitBox = a.clone();
     /// assert!(!State::Not.detect(&[&a,&b]));
     /// ```
@@ -45,8 +45,8 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
-    /// let b: BitBox = BitBox::from_slice(&[254u8]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
+    /// let b: BitBox = BitBox::from_slice(&[254usize]);
     /// assert!(State::Greater.detect(&[&a,&b]));
     /// ```
     Greater,
@@ -59,8 +59,8 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
-    /// let b: BitBox = BitBox::from_slice(&[254u8]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
+    /// let b: BitBox = BitBox::from_slice(&[254usize]);
     /// assert!(State::Lesser.detect(&[&b,&a]));
     /// ```
     Lesser,
@@ -73,7 +73,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
     /// let b: BitBox = a.clone();
     /// assert!(State::GreaterOrEqual.detect(&[&a,&b]));
     /// ```
@@ -87,7 +87,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 12, 34]);
+    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
     /// let b: BitBox = a.clone();
     /// assert!(State::LesserOrEqual.detect(&[&a,&b]));
     /// ```
@@ -101,11 +101,11 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[255u8, 255, 255]);
+    /// let a: BitBox = BitBox::from_slice(&[usize::max_value(), usize::max_value()]);
     /// assert!(State::All.detect(&[&a]));
     /// ```
     All,
-    /// A state operation checking if a substrate is completely unset.
+    /// A state operation checking if a substrate is not completely unset.
     /// 
     /// # Example
     /// ```
@@ -114,11 +114,11 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[0u8, 0, 0]);
-    /// assert!(State::None.detect(&[&a]));
+    /// let a: BitBox = BitBox::from_slice(&[0usize, 1, 0]);
+    /// assert!(State::Some.detect(&[&a]));
     /// ```
     Some,
-    /// A state operation checking if a substrate is partially set.
+    /// A state operation checking if a substrate is not completely set.
     /// 
     /// # Example
     /// ```
@@ -127,7 +127,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[0u8, 1, 0]);
+    /// let a: BitBox = BitBox::from_slice(&[0usize, 1, 0]);
     /// assert!(State::NotAll.detect(&[&a]));
     /// ```
     NotAll,
@@ -140,7 +140,7 @@ pub enum State {
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::chemistry::State;
     /// 
-    /// let a: BitBox = BitBox::from_slice(&[0u8, 0, 0]);
+    /// let a: BitBox = BitBox::from_slice(&[0usize, 0, 0]);
     /// assert!(State::None.detect(&[&a]));
     /// ```
     None,
@@ -247,6 +247,19 @@ pub enum Reaction {
     /// No function.
     Misfunction,
     /// A random binary number.
+    /// 
+    /// # Example
+    /// ```
+    /// extern crate bitvec;
+    /// 
+    /// use bitvec::boxed::BitBox;
+    /// use oben::evolution::chemistry::Reaction;
+    ///
+    /// let educt_values = BitBox::from_slice(&[255usize, 32]);
+    /// let educts = vec!(&educt_values);
+    /// 
+    /// assert_eq!(Reaction::Random.react(&educts[..])[0].len(), educts[0].len());
+    /// ```
     Random,
 }
 
