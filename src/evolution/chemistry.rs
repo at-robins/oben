@@ -267,9 +267,9 @@ impl Reaction {
             self.get_educt_number(), educts.len());
         
         let products = match self {
-            Reaction::And => vec!(educts[0].clone() & educts[1]),
-            Reaction::Or => vec!(educts[0].clone() | educts[1]),
-            Reaction::XOr => vec!(educts[0].clone() ^ educts[1]),
+            Reaction::And => vec!(educts[0].clone() & educts[1].clone()),
+            Reaction::Or => vec!(educts[0].clone() | educts[1].clone()),
+            Reaction::XOr => vec!(educts[0].clone() ^ educts[1].clone()),
             Reaction::ShiftRight => vec!(educts[0].clone() >> educts[1].len()),
             Reaction::ShiftLeft => vec!(educts[0].clone() << educts[1].len()),
             Reaction::Add => vec!(educts[0].clone() + educts[1].clone()),
@@ -287,10 +287,13 @@ impl Reaction {
             },
             Reaction::Duplicate => vec!(educts[0].clone()),
             Reaction::Misfunction => vec!(),
-            Reaction::Random => vec!(BitVec::from(
-                // Generates a sequence of random bits. Its length is equal to the educt length.
-                (0..educts[0].len()).map(|_| rand::random()).collect::<Vec<u8>>()
-            ).into()),
+            Reaction::Random => {
+                let mut random_bits = BitVec::with_capacity(educts[0].len());
+                for _i in 0..educts[0].len() {
+                    random_bits.push(rand::random())
+                }
+                vec!(random_bits.into())
+            },
         };
         
         assert_eq!(products.len(), self.get_product_number(), 
