@@ -13,6 +13,7 @@ use super::chemistry::{Reaction, State};
 /// [`Receptor`]: ./struct.Receptor.html
 #[derive(Clone)]
 pub struct Substrate {
+    // TODO: implement `new` and remove public modifier
     pub value: BitBox,
     pub receptors: Vec<Rc<Receptor>>,
 }
@@ -52,12 +53,30 @@ impl Substrate {
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Clone)]
 pub struct Receptor {
-    substrates: Vec<Rc<Substrate>>,
-    state: State,
-    enzym: CatalyticCentre,
+    // TODO: implement `new` and remove public modifier
+    pub substrates: Vec<Rc<RefCell<Substrate>>>,
+    pub state: State,
+    pub enzym: CatalyticCentre,
 }
 
 impl Receptor {
+    /// Detects the [`State`] of its substrates and determines if triggering the
+    /// [`CatalyticCentre`]'s reaction if appropriate.
+    ///
+    /// [`State`]: ../chemistry/struct.State.html
+    /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
+    fn should_trigger(&self) -> bool {
+        // TODO: insert check of substrate number
+        // TODO: refactor this ugly code
+        let substrates: Vec<Ref<Substrate>> = self.substrates.iter()
+            .map(|sub| sub.borrow())
+            .collect();
+        let substrates: Vec<&BitBox> = substrates.iter()
+            .map(|sub| sub.value())
+            .collect();
+        self.state.detect(&substrates)
+    }
+
     /// Detects the [`State`] of its substrates and triggers a
     /// [`CatalyticCentre`]'s reaction if appropriate. Subsequent ("cascading")
     /// receptors, which are supposed to be checked after the reaction was triggered,
@@ -66,11 +85,7 @@ impl Receptor {
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
     pub fn detect(&self) -> Vec<Rc<Receptor>> {
-        // TODO: insert check of substrate number
-        let substrates: Vec<&BitBox> = self.substrates.iter()
-            .map(|sub| sub.value())
-            .collect();
-        if self.state.detect(&substrates) {
+        if self.should_trigger() {
             self.enzym.catalyse();
             self.enzym.cascading_receptors()
         } else {
@@ -86,6 +101,7 @@ impl Receptor {
 /// [`Reaction`]: ../chemistry/struct.Substrate.html
 #[derive(Clone)]
 pub struct CatalyticCentre {
+    // TODO: implement `new` and remove public modifier
     pub educts: Vec<Rc<RefCell<Substrate>>>,
     pub products: Vec<Rc<RefCell<Substrate>>>,
     pub reaction: Reaction,
@@ -95,19 +111,23 @@ impl CatalyticCentre {
     /// Catalyses the [`Reaction`] specific for this catalytic centre.
     ///
     /// [`Reaction`]: ../chemistry/struct.Substrate.html
-    pub fn catalyse(&self) {
+    fn calculate_product_values(&self) -> Vec<BitBox> {
         // TODO: insert check of product and educt number
-        let mut product_values;
-        {
-            // TODO: refactor this ugly code
-            let educts: Vec<Ref<Substrate>> = self.educts.iter()
-                .map(|sub| sub.borrow())
-                .collect();
-            let educts: Vec<&BitBox> = educts.iter()
-                .map(|sub| sub.value())
-                .collect();
-            product_values = self.reaction.react(&educts);
-        }
+        // TODO: refactor this ugly code
+        let educts: Vec<Ref<Substrate>> = self.educts.iter()
+            .map(|sub| sub.borrow())
+            .collect();
+        let educts: Vec<&BitBox> = educts.iter()
+            .map(|sub| sub.value())
+            .collect();
+        self.reaction.react(&educts)
+    }
+
+    /// Catalyses the [`Reaction`] specific for this catalytic centre.
+    ///
+    /// [`Reaction`]: ../chemistry/struct.Substrate.html
+    pub fn catalyse(&self) {
+        let mut product_values = self.calculate_product_values();
         for product in &self.products {
             // TODO: maybe switch to VecDeque and use pop_first()
             product.borrow_mut().set_value(product_values.remove(0));
