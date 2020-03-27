@@ -50,7 +50,7 @@ impl Substrate {
 /// for [`Reaction`]s.
 ///
 /// [`Substrate`]: ./struct.Substrate.html
-/// [`Reaction`]: ../chemistry/struct.Reaction.html
+/// [`Reaction`]: ./struct.Reaction.html
 #[derive(Clone)]
 pub struct Receptor {
     // TODO: implement `new` and remove public modifier
@@ -98,7 +98,7 @@ impl Receptor {
 /// by performing a [`Reaction`].
 ///
 /// [`Substrate`]: ./struct.Substrate.html
-/// [`Reaction`]: ../chemistry/struct.Substrate.html
+/// [`Reaction`]: ./struct.Reaction.html
 #[derive(Clone)]
 pub struct CatalyticCentre {
     // TODO: implement `new` and remove public modifier
@@ -108,9 +108,10 @@ pub struct CatalyticCentre {
 }
 
 impl CatalyticCentre {
-    /// Catalyses the [`Reaction`] specific for this catalytic centre.
+    /// Calculates the values of the products after performing the
+    /// [`Reaction`] specific for this catalytic centre.
     ///
-    /// [`Reaction`]: ../chemistry/struct.Substrate.html
+    /// [`Reaction`]: ./struct.Reaction.html
     fn calculate_product_values(&self) -> Vec<BitBox> {
         // TODO: insert check of product and educt number
         // TODO: refactor this ugly code
@@ -125,7 +126,7 @@ impl CatalyticCentre {
 
     /// Catalyses the [`Reaction`] specific for this catalytic centre.
     ///
-    /// [`Reaction`]: ../chemistry/struct.Substrate.html
+    /// [`Reaction`]: ./struct.Reaction.html
     pub fn catalyse(&self) {
         let mut product_values = self.calculate_product_values();
         for product in &self.products {
