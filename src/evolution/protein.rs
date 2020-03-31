@@ -13,15 +13,15 @@ use super::chemistry::{Reaction, State};
 /// [`Receptor`]: ./struct.Receptor.html
 #[derive(Clone)]
 pub struct Substrate {
-    // TODO: implement `new` and remove public modifier
-    pub value: BitBox,
-    pub receptors: Vec<Rc<Receptor>>,
+    value: BitBox,
+    receptors: Vec<Rc<Receptor>>,
 }
 
 impl Substrate {
-    /*pub fn new(value: BitBox) -> Self {
-
-    }*/
+    /// Creates a new `Substrate` with the specified binary value.
+    pub fn new(value: BitBox) -> Self {
+            Substrate{value, receptors: vec!()}
+    }
 
     /// Set the value of this substrate.
     /// This method will not notify the corresponding [`Receptor`]s.
@@ -44,24 +44,39 @@ impl Substrate {
     pub fn receptors(&self) -> Vec<Rc<Receptor>> {
         self.receptors.iter().map(Rc::clone).collect()
     }
+
+    /// Adds a [`Receptor`] to the substrate that should be notified upon change.
+    ///
+    /// [`Receptor`]: ./struct.Receptor.html
+    pub fn add_receptor(&mut self, receptor: Rc<Receptor>) {
+        self.receptors.push(receptor);
+    }
 }
 
 /// A `Receptor` is a sensor for [`Substrate`] changes and a trigger
 /// for [`Reaction`]s.
 ///
 /// [`Substrate`]: ./struct.Substrate.html
-/// [`Reaction`]: ./struct.Reaction.html
+/// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Clone)]
 pub struct Receptor {
-    // TODO: implement `new` and remove public modifier
-    pub substrates: Vec<Rc<RefCell<Substrate>>>,
-    pub state: State,
-    pub enzym: CatalyticCentre,
+    substrates: Vec<Rc<RefCell<Substrate>>>,
+    state: State,
+    enzyme: CatalyticCentre,
 }
 
 impl Receptor {
+    /// Creates a `Receptor` detecting the specified [`State`] of its substrates and triggering
+    /// the [`CatalyticCentre`]'s reaction if appropriate.
+    ///
+    /// [`State`]: ../chemistry/struct.State.html
+    /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
+    pub fn new(state: State, enzyme: CatalyticCentre) -> Self {
+        Receptor{substrates: vec!(), state, enzyme}
+    }
+
     /// Detects the [`State`] of its substrates and determines if triggering the
-    /// [`CatalyticCentre`]'s reaction if appropriate.
+    /// [`CatalyticCentre`]'s reaction is appropriate.
     ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
@@ -86,11 +101,18 @@ impl Receptor {
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
     pub fn detect(&self) -> Vec<Rc<Receptor>> {
         if self.should_trigger() {
-            self.enzym.catalyse();
-            self.enzym.cascading_receptors()
+            self.enzyme.catalyse();
+            self.enzyme.cascading_receptors()
         } else {
             vec!()
         }
+    }
+
+    /// Adds a [`Substrate`] to the substrate that should be notified upon change.
+    ///
+    /// [`Substrate`]: ./struct.Substrate.html
+    pub fn add_substrate(&mut self, substrate: Rc<RefCell<Substrate>>) {
+        self.substrates.push(substrate);
     }
 }
 
@@ -98,7 +120,7 @@ impl Receptor {
 /// by performing a [`Reaction`].
 ///
 /// [`Substrate`]: ./struct.Substrate.html
-/// [`Reaction`]: ./struct.Reaction.html
+/// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Clone)]
 pub struct CatalyticCentre {
     // TODO: implement `new` and remove public modifier
@@ -108,10 +130,15 @@ pub struct CatalyticCentre {
 }
 
 impl CatalyticCentre {
+    ///
+    pub fn new(reaction: Reaction) -> Self {
+        CatalyticCentre{educts: vec!(), products: vec!(), reaction}
+    }
+
     /// Calculates the values of the products after performing the
     /// [`Reaction`] specific for this catalytic centre.
     ///
-    /// [`Reaction`]: ./struct.Reaction.html
+    /// [`Reaction`]: ../chemistry/struct.Reaction.html
     fn calculate_product_values(&self) -> Vec<BitBox> {
         // TODO: insert check of product and educt number
         // TODO: refactor this ugly code
@@ -126,7 +153,7 @@ impl CatalyticCentre {
 
     /// Catalyses the [`Reaction`] specific for this catalytic centre.
     ///
-    /// [`Reaction`]: ./struct.Reaction.html
+    /// [`Reaction`]: ../chemistry/struct.Reaction.html
     pub fn catalyse(&self) {
         let mut product_values = self.calculate_product_values();
         for product in &self.products {
