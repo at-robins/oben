@@ -69,10 +69,24 @@ impl Receptor {
     /// Creates a `Receptor` detecting the specified [`State`] of its substrates and triggering
     /// the [`CatalyticCentre`]'s reaction if appropriate.
     ///
+    /// # Parameters
+    ///
+    /// * `substrates` - the [`Substrate`]s the [`State`] should check
+    /// * `state` - the [`State`] to check for
+    /// * `enzyme` - the [`CatalyticCentre`] to trigger if the [`State`] is appropriate
+    ///
+    /// # Panics
+    ///
+    /// If the number of [`Substrate`]s is not exactly equal to the one
+    /// required by the [`State`].
+    ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    pub fn new(state: State, enzyme: CatalyticCentre) -> Self {
-        Receptor{substrates: vec!(), state, enzyme}
+    pub fn new(substrates: Vec<Rc<RefCell<Substrate>>>, state: State, enzyme: CatalyticCentre) -> Self {
+        assert_eq!(substrates.len(), state.get_substrate_number(),
+            "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
+            state, state.get_substrate_number(), substrates.len());
+        Receptor{substrates, state, enzyme}
     }
 
     /// Detects the [`State`] of its substrates and determines if triggering the
@@ -81,7 +95,6 @@ impl Receptor {
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
     fn should_trigger(&self) -> bool {
-        // TODO: insert check of substrate number
         // TODO: refactor this ugly code
         let substrates: Vec<Ref<Substrate>> = self.substrates.iter()
             .map(|sub| sub.borrow())
@@ -107,13 +120,6 @@ impl Receptor {
             vec!()
         }
     }
-
-    /// Adds a [`Substrate`] to the substrate that should be notified upon change.
-    ///
-    /// [`Substrate`]: ./struct.Substrate.html
-    pub fn add_substrate(&mut self, substrate: Rc<RefCell<Substrate>>) {
-        self.substrates.push(substrate);
-    }
 }
 
 /// A `CatalyticCentre` produces products from educt [`Substrate`]s
@@ -123,16 +129,36 @@ impl Receptor {
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Clone)]
 pub struct CatalyticCentre {
-    // TODO: implement `new` and remove public modifier
-    pub educts: Vec<Rc<RefCell<Substrate>>>,
-    pub products: Vec<Rc<RefCell<Substrate>>>,
-    pub reaction: Reaction,
+    educts: Vec<Rc<RefCell<Substrate>>>,
+    products: Vec<Rc<RefCell<Substrate>>>,
+    reaction: Reaction,
 }
 
 impl CatalyticCentre {
+    /// Creates a new `CatalyticCentre` producing products from educt [`Substrate`]s
+    /// by performing a [`Reaction`].
     ///
-    pub fn new(reaction: Reaction) -> Self {
-        CatalyticCentre{educts: vec!(), products: vec!(), reaction}
+    /// # Parameters
+    ///
+    /// * `educts` - the educt [`Substrate`]s for the [`Reaction`]
+    /// * `products` - the product [`Substrate`]s for the [`Reaction`]
+    /// * `reaction` - the [`Reaction`] to catalyse
+    ///
+    /// # Panics
+    ///
+    /// If the number of educt or product [`Substrate`]s is not exactly equal to the one
+    /// required by the [`Reaction`].
+    ///
+    /// [`Substrate`]: ./struct.Substrate.html
+    /// [`Reaction`]: ../chemistry/struct.Reaction.html
+    pub fn new(educts: Vec<Rc<RefCell<Substrate>>>, products: Vec<Rc<RefCell<Substrate>>>, reaction: Reaction) -> Self {
+        assert_eq!(educts.len(), reaction.get_educt_number(),
+            "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
+            reaction, reaction.get_educt_number(), educts.len());
+        assert_eq!(products.len(), reaction.get_product_number(),
+            "The number of required products for reaction {:?} is {}, but {} products were supplied.",
+            reaction, reaction.get_educt_number(), educts.len());
+        CatalyticCentre{educts, products, reaction}
     }
 
     /// Calculates the values of the products after performing the
@@ -140,7 +166,6 @@ impl CatalyticCentre {
     ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
     fn calculate_product_values(&self) -> Vec<BitBox> {
-        // TODO: insert check of product and educt number
         // TODO: refactor this ugly code
         let educts: Vec<Ref<Substrate>> = self.educts.iter()
             .map(|sub| sub.borrow())
