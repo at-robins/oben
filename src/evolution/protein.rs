@@ -157,7 +157,7 @@ impl CatalyticCentre {
             reaction, reaction.get_educt_number(), educts.len());
         assert_eq!(products.len(), reaction.get_product_number(),
             "The number of required products for reaction {:?} is {}, but {} products were supplied.",
-            reaction, reaction.get_educt_number(), educts.len());
+            reaction, reaction.get_product_number(), products.len());
         CatalyticCentre{educts, products, reaction}
     }
 
