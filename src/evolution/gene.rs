@@ -5,8 +5,11 @@ extern crate rand;
 
 use super::chemistry::{Reaction, State};
 use bitvec::{boxed::BitBox};
+use rand::{thread_rng, Rng};
+use std::num::NonZeroUsize;
 
 /// A `Genome` is a collection of individual [`Gene`]s and associations between them.
+/// A `Genome` is required to consist of 1 or more genes.
 ///
 /// [`Gene`]: ./struct.Gene.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -23,6 +26,20 @@ impl Genome {
     /// [`Gene`]: ./struct.Gene.html
     pub fn number_of_genes(&self) -> usize {
         self.genes.len()
+    }
+
+    /// Get the number of input [`Substrate`]s in this `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_inputs(&self) -> usize {
+        self.input.len()
+    }
+
+    /// Get the number of output [`Substrate`]s in this `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_outputs(&self) -> usize {
+        self.output.len()
     }
 }
 
@@ -58,11 +75,23 @@ struct GeneAssociation {
 /// A `Gene` is an immutable structure encoding a self-contained network, but without
 /// explicite function. It defines interfaces with other genes by the means of input/output
 /// substrates. It can be transcribed into a functional protein network.
+/// A `Gene` is required to encode at least 1 [`Substrate`]s.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Gene {
     substrates: Vec<BitBox>,
-    io: Vec<usize>, // indices of the input/output interface substrates
     receptors: Vec<GenomicReceptor>,
+}
+
+impl Gene {
+    /// Gets the number of [`Substrate`]s encoded by this `Gene`.
+    /// A `Gene` must encode for 1 or more [`Substrate`]s.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_substrates(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.substrates.len()).expect("No substrate is encoded by this gene. This is forbidden by the contract.")
+    }
 }
 
 /// A `GenomicReceptor` represents the information of an actual [`Receptor`] that
@@ -178,13 +207,27 @@ enum GenomeMutation {
 }
 
 impl GenomeMutation {
-    fn mutate(&self, genome: &Genome) -> Genome {
-        let mutated_genome = genome.clone();
+    fn mutate(&self, genome: &Genome) -> Option<Genome> {
+        let mut mutated_genome = genome.clone();
         match self {
-            GenomeMutation::InputAssociation => {
-
+            GenomeMutation::InputAssociation if mutated_genome.number_of_inputs() > 0 => {
+                let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
+                mutated_genome.input[random_input] = GeneSubstrate{
+                    gene: random_gene,
+                    substrate: random_gene_substrate
+                };
             },
-            GenomeMutation::OutputAssociation => {},
+            GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
+                let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
+                mutated_genome.input[random_output] = GeneSubstrate{
+                    gene: random_gene,
+                    substrate: random_gene_substrate
+                };
+            },
             GenomeMutation::SubstrateInsertion => {},
             GenomeMutation::SubstrateDeletion => {},
             GenomeMutation::SubstrateMutation => {},
@@ -193,7 +236,8 @@ impl GenomeMutation {
             GenomeMutation::AssociationInsertion => {},
             GenomeMutation::AssociationDeletion => {},
             GenomeMutation::AssociationMuation => {},
+            _ => return None,
         };
-        mutated_genome
+        Some(mutated_genome)
     }
 }
