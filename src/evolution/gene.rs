@@ -201,6 +201,8 @@ enum GenomeMutation {
     SubstrateMutation,
     GeneInsertion,
     GeneDeletion,
+    GeneDuplication,
+    LateralGeneTransfer,
     AssociationInsertion,
     AssociationDeletion,
     AssociationMuation,
@@ -232,10 +234,20 @@ impl GenomeMutation {
             GenomeMutation::SubstrateDeletion => {},
             GenomeMutation::SubstrateMutation => {},
             GenomeMutation::GeneInsertion => {},
-            GenomeMutation::GeneDeletion => {},
+            GenomeMutation::GeneDeletion if mutated_genome.number_of_genes() > 1 => {
+                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                mutated_genome.genes.remove(random_gene);
+                // TODO: reassociate input and output
+                // TODO: delete all other substrate associations
+            },
+            GenomeMutation::GeneDuplication => {
+                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                mutated_genome.genes.push(mutated_genome.genes[random_gene].clone());
+            },
             GenomeMutation::AssociationInsertion => {},
             GenomeMutation::AssociationDeletion => {},
             GenomeMutation::AssociationMuation => {},
+            GenomeMutation::LateralGeneTransfer => return None, //TODO: implement a global gene pool
             _ => return None,
         };
         Some(mutated_genome)
