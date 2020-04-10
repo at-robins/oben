@@ -22,10 +22,11 @@ pub struct Genome {
 
 impl Genome {
     /// Get the number of [`Gene`]s in this `Genome`.
+    /// A `Genome` must encode 1 or more [`Gene`]s.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn number_of_genes(&self) -> usize {
-        self.genes.len()
+    pub fn number_of_genes(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.genes.len()).expect("No gene is encoded by this genome. This is forbidden by the contract.")
     }
 
     /// Get the number of input [`Substrate`]s in this `Genome`.
@@ -40,6 +41,88 @@ impl Genome {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_outputs(&self) -> usize {
         self.output.len()
+    }
+
+    /// Adds a [`Gene`] to the `Genome` if possible and returns the index of the
+    /// new gene.
+    /// This function will fail if the underlying vector would overflow due to the addition.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the [`Gene`] to add to the `Genome`
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn add_gene(&mut self, gene: Gene) -> Option<usize>{
+        if let Some(new_index) = self.genes.len().checked_add(1) {
+            self.genes.push(gene);
+            Some(new_index)
+        } else {
+            None
+        }
+    }
+    /// Removes the [`Gene`] at the specified index and returns it.
+    /// The number of [`Gene`]s in the `Genome` cannot be reduced to zero.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to remove
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds or the `Genome` contains only a single [`Gene`].
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn remove_gene(&mut self, gene: usize) -> Gene {
+        if self.number_of_genes().get() <= 1 {
+            panic!("A genome needs to contain at least one gene, so no gene can be removed.");
+        }
+        self.genes.remove(gene)
+    }
+
+    /// Duplicates the [`Gene`] at the specified index and returns it
+    /// for further processing.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to duplicate
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn duplicate_gene(&self, gene: usize) -> Gene {
+        self.genes[gene].duplicate()
+    }
+
+    /// Duplicates the [`Gene`] at the specified index and adds it directly to the genome
+    /// if possible.
+    /// This function will fail if the underlying vector would overflow due to the duplication.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to duplicate
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn duplicate_gene_internal(&mut self, gene: usize) -> Option<usize> {
+        self.add_gene(self.genes[gene].duplicate())
+    }
+
+    /// Returns the index of a random [`Gene`].
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn get_random_gene(&self) -> usize {
+        thread_rng().gen_range(0, self.number_of_genes().get())
+    }
+
+    /// Duplicates the `Genome` and all its contents.
+    pub fn duplicate(&self) -> Self {
+        // At the moment this is just a wrapper for cloning.
+        self.clone()
     }
 }
 
@@ -91,6 +174,21 @@ impl Gene {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_substrates(&self) -> NonZeroUsize {
         NonZeroUsize::new(self.substrates.len()).expect("No substrate is encoded by this gene. This is forbidden by the contract.")
+    }
+
+    pub fn fuse(&self, other_gene: &Gene) -> Option<Gene> {
+        if let None = self.substrates.len().checked_add(other_gene.substrates.len()) {
+            return None;
+        };
+        let mut fusion_gene = self.duplicate();
+        fusion_gene.substrates.append(&mut other_gene.substrates.clone());
+        Some(fusion_gene)
+    }
+
+    /// Duplicates the `Gene` and all its contents.
+    pub fn duplicate(&self) -> Self {
+        // At the moment this is just a wrapper for cloning.
+        self.clone()
     }
 }
 
@@ -199,7 +297,7 @@ enum GenomeMutation {
     SubstrateInsertion,
     SubstrateDeletion,
     SubstrateMutation,
-    GeneInsertion,
+    GeneFusion,
     GeneDeletion,
     GeneDuplication,
     LateralGeneTransfer,
@@ -210,11 +308,11 @@ enum GenomeMutation {
 
 impl GenomeMutation {
     fn mutate(&self, genome: &Genome) -> Option<Genome> {
-        let mut mutated_genome = genome.clone();
+        let mut mutated_genome = genome.duplicate();
         match self {
             GenomeMutation::InputAssociation if mutated_genome.number_of_inputs() > 0 => {
                 let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
-                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                let random_gene = mutated_genome.get_random_gene();
                 let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
                 mutated_genome.input[random_input] = GeneSubstrate{
                     gene: random_gene,
@@ -223,9 +321,9 @@ impl GenomeMutation {
             },
             GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
                 let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
-                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
+                let random_gene = mutated_genome.get_random_gene();
                 let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-                mutated_genome.input[random_output] = GeneSubstrate{
+                mutated_genome.output[random_output] = GeneSubstrate{
                     gene: random_gene,
                     substrate: random_gene_substrate
                 };
@@ -233,16 +331,26 @@ impl GenomeMutation {
             GenomeMutation::SubstrateInsertion => {},
             GenomeMutation::SubstrateDeletion => {},
             GenomeMutation::SubstrateMutation => {},
-            GenomeMutation::GeneInsertion => {},
-            GenomeMutation::GeneDeletion if mutated_genome.number_of_genes() > 1 => {
-                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
-                mutated_genome.genes.remove(random_gene);
+            // Only allow this mutation if there is more than one gene in the genome.
+            GenomeMutation::GeneFusion if mutated_genome.number_of_genes().get() > 1 => {
+                // Select two different genes from the genome.
+                let mut genes: Vec<usize> = (0..mutated_genome.number_of_genes().get()).collect();
+                let gene_a = genes.remove(thread_rng().gen_range(0, genes.len()));
+                let gene_b = genes.remove(thread_rng().gen_range(0, genes.len()));
+                let fusion_gene = mutated_genome.duplicate_gene(gene_a);
+
+                // TODO: finish
+            },
+            GenomeMutation::GeneDeletion => {
+                let random_gene = mutated_genome.get_random_gene();
+                // Delete the gene from the genome.
+                mutated_genome.remove_gene(random_gene);
                 // TODO: reassociate input and output
                 // TODO: delete all other substrate associations
+                // mutated_genome.associations = mutated_genome.associations.iter().filter(|association| association.gene == random_gene).collect();
             },
             GenomeMutation::GeneDuplication => {
-                let random_gene = thread_rng().gen_range(0, mutated_genome.number_of_genes());
-                mutated_genome.genes.push(mutated_genome.genes[random_gene].clone());
+                mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
             },
             GenomeMutation::AssociationInsertion => {},
             GenomeMutation::AssociationDeletion => {},
