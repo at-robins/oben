@@ -112,6 +112,21 @@ impl Genome {
         self.add_gene(self.genes[gene].duplicate())
     }
 
+    /// Returns the [`Gene`] at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to duplicate
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn get_gene(&self, gene: usize) -> &Gene {
+        &self.genes[gene]
+    }
+
     /// Returns the index of a random [`Gene`].
     ///
     /// [`Gene`]: ./struct.Gene.html
@@ -176,12 +191,32 @@ impl Gene {
         NonZeroUsize::new(self.substrates.len()).expect("No substrate is encoded by this gene. This is forbidden by the contract.")
     }
 
+    /// Fuse this `Gene` with the specified `Gene` if possible and return the fusion.
+    /// This function will fail if the fusion would overflow the internal [`Substrate`] or
+    /// [`Receptor`] vector.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`Receptor`]: ../protein/struct.Receptor.html
     pub fn fuse(&self, other_gene: &Gene) -> Option<Gene> {
+        // Prevent overflow of substrates.
         if let None = self.substrates.len().checked_add(other_gene.substrates.len()) {
+            return None;
+        };
+        // Prevent overflow of receptors.
+        if let None = self.receptors.len().checked_add(other_gene.receptors.len()) {
             return None;
         };
         let mut fusion_gene = self.duplicate();
         fusion_gene.substrates.append(&mut other_gene.substrates.clone());
+        let mut receptors = other_gene.receptors.clone();
+        for mut receptor in &mut receptors {
+            // Update all substrate indices.
+            receptor.substrates = receptor.substrates.iter().map(|i| i + self.number_of_substrates().get()).collect();
+            receptor.triggers = receptor.triggers.iter().map(|i| i + self.number_of_substrates().get()).collect();
+            receptor.enzyme.educts = receptor.enzyme.educts.iter().map(|i| i + self.number_of_substrates().get()).collect();
+            receptor.enzyme.products = receptor.enzyme.products.iter().map(|i| i + self.number_of_substrates().get()).collect();
+        }
+        fusion_gene.receptors.append(&mut receptors);
         Some(fusion_gene)
     }
 
@@ -318,6 +353,7 @@ impl GenomeMutation {
                     gene: random_gene,
                     substrate: random_gene_substrate
                 };
+                Some(mutated_genome)
             },
             GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
                 let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
@@ -327,19 +363,23 @@ impl GenomeMutation {
                     gene: random_gene,
                     substrate: random_gene_substrate
                 };
+                Some(mutated_genome)
             },
-            GenomeMutation::SubstrateInsertion => {},
-            GenomeMutation::SubstrateDeletion => {},
-            GenomeMutation::SubstrateMutation => {},
+            GenomeMutation::SubstrateInsertion => None,
+            GenomeMutation::SubstrateDeletion => None,
+            GenomeMutation::SubstrateMutation => None,
             // Only allow this mutation if there is more than one gene in the genome.
             GenomeMutation::GeneFusion if mutated_genome.number_of_genes().get() > 1 => {
                 // Select two different genes from the genome.
                 let mut genes: Vec<usize> = (0..mutated_genome.number_of_genes().get()).collect();
                 let gene_a = genes.remove(thread_rng().gen_range(0, genes.len()));
                 let gene_b = genes.remove(thread_rng().gen_range(0, genes.len()));
-                let fusion_gene = mutated_genome.duplicate_gene(gene_a);
-
-                // TODO: finish
+                if let Some(fusion_gene) = mutated_genome.duplicate_gene(gene_a).fuse(mutated_genome.get_gene(gene_b)) {
+                    if let Some(_) = mutated_genome.add_gene(fusion_gene) {
+                        return Some(mutated_genome)
+                    }
+                }
+                None
             },
             GenomeMutation::GeneDeletion => {
                 let random_gene = mutated_genome.get_random_gene();
@@ -348,16 +388,17 @@ impl GenomeMutation {
                 // TODO: reassociate input and output
                 // TODO: delete all other substrate associations
                 // mutated_genome.associations = mutated_genome.associations.iter().filter(|association| association.gene == random_gene).collect();
+                None
             },
             GenomeMutation::GeneDuplication => {
                 mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
+                Some(mutated_genome)
             },
-            GenomeMutation::AssociationInsertion => {},
-            GenomeMutation::AssociationDeletion => {},
-            GenomeMutation::AssociationMuation => {},
-            GenomeMutation::LateralGeneTransfer => return None, //TODO: implement a global gene pool
-            _ => return None,
-        };
-        Some(mutated_genome)
+            GenomeMutation::AssociationInsertion => None,
+            GenomeMutation::AssociationDeletion => None,
+            GenomeMutation::AssociationMuation => None,
+            GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
+            _ => None,
+        }
     }
 }
