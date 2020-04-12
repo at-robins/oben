@@ -14,8 +14,8 @@ use std::num::NonZeroUsize;
 /// [`Gene`]: ./struct.Gene.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Genome {
-    input: Vec<GeneSubstrate>,
-    output: Vec<GeneSubstrate>,
+    input: Vec<Option<GeneSubstrate>>,
+    output: Vec<Option<GeneSubstrate>>,
     genes: Vec<Gene>,
     associations: Vec<GeneAssociation>,
 }
@@ -41,6 +41,46 @@ impl Genome {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_outputs(&self) -> usize {
         self.output.len()
+    }
+
+    /// Sets the input association at the specified index to the specified value
+    /// and returns the previous value.
+    ///
+    /// # Parameters
+    ///
+    /// * `input_index` - the index of the input association to changes
+    /// * `input_value` - the new value for the specified input association
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    fn set_input(&mut self, input_index: usize, input_value: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+        if input_index >= self.input.len() {
+            panic!("The input vector of this genome is of length {}, but insertion of element {:#?} at index {} was attempted.", self.number_of_inputs(), input_value, input_index);
+        }
+        let old_value = self.input[input_index];
+        self.input[input_index] = input_value;
+        old_value
+    }
+
+    /// Sets the output association at the specified index to the specified value
+    /// and returns the previous value.
+    ///
+    /// # Parameters
+    ///
+    /// * `output_index` - the index of the output association to changes
+    /// * `output_value` - the new value for the specified output association
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    fn set_output(&mut self, output_index: usize, output_value: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+        if output_index >= self.output.len() {
+            panic!("The output vector of this genome is of length {}, but insertion of element {:#?} at index {} was attempted.", self.number_of_outputs(), output_value, output_index);
+        }
+        let old_value = self.output[output_index];
+        self.output[output_index] = output_value;
+        old_value
     }
 
     /// Adds a [`Gene`] to the `Genome` if possible and returns the index of the
@@ -76,6 +116,8 @@ impl Genome {
         if self.number_of_genes().get() <= 1 {
             panic!("A genome needs to contain at least one gene, so no gene can be removed.");
         }
+        // TODO: reassociate input and output
+        // TODO: delete all other substrate associations
         self.genes.remove(gene)
     }
 
@@ -349,20 +391,20 @@ impl GenomeMutation {
                 let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
                 let random_gene = mutated_genome.get_random_gene();
                 let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-                mutated_genome.input[random_input] = GeneSubstrate{
+                mutated_genome.input[random_input] = Some(GeneSubstrate{
                     gene: random_gene,
                     substrate: random_gene_substrate
-                };
+                });
                 Some(mutated_genome)
             },
             GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
                 let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
                 let random_gene = mutated_genome.get_random_gene();
                 let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-                mutated_genome.output[random_output] = GeneSubstrate{
+                mutated_genome.output[random_output] = Some(GeneSubstrate{
                     gene: random_gene,
                     substrate: random_gene_substrate
-                };
+                });
                 Some(mutated_genome)
             },
             GenomeMutation::SubstrateInsertion => None,
@@ -381,7 +423,7 @@ impl GenomeMutation {
                 }
                 None
             },
-            GenomeMutation::GeneDeletion => {
+            GenomeMutation::GeneDeletion  if mutated_genome.number_of_genes().get() > 1 => {
                 let random_gene = mutated_genome.get_random_gene();
                 // Delete the gene from the genome.
                 mutated_genome.remove_gene(random_gene);
