@@ -407,7 +407,9 @@ pub struct MutagenicEnvironment {
 enum GenomeMutation {
     ///
     InputAssociation,
+    InputDissociation,
     OutputAssociation,
+    OutputDissociation,
     SubstrateInsertion,
     SubstrateDeletion,
     SubstrateMutation,
@@ -434,6 +436,18 @@ impl GenomeMutation {
                 });
                 Some(mutated_genome)
             },
+            GenomeMutation::InputDissociation if mutated_genome.number_of_inputs() > 0 => {
+                let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+                if let None = mutated_genome.input[random_input] {
+                    // If there is no association, return no change.
+                    None
+                } else {
+                    // If there is an association, remove it.
+                    mutated_genome.input[random_input] = None;
+                    Some(mutated_genome)
+                }
+
+            },
             GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
                 let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
                 let random_gene = mutated_genome.get_random_gene();
@@ -443,6 +457,18 @@ impl GenomeMutation {
                     substrate: random_gene_substrate
                 });
                 Some(mutated_genome)
+            },
+            GenomeMutation::OutputDissociation if mutated_genome.number_of_outputs() > 0 => {
+                let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+                if let None = mutated_genome.input[random_output] {
+                    // If there is no association, return no change.
+                    None
+                } else {
+                    // If there is an association, remove it.
+                    mutated_genome.input[random_output] = None;
+                    Some(mutated_genome)
+                }
+
             },
             GenomeMutation::SubstrateInsertion => None,
             GenomeMutation::SubstrateDeletion => None,
