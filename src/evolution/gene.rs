@@ -101,6 +101,8 @@ impl Genome {
         }
     }
     /// Removes the [`Gene`] at the specified index and returns it.
+    /// All input-, output- and substrate-associations with the specified gene
+    /// are cleared.
     /// The number of [`Gene`]s in the `Genome` cannot be reduced to zero.
     ///
     /// # Parameters
@@ -116,8 +118,22 @@ impl Genome {
         if self.number_of_genes().get() <= 1 {
             panic!("A genome needs to contain at least one gene, so no gene can be removed.");
         }
-        // TODO: reassociate input and output
-        // TODO: delete all other substrate associations
+        // Remove all inputs pointing to the removed gene.
+        for input_value in &mut self.input {
+            if input_value.and_then(|input| Some(input.gene == gene)).unwrap_or(false) {
+                *input_value = None;
+            }
+        }
+        // Remove all outputs pointing to the removed gene.
+        for output_value in &mut self.output {
+            if output_value.and_then(|output| Some(output.gene == gene)).unwrap_or(false) {
+                *output_value = None;
+            }
+        }
+        // Remove all substrate associations pointing to the removed gene.
+        for association in &mut self.associations {
+            association.remove_associated_gene(gene);
+        }
         self.genes.remove(gene)
     }
 
@@ -210,6 +226,27 @@ struct GeneAssociation {
     substrate: BitBox,
     // gene specific substrates pointing to the shared substrate
     associations: Vec<GeneSubstrate>,
+}
+
+impl GeneAssociation {
+    /// Remove all associations with the specified [`Gene`].
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to remove associations to
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn remove_associated_gene(&mut self, gene: usize) {
+        // TODO: Replace with drain_filter once stabilised.
+        let mut i = 0;
+        while i != self.associations.len() {
+            if self.associations[i].gene == gene {
+                self.associations.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
 }
 
 /// A `Gene` is an immutable structure encoding a self-contained network, but without
@@ -425,12 +462,8 @@ impl GenomeMutation {
             },
             GenomeMutation::GeneDeletion  if mutated_genome.number_of_genes().get() > 1 => {
                 let random_gene = mutated_genome.get_random_gene();
-                // Delete the gene from the genome.
                 mutated_genome.remove_gene(random_gene);
-                // TODO: reassociate input and output
-                // TODO: delete all other substrate associations
-                // mutated_genome.associations = mutated_genome.associations.iter().filter(|association| association.gene == random_gene).collect();
-                None
+                Some(mutated_genome)
             },
             GenomeMutation::GeneDuplication => {
                 mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
