@@ -250,9 +250,8 @@ impl GeneAssociation {
 }
 
 /// A `Gene` is an immutable structure encoding a self-contained network, but without
-/// explicite function. It defines interfaces with other genes by the means of input/output
-/// substrates. It can be transcribed into a functional protein network.
-/// A `Gene` is required to encode at least 1 [`Substrate`]s.
+/// explicite function. It can be transcribed into a functional protein network.
+/// A `Gene` is required to encode at least 1 [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -416,63 +415,25 @@ enum GenomeMutation {
     GeneFusion,
     GeneDeletion,
     GeneDuplication,
-    LateralGeneTransfer,
     AssociationInsertion,
     AssociationDeletion,
     AssociationMuation,
+    // TODO: Lateral gene transfer
+    // TODO: Genomic receptor
+    // TODO: Genomic catalytic centre
 }
 
 impl GenomeMutation {
     fn mutate(&self, genome: &Genome) -> Option<Genome> {
         let mut mutated_genome = genome.duplicate();
         match self {
-            GenomeMutation::InputAssociation if mutated_genome.number_of_inputs() > 0 => {
-                let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
-                let random_gene = mutated_genome.get_random_gene();
-                let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-                mutated_genome.input[random_input] = Some(GeneSubstrate{
-                    gene: random_gene,
-                    substrate: random_gene_substrate
-                });
-                Some(mutated_genome)
-            },
-            GenomeMutation::InputDissociation if mutated_genome.number_of_inputs() > 0 => {
-                let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
-                if let None = mutated_genome.input[random_input] {
-                    // If there is no association, return no change.
-                    None
-                } else {
-                    // If there is an association, remove it.
-                    mutated_genome.input[random_input] = None;
-                    Some(mutated_genome)
-                }
-
-            },
-            GenomeMutation::OutputAssociation if mutated_genome.number_of_outputs() > 0 => {
-                let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
-                let random_gene = mutated_genome.get_random_gene();
-                let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-                mutated_genome.output[random_output] = Some(GeneSubstrate{
-                    gene: random_gene,
-                    substrate: random_gene_substrate
-                });
-                Some(mutated_genome)
-            },
-            GenomeMutation::OutputDissociation if mutated_genome.number_of_outputs() > 0 => {
-                let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
-                if let None = mutated_genome.input[random_output] {
-                    // If there is no association, return no change.
-                    None
-                } else {
-                    // If there is an association, remove it.
-                    mutated_genome.input[random_output] = None;
-                    Some(mutated_genome)
-                }
-
-            },
-            GenomeMutation::SubstrateInsertion => None,
-            GenomeMutation::SubstrateDeletion => None,
-            GenomeMutation::SubstrateMutation => None,
+            GenomeMutation::InputAssociation => GenomeMutation::mutate_input_association(genome),
+            GenomeMutation::InputDissociation => GenomeMutation::mutate_input_dissociation(genome),
+            GenomeMutation::OutputAssociation => GenomeMutation::mutate_output_association(genome),
+            GenomeMutation::OutputDissociation => GenomeMutation::mutate_output_dissociation(genome),
+            // GenomeMutation::SubstrateInsertion => None,
+            // GenomeMutation::SubstrateDeletion => None,
+            // GenomeMutation::SubstrateMutation => None,
             // Only allow this mutation if there is more than one gene in the genome.
             GenomeMutation::GeneFusion if mutated_genome.number_of_genes().get() > 1 => {
                 // Select two different genes from the genome.
@@ -495,11 +456,115 @@ impl GenomeMutation {
                 mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
                 Some(mutated_genome)
             },
-            GenomeMutation::AssociationInsertion => None,
-            GenomeMutation::AssociationDeletion => None,
-            GenomeMutation::AssociationMuation => None,
-            GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
-            _ => None,
+            // GenomeMutation::AssociationInsertion => None,
+            // GenomeMutation::AssociationDeletion => None,
+            // GenomeMutation::AssociationMuation => None,
+            // GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
         }
     }
+
+    /// Duplicates the [`Genome`] and then duplicates a random [`Gene`] inside of the [`Genome`].
+    /// Returns the altered [`Genome`].
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Genome`]: ./struct.Genome.html
+    fn mutate_gene_duplication(genome: &Genome) -> Option<Genome> {
+        let mut mutated_genome = genome.duplicate();
+        mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
+        Some(mutated_genome)
+    }
+
+    /// Duplicates the [`Genome`] and then associates a random input [`GeneSubstrate`] of the [`Genome`]
+    /// with a random [`Substrate`] of a random [`Gene`].
+    /// Returns the altered [`Genome`] if there are any input [`GeneSubstrate`].
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Genome`]: ./struct.Genome.html
+    /// [`Substrate`]: ./struct.Substrate.html
+   fn mutate_input_association(genome: &Genome) -> Option<Genome> {
+       if genome.number_of_inputs() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+           let random_gene = mutated_genome.get_random_gene();
+           let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
+           mutated_genome.input[random_input] = Some(GeneSubstrate{
+               gene: random_gene,
+               substrate: random_gene_substrate
+           });
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and then dissociates a random input [`GeneSubstrate`] of the [`Genome`].
+   /// Returns the altered [`Genome`] if there are any input [`GeneSubstrate`] and the randomly selected
+   /// input [`GeneSubstrate`] was previously associated.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ./struct.Substrate.html
+   fn mutate_input_dissociation(genome: &Genome) -> Option<Genome> {
+       if genome.number_of_inputs() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+           if let None = mutated_genome.input[random_input] {
+               // If there is no association, return no change.
+               None
+           } else {
+               // If there is an association, remove it.
+               mutated_genome.input[random_input] = None;
+               Some(mutated_genome)
+           }
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and then associates a random output [`GeneSubstrate`] of the [`Genome`]
+   /// with a random [`Substrate`] of a random [`Gene`].
+   /// Returns the altered [`Genome`] if there are any output [`GeneSubstrate`].
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ./struct.Substrate.html
+   fn mutate_output_association(genome: &Genome) -> Option<Genome> {
+       if genome.number_of_outputs() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+           let random_gene = mutated_genome.get_random_gene();
+           let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
+           mutated_genome.output[random_output] = Some(GeneSubstrate{
+               gene: random_gene,
+               substrate: random_gene_substrate
+           });
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and then dissociates a random output [`GeneSubstrate`] of the [`Genome`].
+   /// Returns the altered [`Genome`] if there are any output [`GeneSubstrate`] and the randomly selected
+   /// output [`GeneSubstrate`] was previously associated.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ./struct.Substrate.html
+   fn mutate_output_dissociation(genome: &Genome) -> Option<Genome> {
+       if genome.number_of_outputs() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+           if let None = mutated_genome.input[random_output] {
+               // If there is no association, return no change.
+               None
+           } else {
+               // If there is an association, remove it.
+               mutated_genome.input[random_output] = None;
+               Some(mutated_genome)
+           }
+       } else {
+           None
+       }
+   }
 }
