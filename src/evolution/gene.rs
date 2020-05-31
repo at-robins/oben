@@ -192,6 +192,28 @@ impl Genome {
         thread_rng().gen_range(0, self.number_of_genes().get())
     }
 
+    /// Returns the index of a random input [`GeneSubstrate`] if there is any.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    pub fn get_random_input(&self) -> Option<usize> {
+        if self.number_of_inputs() > 0 {
+            Some(thread_rng().gen_range(0, self.number_of_inputs()))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the index of a random output [`GeneSubstrate`] if there is any.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    pub fn get_random_output(&self) -> Option<usize> {
+        if self.number_of_outputs() > 0 {
+            Some(thread_rng().gen_range(0, self.number_of_outputs()))
+        } else {
+            None
+        }
+    }
+
     /// Duplicates the `Genome` and all its contents.
     pub fn duplicate(&self) -> Self {
         // At the moment this is just a wrapper for cloning.
@@ -267,6 +289,14 @@ impl Gene {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_substrates(&self) -> NonZeroUsize {
         NonZeroUsize::new(self.substrates.len()).expect("No substrate is encoded by this gene. This is forbidden by the contract.")
+    }
+
+
+    /// Returns the index of a random [`Substrate`] encoded by this `Gene`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn get_random_substrate(&self) -> usize {
+        thread_rng().gen_range(0, self.number_of_substrates().get())
     }
 
     /// Fuse this `Gene` with the specified `Gene` if possible and return the fusion.
@@ -471,13 +501,14 @@ impl GenomeMutation {
    fn mutate_input_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_inputs() > 0 {
            let mut mutated_genome = genome.duplicate();
-           let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+           // It was checked before if there are any inputs, so the unwrap must work.
+           let random_input = mutated_genome.get_random_input().unwrap();
            let random_gene = mutated_genome.get_random_gene();
-           let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-           mutated_genome.input[random_input] = Some(GeneSubstrate{
+           let random_gene_substrate = mutated_genome.get_gene(random_gene).get_random_substrate();
+           mutated_genome.set_input(random_input, Some(GeneSubstrate{
                gene: random_gene,
                substrate: random_gene_substrate
-           });
+           }));
            Some(mutated_genome)
        } else {
            None
@@ -493,13 +524,14 @@ impl GenomeMutation {
    fn mutate_input_dissociation(genome: &Genome) -> Option<Genome> {
        if genome.number_of_inputs() > 0 {
            let mut mutated_genome = genome.duplicate();
-           let random_input = thread_rng().gen_range(0, mutated_genome.number_of_inputs());
+           // It was checked before if there are any inputs, so the unwrap must work.
+           let random_input = mutated_genome.get_random_input().unwrap();
            if let None = mutated_genome.input[random_input] {
                // If there is no association, return no change.
                None
            } else {
                // If there is an association, remove it.
-               mutated_genome.input[random_input] = None;
+               mutated_genome.set_input(random_input, None);
                Some(mutated_genome)
            }
        } else {
@@ -518,13 +550,14 @@ impl GenomeMutation {
    fn mutate_output_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_outputs() > 0 {
            let mut mutated_genome = genome.duplicate();
-           let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+           // It was checked before if there are any outputs, so the unwrap must work.
+           let random_output = mutated_genome.get_random_output().unwrap();
            let random_gene = mutated_genome.get_random_gene();
-           let random_gene_substrate = thread_rng().gen_range(0, mutated_genome.genes[random_gene].number_of_substrates().get());
-           mutated_genome.output[random_output] = Some(GeneSubstrate{
+           let random_gene_substrate = mutated_genome.get_gene(random_gene).get_random_substrate();
+           mutated_genome.set_output(random_output, Some(GeneSubstrate{
                gene: random_gene,
                substrate: random_gene_substrate
-           });
+           }));
            Some(mutated_genome)
        } else {
            None
@@ -540,13 +573,14 @@ impl GenomeMutation {
    fn mutate_output_dissociation(genome: &Genome) -> Option<Genome> {
        if genome.number_of_outputs() > 0 {
            let mut mutated_genome = genome.duplicate();
-           let random_output = thread_rng().gen_range(0, mutated_genome.number_of_outputs());
+           // It was checked before if there are any outputs, so the unwrap must work.
+           let random_output = mutated_genome.get_random_output().unwrap();
            if let None = mutated_genome.input[random_output] {
                // If there is no association, return no change.
                None
            } else {
                // If there is an association, remove it.
-               mutated_genome.input[random_output] = None;
+               mutated_genome.set_input(random_output, None);
                Some(mutated_genome)
            }
        } else {
