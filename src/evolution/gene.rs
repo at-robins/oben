@@ -404,20 +404,26 @@ pub struct MutagenicEnvironment {
 }
 
 enum GenomeMutation {
-    ///
+    /// Random association of an input.
     InputAssociation,
+    /// Random removal of an input.
     InputDissociation,
+    /// Random association of an output.
     OutputAssociation,
+    /// Random removal an output.
     OutputDissociation,
-    SubstrateInsertion,
-    SubstrateDeletion,
-    SubstrateMutation,
+    // SubstrateInsertion,
+    // SubstrateDeletion,
+    // SubstrateMutation,
+    /// Random fusion of two genes.
     GeneFusion,
+    /// Random removal of a gene.
     GeneDeletion,
+    /// Random duplication of a gene.
     GeneDuplication,
-    AssociationInsertion,
-    AssociationDeletion,
-    AssociationMuation,
+    // AssociationInsertion,
+    // AssociationDeletion,
+    // AssociationMuation,
     // TODO: Lateral gene transfer
     // TODO: Genomic receptor
     // TODO: Genomic catalytic centre
@@ -425,7 +431,6 @@ enum GenomeMutation {
 
 impl GenomeMutation {
     fn mutate(&self, genome: &Genome) -> Option<Genome> {
-        let mut mutated_genome = genome.duplicate();
         match self {
             GenomeMutation::InputAssociation => GenomeMutation::mutate_input_association(genome),
             GenomeMutation::InputDissociation => GenomeMutation::mutate_input_dissociation(genome),
@@ -434,17 +439,9 @@ impl GenomeMutation {
             // GenomeMutation::SubstrateInsertion => None,
             // GenomeMutation::SubstrateDeletion => None,
             // GenomeMutation::SubstrateMutation => None,
-            // Only allow this mutation if there is more than one gene in the genome.
             GenomeMutation::GeneFusion => GenomeMutation::mutate_gene_fusion(genome),
-            GenomeMutation::GeneDeletion  if mutated_genome.number_of_genes().get() > 1 => {
-                let random_gene = mutated_genome.get_random_gene();
-                mutated_genome.remove_gene(random_gene);
-                Some(mutated_genome)
-            },
-            GenomeMutation::GeneDuplication => {
-                mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
-                Some(mutated_genome)
-            },
+            GenomeMutation::GeneDeletion => GenomeMutation::mutate_gene_deletion(genome),
+            GenomeMutation::GeneDuplication => GenomeMutation::mutate_gene_duplication(genome),
             // GenomeMutation::AssociationInsertion => None,
             // GenomeMutation::AssociationDeletion => None,
             // GenomeMutation::AssociationMuation => None,
@@ -565,7 +562,8 @@ impl GenomeMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    fn mutate_gene_fusion(genome: &Genome) -> Option<Genome> {
-       // Only allow this mutation if there is more than one gene in the genome.
+       // Only allow this mutation if there is more than one gene in the genome, since
+       // 2 different genes are needed for fusion.
        if genome.number_of_genes().get() > 1 {
            let mut mutated_genome = genome.duplicate();
            // Select two different genes from the genome.
@@ -580,6 +578,24 @@ impl GenomeMutation {
        }
        // Return nothing if any of the prequisites is not met.
        None
+   }
+
+   /// Duplicates the [`Genome`] and then removes a random [`Gene`] from it.
+   /// Returns the altered [`Genome`] if there was more than 1 [`Gene`] in the [`Genome`].
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   fn mutate_gene_deletion(genome: &Genome) -> Option<Genome> {
+       // Only allow this mutation if there is more than one gene in the genome,
+       // otherwise the genome would end up in an invalid state.
+       if genome.number_of_genes().get() > 1 {
+           let mut mutated_genome = genome.duplicate();
+           let random_gene = mutated_genome.get_random_gene();
+           mutated_genome.remove_gene(random_gene);
+           Some(mutated_genome)
+       } else {
+           None
+       }
    }
 
 }
