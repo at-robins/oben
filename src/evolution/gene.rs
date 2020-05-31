@@ -356,7 +356,7 @@ impl GenomicReceptor {
 ///
 /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
 /// [`Gene`]: ./struct.Gene.html
-/// [`Substrate`]: ./struct.Substrate.html
+/// [`Substrate`]: ../protein/struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct GenomicCatalyticCentre {
@@ -435,18 +435,7 @@ impl GenomeMutation {
             // GenomeMutation::SubstrateDeletion => None,
             // GenomeMutation::SubstrateMutation => None,
             // Only allow this mutation if there is more than one gene in the genome.
-            GenomeMutation::GeneFusion if mutated_genome.number_of_genes().get() > 1 => {
-                // Select two different genes from the genome.
-                let mut genes: Vec<usize> = (0..mutated_genome.number_of_genes().get()).collect();
-                let gene_a = genes.remove(thread_rng().gen_range(0, genes.len()));
-                let gene_b = genes.remove(thread_rng().gen_range(0, genes.len()));
-                if let Some(fusion_gene) = mutated_genome.duplicate_gene(gene_a).fuse(mutated_genome.get_gene(gene_b)) {
-                    if let Some(_) = mutated_genome.add_gene(fusion_gene) {
-                        return Some(mutated_genome)
-                    }
-                }
-                None
-            },
+            GenomeMutation::GeneFusion => GenomeMutation::mutate_gene_fusion(genome),
             GenomeMutation::GeneDeletion  if mutated_genome.number_of_genes().get() > 1 => {
                 let random_gene = mutated_genome.get_random_gene();
                 mutated_genome.remove_gene(random_gene);
@@ -479,8 +468,9 @@ impl GenomeMutation {
     /// Returns the altered [`Genome`] if there are any input [`GeneSubstrate`].
     ///
     /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     /// [`Genome`]: ./struct.Genome.html
-    /// [`Substrate`]: ./struct.Substrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_input_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_inputs() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -501,9 +491,8 @@ impl GenomeMutation {
    /// Returns the altered [`Genome`] if there are any input [`GeneSubstrate`] and the randomly selected
    /// input [`GeneSubstrate`] was previously associated.
    ///
-   /// [`Gene`]: ./struct.Gene.html
+   /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
-   /// [`Substrate`]: ./struct.Substrate.html
    fn mutate_input_dissociation(genome: &Genome) -> Option<Genome> {
        if genome.number_of_inputs() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -526,8 +515,9 @@ impl GenomeMutation {
    /// Returns the altered [`Genome`] if there are any output [`GeneSubstrate`].
    ///
    /// [`Gene`]: ./struct.Gene.html
+   /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
-   /// [`Substrate`]: ./struct.Substrate.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_output_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_outputs() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -548,9 +538,8 @@ impl GenomeMutation {
    /// Returns the altered [`Genome`] if there are any output [`GeneSubstrate`] and the randomly selected
    /// output [`GeneSubstrate`] was previously associated.
    ///
-   /// [`Gene`]: ./struct.Gene.html
+   /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
-   /// [`Substrate`]: ./struct.Substrate.html
    fn mutate_output_dissociation(genome: &Genome) -> Option<Genome> {
        if genome.number_of_outputs() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -567,4 +556,30 @@ impl GenomeMutation {
            None
        }
    }
+
+   /// Duplicates the [`Genome`] and then fuses two random [`Gene`]s of the [`Genome`].
+   /// The fusion product is added as a new [`Gene`].
+   /// Returns the altered [`Genome`] if there are 2 or more different [`Gene`]s in the [`Genome`]
+   /// and if the fusion process was successful.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   fn mutate_gene_fusion(genome: &Genome) -> Option<Genome> {
+       // Only allow this mutation if there is more than one gene in the genome.
+       if genome.number_of_genes().get() > 1 {
+           let mut mutated_genome = genome.duplicate();
+           // Select two different genes from the genome.
+           let mut genes: Vec<usize> = (0..mutated_genome.number_of_genes().get()).collect();
+           let gene_a = genes.remove(thread_rng().gen_range(0, genes.len()));
+           let gene_b = genes.remove(thread_rng().gen_range(0, genes.len()));
+           if let Some(fusion_gene) = mutated_genome.duplicate_gene(gene_a).fuse(mutated_genome.get_gene(gene_b)) {
+               if let Some(_) = mutated_genome.add_gene(fusion_gene) {
+                   return Some(mutated_genome)
+               }
+           }
+       }
+       // Return nothing if any of the prequisites is not met.
+       None
+   }
+
 }
