@@ -4,9 +4,18 @@ extern crate bitvec;
 extern crate rand;
 
 use super::chemistry::{Reaction, State};
-use bitvec::{boxed::BitBox};
+use bitvec::{boxed::BitBox, order::Local};
 use rand::{thread_rng, Rng};
 use std::num::NonZeroUsize;
+
+/// The minimal length in byte of a randomly created binary [`Substrate`].
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+const RANDOM_SUBSTRATE_MIN_LENGTH: usize = 0;
+/// The maximal length in byte of a randomly created binary [`Substrate`].
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 128;
 
 /// A `Genome` is a collection of individual [`Gene`]s and associations between them.
 /// A `Genome` is required to consist of 1 or more genes.
@@ -41,6 +50,13 @@ impl Genome {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_outputs(&self) -> usize {
         self.output.len()
+    }
+
+    /// Get the number of [`GeneAssociation`]s in this `Genome`.
+    ///
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+    pub fn number_of_associations(&self) -> usize {
+        self.associations.len()
     }
 
     /// Sets the input association at the specified index to the specified value
@@ -100,6 +116,7 @@ impl Genome {
             None
         }
     }
+
     /// Removes the [`Gene`] at the specified index and returns it.
     /// All input-, output- and substrate-associations with the specified gene
     /// are cleared.
@@ -214,10 +231,69 @@ impl Genome {
         }
     }
 
+    /// Returns the index of a random [`GeneAssociation`] if there is any.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneAssociation.html
+    pub fn get_random_association(&self) -> Option<usize> {
+        if self.number_of_associations() > 0 {
+            Some(thread_rng().gen_range(0, self.number_of_associations()))
+        } else {
+            None
+        }
+    }
+
     /// Duplicates the `Genome` and all its contents.
     pub fn duplicate(&self) -> Self {
         // At the moment this is just a wrapper for cloning.
         self.clone()
+    }
+
+    /// Generates a random [`GeneSubstrate`] pointing to a [`Substrate`] of a [`Gene`]
+    /// contained within the `Genome`.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn random_gene_substrate(&self) -> GeneSubstrate {
+        let random_gene = self.get_random_gene();
+        let random_substrate = self.get_gene(random_gene).get_random_substrate();
+        GeneSubstrate{
+            gene: random_gene,
+            substrate: random_substrate
+        }
+    }
+
+    /// Adds a [`GeneAssociation`] to the `Genome` if possible and returns the index of the
+    /// new gene.
+    /// This function will fail if the underlying vector would overflow due to the addition.
+    ///
+    /// # Parameters
+    ///
+    /// * `association` - the [`GeneAssociation`] to add to the `Genome`
+    ///
+    /// [`Gene`]: ./struct.GeneAssociation.html
+    fn add_association(&mut self, association: GeneAssociation) -> Option<usize>{
+        if let Some(new_index) = self.associations.len().checked_add(1) {
+            self.associations.push(association);
+            Some(new_index)
+        } else {
+            None
+        }
+    }
+
+    /// Removes the [`GeneAssociation`] at the specified index and returns it.
+    ///
+    /// # Parameters
+    ///
+    /// * `association` - the index of the association to remove
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+    fn remove_association(&mut self, association: usize) -> GeneAssociation {
+        self.associations.remove(association)
     }
 }
 
@@ -245,7 +321,7 @@ struct GeneSubstrate {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 struct GeneAssociation {
     // substrate value defined in the genome and shared between genes
-    substrate: BitBox,
+    substrate: BitBox<Local, u8>,
     // gene specific substrates pointing to the shared substrate
     associations: Vec<GeneSubstrate>,
 }
@@ -451,8 +527,10 @@ enum GenomeMutation {
     GeneDeletion,
     /// Random duplication of a gene.
     GeneDuplication,
-    // AssociationInsertion,
-    // AssociationDeletion,
+    /// Random addition of an genome level substrate association.
+    AssociationInsertion,
+    /// Random removal of an genome level substrate association.
+    AssociationDeletion,
     // AssociationMuation,
     // TODO: Lateral gene transfer
     // TODO: Genomic receptor
@@ -472,8 +550,8 @@ impl GenomeMutation {
             GenomeMutation::GeneFusion => GenomeMutation::mutate_gene_fusion(genome),
             GenomeMutation::GeneDeletion => GenomeMutation::mutate_gene_deletion(genome),
             GenomeMutation::GeneDuplication => GenomeMutation::mutate_gene_duplication(genome),
-            // GenomeMutation::AssociationInsertion => None,
-            // GenomeMutation::AssociationDeletion => None,
+            GenomeMutation::AssociationInsertion => GenomeMutation::mutate_association_insertion(genome),
+            GenomeMutation::AssociationDeletion => GenomeMutation::mutate_association_deletion(genome),
             // GenomeMutation::AssociationMuation => None,
             // GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
         }
@@ -632,4 +710,71 @@ impl GenomeMutation {
        }
    }
 
+   /// Duplicates the [`Genome`] and adds a random [`GeneAssociation`] to it.
+   /// Returns the altered [`Genome`] if the [`GeneAssociation`] could be established.
+   ///
+   /// [`Gene`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   fn mutate_association_insertion(genome: &Genome) -> Option<Genome> {
+       let mut mutated_genome = genome.duplicate();
+       let random_association = GeneAssociation {
+           substrate: random_substrate(),
+           associations: vec!(mutated_genome.random_gene_substrate())
+       };
+       if let Some(_) = mutated_genome.add_association(random_association) {
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and removes a random [`GeneAssociation`] from it.
+   /// Returns the altered [`Genome`] if there were 1 or more [`GeneAssociation`]s present.
+   ///
+   /// [`Gene`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   fn mutate_association_deletion(genome: &Genome) -> Option<Genome> {
+       let mut mutated_genome = genome.duplicate();
+       if let Some(random_association_index) = mutated_genome.get_random_association() {
+           mutated_genome.remove_association(random_association_index);
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+}
+
+/// Generates a random binary [`Substrate`].
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+fn random_substrate() -> BitBox<Local, u8> {
+    let length: usize = thread_rng().gen_range(RANDOM_SUBSTRATE_MIN_LENGTH, RANDOM_SUBSTRATE_MAX_LENGTH + 1);
+    let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
+    BitBox::from_slice(&random_bytes)
+}
+
+/// Generates a random binary [`Substrate`] based on the specified length in byte.
+/// The resulting [`Substrate`] will be of length 1 B if the base length was 0.
+/// Otherwise the resulting length will be in range `base length / 2` to `base_length * 2`.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
+    let length: usize;
+    if base_length == 0 {
+        // If the substrate was empty, create the smallest possible substrate to begin with.
+        length = 1;
+    } else {
+        let min_length: usize = base_length / 2;
+        let max_length: usize = if let Some(u) = base_length.checked_mul(2) {
+            u
+        } else {
+            usize::max_value()
+        };
+        // This limits the generated number to `usize::max_value() - 1`, which should be enough
+        // and not pose a problem.
+        length = thread_rng().gen_range(min_length, max_length);
+    }
+    let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
+    BitBox::from_slice(&random_bytes)
 }
