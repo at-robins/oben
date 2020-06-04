@@ -345,6 +345,17 @@ impl GeneAssociation {
             }
         }
     }
+
+    /// Returns the index of a random [`GeneSubstrate`] if there are any.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    pub fn get_random_gene_substrate(&self) -> Option<usize> {
+        if self.associations.len() > 0 {
+            Some(thread_rng().gen_range(0, self.associations.len()))
+        } else {
+            None
+        }
+    }
 }
 
 /// A `Gene` is an immutable structure encoding a self-contained network, but without
@@ -531,8 +542,14 @@ pub enum GenomeMutation {
     AssociationInsertion,
     /// Random removal of an genome level substrate association.
     AssociationDeletion,
+    /// Random mutation of the value of a random genome level substrate association.
     AssociationMutationSubstrate,
+    /// Random addition of a gene's substrate to be referenced by a genome level substrate association.
+    AssociationMutationGeneInsertion,
+    /// Random removal of a gene's substrate to be referenced by a genome level substrate association.
+    AssociationMutationGeneDeletion,
     // TODO: Lateral gene transfer
+    // TODO: Gene mutations
     // TODO: Genomic receptor
     // TODO: Genomic catalytic centre
 }
@@ -544,16 +561,14 @@ impl GenomeMutation {
             GenomeMutation::InputDissociation => GenomeMutation::mutate_input_dissociation(genome),
             GenomeMutation::OutputAssociation => GenomeMutation::mutate_output_association(genome),
             GenomeMutation::OutputDissociation => GenomeMutation::mutate_output_dissociation(genome),
-            // GenomeMutation::SubstrateInsertion => None,
-            // GenomeMutation::SubstrateDeletion => None,
-            // GenomeMutation::SubstrateMutation => None,
             GenomeMutation::GeneFusion => GenomeMutation::mutate_gene_fusion(genome),
             GenomeMutation::GeneDeletion => GenomeMutation::mutate_gene_deletion(genome),
             GenomeMutation::GeneDuplication => GenomeMutation::mutate_gene_duplication(genome),
             GenomeMutation::AssociationInsertion => GenomeMutation::mutate_association_insertion(genome),
             GenomeMutation::AssociationDeletion => GenomeMutation::mutate_association_deletion(genome),
             GenomeMutation::AssociationMutationSubstrate => GenomeMutation::mutate_association_substrate(genome),
-            // GenomeMutation::AssociationMuation => None,
+            GenomeMutation::AssociationMutationGeneInsertion => GenomeMutation::mutate_association_gene_insertion(genome),
+            GenomeMutation::AssociationMutationGeneDeletion => GenomeMutation::mutate_association_gene_deletion(genome),
             // GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
         }
     }
@@ -747,7 +762,7 @@ impl GenomeMutation {
    /// Duplicates the [`Genome`] and randomly sets an existing [`GeneAssociation`]'s [`Substrate`] value.
    /// Returns the altered [`Genome`] if 1 or more [`GeneAssociation`]s were present.
    ///
-   /// [`Gene`]: ./struct.GeneAssociation.html
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_association_substrate(genome: &Genome) -> Option<Genome> {
@@ -758,6 +773,48 @@ impl GenomeMutation {
            if random_substrate != mutated_genome.associations[random_association_index].substrate {
                mutated_genome.associations[random_association_index].substrate = random_substrate;
                Some(mutated_genome)
+           } else {
+               None
+           }
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly adds a [`GeneSubstrate`] to an existing [`GeneAssociation`].
+   /// Returns the altered [`Genome`] if 1 or more [`GeneAssociation`]s were present.
+   ///
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`GeneAssociation`]: ./struct.GeneSubstrate.html
+   fn mutate_association_gene_insertion(genome: &Genome) -> Option<Genome> {
+       if let Some(random_association_index) = genome.get_random_association() {
+           let mut mutated_genome = genome.duplicate();
+           let random_gene_substrate = mutated_genome.random_gene_substrate();
+           mutated_genome.associations[random_association_index].associations.push(random_gene_substrate);
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly removes a [`GeneSubstrate`] from an existing [`GeneAssociation`].
+   /// Returns the altered [`Genome`] if 1 or more [`GeneAssociation`]s were present and a [`GeneSubstrate`]
+   /// could be removed.
+   ///
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`GeneAssociation`]: ./struct.GeneSubstrate.html
+   fn mutate_association_gene_deletion(genome: &Genome) -> Option<Genome> {
+       if let Some(random_association_index) = genome.get_random_association() {
+           let mut mutated_genome = genome.duplicate();
+           if mutated_genome.associations[random_association_index].associations.len() > 0 {
+               if let Some(random_deletion_index) = mutated_genome.associations[random_association_index].get_random_gene_substrate() {
+                   mutated_genome.associations[random_association_index].associations.remove(random_deletion_index);
+                   Some(mutated_genome)
+               } else {
+                   None
+               }
            } else {
                None
            }
