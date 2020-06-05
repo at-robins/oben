@@ -271,7 +271,7 @@ impl Genome {
     ///
     /// * `association` - the [`GeneAssociation`] to add to the `Genome`
     ///
-    /// [`Gene`]: ./struct.GeneAssociation.html
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
     fn add_association(&mut self, association: GeneAssociation) -> Option<usize>{
         if let Some(new_index) = self.associations.len().checked_add(1) {
             self.associations.push(association);
@@ -294,6 +294,78 @@ impl Genome {
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
     fn remove_association(&mut self, association: usize) -> GeneAssociation {
         self.associations.remove(association)
+    }
+
+    /// Adjust the input [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_input_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        for input_ref in &mut self.input {
+            if input_ref.is_some() {
+                let mut current_reference = input_ref.unwrap();
+                if current_reference == removed_substrate {
+                    // Remove the input association if it points to the removed substrate.
+                    *input_ref = None;
+                } else if current_reference.is_gene(removed_substrate.gene) {
+                    // Adjust the input association if it points to the gene from which the
+                    // substrate was removed.
+                    current_reference.substrate = Gene::adjust_index(current_reference.substrate, removed_substrate.substrate);
+                    *input_ref = Some(current_reference);
+                }
+                // Otherwise, leave the input untouched.
+            }
+        }
+    }
+
+    /// Adjust the output [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_output_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        for output_ref in &mut self.output {
+            if output_ref.is_some() {
+                let mut current_reference = output_ref.unwrap();
+                if current_reference == removed_substrate {
+                    // Remove the output association if it points to the removed substrate.
+                    *output_ref = None;
+                } else if current_reference.is_gene(removed_substrate.gene) {
+                    // Adjust the output association if it points to the gene from which the
+                    // substrate was removed.
+                    current_reference.substrate = Gene::adjust_index(current_reference.substrate, removed_substrate.substrate);
+                    *output_ref = Some(current_reference);
+                }
+                // Otherwise, leave the output untouched.
+            }
+        }
+    }
+
+    /// Adjust the [`GeneAssociation`] references after the binary [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_associations_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        for association in &mut self.associations {
+            association.adjust_after_gene_substrate_removal(removed_substrate);
+        }
     }
 }
 
@@ -372,15 +444,7 @@ impl GeneAssociation {
     ///
     /// [`Gene`]: ./struct.Gene.html
     fn remove_associated_gene(&mut self, gene: usize) {
-        // TODO: Replace with drain_filter once stabilised.
-        let mut i = 0;
-        while i != self.associations.len() {
-            if self.associations[i].gene == gene {
-                self.associations.remove(i);
-            } else {
-                i += 1;
-            }
-        }
+        self.associations.retain(|a| a.gene != gene);
     }
 
     /// Returns the index of a random [`GeneSubstrate`] if there are any.
@@ -409,6 +473,28 @@ impl GeneAssociation {
             Some(new_index)
         } else {
             None
+        }
+    }
+
+    /// Adjust the [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        self.associations.retain(|a| a != &removed_substrate);
+        for association in &mut self.associations {
+            if association.is_gene(removed_substrate.gene) {
+                // Adjust the input association if it points to the gene from which the
+                // substrate was removed.
+                association.substrate = Gene::adjust_index(association.substrate, removed_substrate.substrate);
+            }
+            // Otherwise, leave the input untouched.
         }
     }
 }
@@ -477,15 +563,7 @@ impl Gene {
             panic!("A genome needs to contain at least one substrate, so no substrate can be removed.");
         }
         // Remove all receptors and catalytic centres referencing the substrate.
-        // TODO: Replace with drain_filter once stabilased.
-        let mut i = 0;
-        while i != self.receptors.len() {
-            if self.receptors[i].referes_to_substrate(substrate_index) {
-                self.receptors.remove(i);
-            } else {
-                i += 1;
-            }
-        }
+        self.receptors.retain(|r| !r.referes_to_substrate(substrate_index));
         // Adjust the indices of the remaining pointers.
         for receptor in &mut self.receptors {
             receptor.adjust_indices(substrate_index);
@@ -1055,10 +1133,14 @@ impl GenomeMutation {
        let random_gene_index = genome.get_random_gene();
        if genome.get_gene(random_gene_index).number_of_substrates().get() > 1 {
            let mut mutated_genome = genome.duplicate();
-           let random_substrate_index = mutated_genome.genes[random_gene_index].get_random_substrate();
-           mutated_genome.genes[random_gene_index].remove_substrate(random_substrate_index);
-           // TODO: Remove all genome level associations
-           // TODO: Update all index based pointers at genome level
+           let removed_substrate = GeneSubstrate{
+               gene: random_gene_index,
+               substrate: mutated_genome.genes[random_gene_index].get_random_substrate(),
+           };
+           mutated_genome.genes[removed_substrate.gene].remove_substrate(removed_substrate.substrate);
+           mutated_genome.adjust_input_after_gene_substrate_removal(removed_substrate);
+           mutated_genome.adjust_output_after_gene_substrate_removal(removed_substrate);
+           mutated_genome.adjust_associations_after_gene_substrate_removal(removed_substrate);
            Some(mutated_genome)
        } else {
            None
