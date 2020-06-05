@@ -356,6 +356,24 @@ impl GeneAssociation {
             None
         }
     }
+
+    /// Adds a [`GeneSubstrate`] to the `GeneAssociation` if possible and returns the index of the
+    /// new [`GeneSubstrate`].
+    /// This function will fail if the underlying vector would overflow due to the addition.
+    ///
+    /// # Parameters
+    ///
+    /// * `association` - the [`GeneSubstrate`] to add to the `GeneAssociation`
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    fn add_association(&mut self, association: GeneSubstrate) -> Option<usize>{
+        if let Some(new_index) = self.associations.len().checked_add(1) {
+            self.associations.push(association);
+            Some(new_index)
+        } else {
+            None
+        }
+    }
 }
 
 /// A `Gene` is an immutable structure encoding a self-contained network, but without
@@ -365,7 +383,7 @@ impl GeneAssociation {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Gene {
-    substrates: Vec<BitBox>,
+    substrates: Vec<BitBox<Local, u8>>,
     receptors: Vec<GenomicReceptor>,
 }
 
@@ -384,6 +402,24 @@ impl Gene {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_substrate(&self) -> usize {
         thread_rng().gen_range(0, self.number_of_substrates().get())
+    }
+
+    /// Adds a binary [`Substrate`] to the `Gene` if possible and returns the index of the
+    /// new [`Substrate`].
+    /// This function will fail if the underlying vector would overflow due to the addition.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrate` - the [`Substrate`] to add to the `Gene`
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn add_substrate(&mut self, substrate: BitBox<Local, u8>) -> Option<usize>{
+        if let Some(new_index) = self.substrates.len().checked_add(1) {
+            self.substrates.push(substrate);
+            Some(new_index)
+        } else {
+            None
+        }
     }
 
     /// Fuse this `Gene` with the specified `Gene` if possible and return the fusion.
@@ -529,9 +565,6 @@ pub enum GenomeMutation {
     OutputAssociation,
     /// Random removal an output.
     OutputDissociation,
-    // SubstrateInsertion,
-    // SubstrateDeletion,
-    // SubstrateMutation,
     /// Random fusion of two genes.
     GeneFusion,
     /// Random removal of a gene.
@@ -548,6 +581,12 @@ pub enum GenomeMutation {
     AssociationMutationGeneInsertion,
     /// Random removal of a gene's substrate to be referenced by a genome level substrate association.
     AssociationMutationGeneDeletion,
+    /// Random addition of a substrate to a gene.
+    GeneMutationSubstrateInsertion,
+    /// Random removal of a substrate to a gene.
+    GeneMutationSubstrateDeletion,
+    /// Random alteration of a substrate of a gene.
+    GeneMutationSubstrateMutation,
     // TODO: Lateral gene transfer
     // TODO: Gene mutations
     // TODO: Genomic receptor
@@ -569,6 +608,9 @@ impl GenomeMutation {
             GenomeMutation::AssociationMutationSubstrate => GenomeMutation::mutate_association_substrate(genome),
             GenomeMutation::AssociationMutationGeneInsertion => GenomeMutation::mutate_association_gene_insertion(genome),
             GenomeMutation::AssociationMutationGeneDeletion => GenomeMutation::mutate_association_gene_deletion(genome),
+            GenomeMutation::GeneMutationSubstrateInsertion => GenomeMutation::mutate_gene_substrate_insertion(genome),
+            GenomeMutation::GeneMutationSubstrateDeletion => GenomeMutation::mutate_gene_substrate_deletion(genome),
+            GenomeMutation::GeneMutationSubstrateMutation => GenomeMutation::mutate_gene_substrate_mutation(genome),
             // GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
         }
     }
@@ -737,11 +779,7 @@ impl GenomeMutation {
            substrate: random_substrate(),
            associations: vec!(mutated_genome.random_gene_substrate())
        };
-       if let Some(_) = mutated_genome.add_association(random_association) {
-           Some(mutated_genome)
-       } else {
-           None
-       }
+       mutated_genome.add_association(random_association).and(Some(mutated_genome))
    }
 
    /// Duplicates the [`Genome`] and removes a random [`GeneAssociation`] from it.
@@ -791,8 +829,7 @@ impl GenomeMutation {
        if let Some(random_association_index) = genome.get_random_association() {
            let mut mutated_genome = genome.duplicate();
            let random_gene_substrate = mutated_genome.random_gene_substrate();
-           mutated_genome.associations[random_association_index].associations.push(random_gene_substrate);
-           Some(mutated_genome)
+            mutated_genome.associations[random_association_index].add_association(random_gene_substrate).and(Some(mutated_genome))
        } else {
            None
        }
@@ -818,6 +855,55 @@ impl GenomeMutation {
            } else {
                None
            }
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly adds a [`Substrate`] to an existing [`Gene`].
+   /// Returns the altered [`Genome`] if the addition was successful.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_insertion(genome: &Genome) -> Option<Genome> {
+       let mut mutated_genome = genome.duplicate();
+       let random_gene_index = mutated_genome.get_random_gene();
+       mutated_genome.genes[random_gene_index].add_substrate(random_substrate()).and(Some(mutated_genome))
+   }
+
+   /// Duplicates the [`Genome`] and randomly removes a [`Substrate`] from an existing [`Gene`].
+   /// Returns the altered [`Genome`] if more than 1 [`Substrate`] was present for the selected [`Gene`].
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_deletion(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       if genome.get_gene(random_gene_index).number_of_substrates().get() > 1 {
+           let mut mutated_genome = genome.duplicate();
+           let random_substrate_index = mutated_genome.genes[random_gene_index].get_random_substrate();
+           mutated_genome.genes[random_gene_index].substrates.remove(random_substrate_index);
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly modifies a [`Substrate`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_mutation(genome: &Genome) -> Option<Genome> {
+       let mut mutated_genome = genome.duplicate();
+       let random_gene_index = mutated_genome.get_random_gene();
+       let random_substrate_index = mutated_genome.get_gene(random_gene_index).get_random_substrate();
+       let random_substrate_value = mutate_substrate_based_on(mutated_genome.get_gene(random_gene_index).substrates[random_substrate_index].len() / 8);
+       if random_substrate_value != mutated_genome.get_gene(random_gene_index).substrates[random_substrate_index] {
+           mutated_genome.genes[random_gene_index].substrates[random_substrate_index] = random_substrate_value;
+           Some(mutated_genome)
        } else {
            None
        }
