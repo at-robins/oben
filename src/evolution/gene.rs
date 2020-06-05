@@ -5,7 +5,7 @@ extern crate rand;
 
 use super::chemistry::{Reaction, State};
 use bitvec::{boxed::BitBox, order::Local};
-use rand::{thread_rng, Rng};
+use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
@@ -943,4 +943,27 @@ fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
     }
     let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
     BitBox::from_slice(&random_bytes)
+}
+
+impl Distribution<GenomeMutation> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenomeMutation {
+        match rng.gen_range(0u8, 15) {
+            0 => GenomeMutation::InputAssociation,
+            1 => GenomeMutation::InputDissociation,
+            2 => GenomeMutation::OutputAssociation,
+            3 => GenomeMutation::OutputDissociation,
+            4 => GenomeMutation::GeneFusion,
+            5 => GenomeMutation::GeneDeletion,
+            6 => GenomeMutation::GeneDuplication,
+            7 => GenomeMutation::AssociationInsertion,
+            8 => GenomeMutation::AssociationDeletion,
+            9 => GenomeMutation::AssociationMutationSubstrate,
+            10 => GenomeMutation::AssociationMutationGeneInsertion,
+            11 => GenomeMutation::AssociationMutationGeneDeletion,
+            12 => GenomeMutation::GeneMutationSubstrateInsertion,
+            13 => GenomeMutation::GeneMutationSubstrateDeletion,
+            14 => GenomeMutation::GeneMutationSubstrateMutation,
+            _ => panic!("A random number with no matching genomic mutation was created.")
+        }
+    }
 }
