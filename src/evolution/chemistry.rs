@@ -4,6 +4,7 @@ extern crate bitvec;
 extern crate rand;
 
 use bitvec::{boxed::BitBox, vec::BitVec};
+use rand::{distributions::{Distribution, Standard}, Rng};
 
 /// A `State` is an elementary operation for comparing binary substrates.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -221,6 +222,26 @@ impl State {
 
 }
 
+impl Distribution<State> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> State {
+        match rng.gen_range(0u8, 12) {
+            0 => State::Equals,
+            1 => State::Not,
+            2 => State::Greater,
+            3 => State::Lesser,
+            4 => State::GreaterOrEqual,
+            5 => State::LesserOrEqual,
+            6 => State::All,
+            7 => State::Some,
+            8 => State::NotAll,
+            9 => State::None,
+            10 => State::Always,
+            11 => State::Never,
+            _ => panic!("A random number with no matching state was created.")
+        }
+    }
+}
+
 /// A `Reaction` represents an elementary operation for modification of binary substrates.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum Reaction {
@@ -391,6 +412,26 @@ impl Reaction {
             Reaction::Duplicate => 1,
             Reaction::Misfunction => 0,
             Reaction::Random => 1,
+        }
+    }
+}
+
+impl Distribution<Reaction> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Reaction {
+        match rng.gen_range(0u8, 12) {
+            0 => Reaction::And,
+            1 => Reaction::Or,
+            2 => Reaction::XOr,
+            3 => Reaction::ShiftRight,
+            4 => Reaction::ShiftLeft,
+            5 => Reaction::Add,
+            6 => Reaction::Append,
+            7 => Reaction::Inverse,
+            8 => Reaction::Reverse,
+            9 => Reaction::Duplicate,
+            10 => Reaction::Misfunction,
+            11 => Reaction::Random,
+            _ => panic!("A random number with no matching reaction was created.")
         }
     }
 }

@@ -297,6 +297,17 @@ impl Genome {
     }
 }
 
+impl Default for Genome {
+    fn default() -> Self {
+        Genome {
+            input: Vec::default(),
+            output: Vec::default(),
+            genes: vec!(Gene::default()),
+            associations: Vec::default(),
+        }
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 /// A `GeneSubstrate` is an index based pointer to a [`Substrate`] encoded in a [`Gene`]
 /// contained within the respective [`Genome`].
@@ -458,6 +469,15 @@ impl Gene {
     }
 }
 
+impl Default for Gene {
+    fn default() -> Self {
+        Gene {
+            substrates: vec!(BitBox::empty()),
+            receptors: Vec::default(),
+        }
+    }
+}
+
 /// A `GenomicReceptor` represents the information of an actual [`Receptor`] that
 /// is triggered upon specific [`Substrate`] changes and compares [`Substrate`], eventually
 /// performing a [`Reaction`]. It is contained within a [`Gene`].
@@ -556,6 +576,7 @@ pub struct MutagenicEnvironment {
 
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum GenomeMutation {
     /// Random association of an input.
     InputAssociation,
@@ -594,6 +615,17 @@ pub enum GenomeMutation {
 }
 
 impl GenomeMutation {
+    /// Generates a mutated version of the specified [`Genome`] based on the kind of
+    /// `GenomeMutation`.
+    ///
+    /// This will fail if the mutated [`Genome`] would be identical to the input or if the
+    /// mutation is impossible for the specified [`Genome`].
+    ///
+    /// # Parameters
+    ///
+    /// `genome` - the base [`Genome`] to generate a mutated version of
+    ///
+    /// [`Genome`]: ./struct.Genome.html
     pub fn mutate(&self, genome: &Genome) -> Option<Genome> {
         match self {
             GenomeMutation::InputAssociation => GenomeMutation::mutate_input_association(genome),
@@ -884,6 +916,10 @@ impl GenomeMutation {
            let mut mutated_genome = genome.duplicate();
            let random_substrate_index = mutated_genome.genes[random_gene_index].get_random_substrate();
            mutated_genome.genes[random_gene_index].substrates.remove(random_substrate_index);
+           // TODO: Remove all genome level associations
+           // TODO: Remove all GenomicReceptor pointers
+           // TODO: Remove all GenomicCatalyticCentre pointers
+           // TODO: Update all index based pointers (GenomicReceptor + GenomicCatalyticCentre)
            Some(mutated_genome)
        } else {
            None
