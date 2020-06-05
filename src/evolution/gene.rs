@@ -533,11 +533,15 @@ impl Gene {
         thread_rng().gen_range(0, self.number_of_substrates().get())
     }
 
-    /// Returns the index of a random [`GenomicReceptor`] encoded by this `Gene`.
+    /// Returns the index of a random [`GenomicReceptor`] encoded by this `Gene` if there is any.
     ///
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-    pub fn get_random_receptor(&self) -> usize {
-        thread_rng().gen_range(0, self.number_of_receptors())
+    pub fn get_random_receptor(&self) -> Option<usize> {
+        if self.number_of_receptors() > 0 {
+            Some(thread_rng().gen_range(0, self.number_of_receptors()))
+        } else {
+            None
+        }
     }
 
     /// Adds a binary [`Substrate`] to the `Gene` if possible and returns the index of the
@@ -1325,14 +1329,11 @@ impl GenomeMutation {
    /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
    fn mutate_gene_receptor_deletion(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
-           let mut mutated_genome = genome.duplicate();
-           let random_receptor = mutated_genome.get_gene(random_gene_index).get_random_receptor();
-           mutated_genome.genes[random_gene_index].receptors.remove(random_receptor);
-           Some(mutated_genome)
-       } else {
-           None
-       }
+       let mut mutated_genome = genome.duplicate();
+        mutated_genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
+            mutated_genome.genes[random_gene_index].receptors.remove(random_receptor);
+            Some(mutated_genome)
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly adds a trigger to a [`GenomicReceptor`] of an existing [`Gene`].
@@ -1344,9 +1345,10 @@ impl GenomeMutation {
    fn mutate_gene_receptor_trigger_insertion(genome: &Genome) -> Option<Genome> {
        let mut mutated_genome = genome.duplicate();
        let random_gene_index = mutated_genome.get_random_gene();
-       let random_receptor = mutated_genome.genes[random_gene_index].get_random_receptor();
-       let random_substrate_index = mutated_genome.get_gene(random_gene_index).get_random_substrate();
-       mutated_genome.genes[random_gene_index].receptors[random_receptor].add_trigger(random_substrate_index).and(Some(mutated_genome))
+       mutated_genome.genes[random_gene_index].get_random_receptor().and_then(|random_receptor| {
+           let random_substrate_index = mutated_genome.get_gene(random_gene_index).get_random_substrate();
+           mutated_genome.genes[random_gene_index].receptors[random_receptor].add_trigger(random_substrate_index).and(Some(mutated_genome))
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly removes a trigger from a [`GenomicReceptor`] of an existing [`Gene`].
@@ -1357,16 +1359,13 @@ impl GenomeMutation {
    /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
    fn mutate_gene_receptor_trigger_deletion(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
-           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            genome.get_gene(random_gene_index).receptors[random_receptor].get_random_trigger().and_then(|random_trigger| {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.genes[random_gene_index].receptors[random_receptor].triggers.remove(random_trigger);
                Some(mutated_genome)
            })
-       } else {
-           None
-       }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly mutates a [`State`] of a [`GenomicReceptor`] of an existing [`Gene`].
@@ -1378,17 +1377,14 @@ impl GenomeMutation {
    /// [`State`]: ../chemistry/struct.State.html
    fn mutate_gene_receptor_state_mutation(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            let mut mutated_genome = genome.duplicate();
-           let random_receptor = mutated_genome.get_gene(random_gene_index).get_random_receptor();
            let state: State = rand::random();
            let substrates = (0..state.get_substrate_number()).map(|_| mutated_genome.get_gene(random_gene_index).get_random_substrate()).collect();
            mutated_genome.genes[random_gene_index].receptors[random_receptor].state = state;
            mutated_genome.genes[random_gene_index].receptors[random_receptor].substrates = substrates;
            Some(mutated_genome)
-       } else {
-           None
-       }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly mutates a [`Substrate`] of a [`GenomicReceptor`] of an existing [`Gene`].
@@ -1400,16 +1396,13 @@ impl GenomeMutation {
    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_gene_receptor_substrate_mutation(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
-           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            genome.get_gene(random_gene_index).receptors[random_receptor].get_random_substrate().and_then(|random_substrate| {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.genes[random_gene_index].receptors[random_receptor].substrates[random_substrate] = mutated_genome.get_gene(random_gene_index).get_random_substrate();
                Some(mutated_genome)
            })
-       } else {
-           None
-       }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly mutates a [`Reaction`] of a [`GenomicReceptor`] of an existing [`Gene`].
@@ -1421,15 +1414,12 @@ impl GenomeMutation {
    /// [`Reaction`]: ../chemistry/struct.Reaction.html
    fn mutate_gene_receptor_enzyme_mutation(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            let mut mutated_genome = genome.duplicate();
-           let random_receptor = mutated_genome.get_gene(random_gene_index).get_random_receptor();
            let enzyme = mutated_genome.get_gene(random_gene_index).random_catalytic_centre();
            mutated_genome.genes[random_gene_index].receptors[random_receptor].enzyme = enzyme;
            Some(mutated_genome)
-       } else {
-           None
-       }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly mutates an educt [`Substrate`] of a [`GenomicCatalyticCentre`] of an existing [`Gene`].
@@ -1442,16 +1432,13 @@ impl GenomeMutation {
    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_gene_catalytic_centre_educt_mutation(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
-           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            genome.get_gene(random_gene_index).receptors[random_receptor].enzyme.get_random_educt().and_then(|random_educt| {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.genes[random_gene_index].receptors[random_receptor].enzyme.educts[random_educt] = mutated_genome.get_gene(random_gene_index).get_random_substrate();
                Some(mutated_genome)
            })
-       } else {
-           None
-       }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly mutates an product [`Substrate`] of a [`GenomicCatalyticCentre`] of an existing [`Gene`].
@@ -1464,16 +1451,13 @@ impl GenomeMutation {
    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_gene_catalytic_centre_product_mutation(genome: &Genome) -> Option<Genome> {
        let random_gene_index = genome.get_random_gene();
-       if genome.get_gene(random_gene_index).receptors.len() > 0 {
-           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+       genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
            genome.get_gene(random_gene_index).receptors[random_receptor].enzyme.get_random_product().and_then(|random_product| {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.genes[random_gene_index].receptors[random_receptor].enzyme.products[random_product] = mutated_genome.get_gene(random_gene_index).get_random_substrate();
                Some(mutated_genome)
            })
-       } else {
-           None
-       }
+       })
    }
 
 }
