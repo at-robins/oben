@@ -875,6 +875,30 @@ impl GenomicCatalyticCentre {
         }
     }
 
+    /// Returns the index of a random educt [`Substrate`] of this `GenomicCatalyticCentre`
+    /// if there are any.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn get_random_educt(&self) -> Option<usize> {
+        if self.educts.len() > 0 {
+            Some(thread_rng().gen_range(0, self.educts.len()))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the index of a random product [`Substrate`] of this `GenomicCatalyticCentre`
+    /// if there are any.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn get_random_product(&self) -> Option<usize> {
+        if self.products.len() > 0 {
+            Some(thread_rng().gen_range(0, self.products.len()))
+        } else {
+            None
+        }
+    }
+
 }
 
 pub struct MutagenicEnvironment {
@@ -931,7 +955,10 @@ pub enum GenomeMutation {
     GeneMutationReceptorMutationSubstratesMutation,
     /// Random mutation of a receptor's enzyme of a gene.
     GeneMutationReceptorMutationEnzymeMutation,
-    // TODO: Receptor mutation.
+    /// Random mutation of a catalytic centres's educts.
+    GeneMutationCatalyticCentreMutationEductMutation,
+    /// Random mutation of a catalytic centres's products.
+    GeneMutationCatalyticCentreMutationProductMutation,
     // TODO: Lateral gene transfer
 }
 
@@ -971,6 +998,8 @@ impl GenomeMutation {
             GenomeMutation::GeneMutationReceptorMutationStateMutation => GenomeMutation::mutate_gene_receptor_state_mutation(genome),
             GenomeMutation::GeneMutationReceptorMutationSubstratesMutation => GenomeMutation::mutate_gene_receptor_substrate_mutation(genome),
             GenomeMutation::GeneMutationReceptorMutationEnzymeMutation => GenomeMutation::mutate_gene_receptor_enzyme_mutation(genome),
+            GenomeMutation::GeneMutationCatalyticCentreMutationEductMutation => GenomeMutation::mutate_gene_catalytic_centre_educt_mutation(genome),
+            GenomeMutation::GeneMutationCatalyticCentreMutationProductMutation => GenomeMutation::mutate_gene_catalytic_centre_product_mutation(genome),
             // GenomeMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
         }
     }
@@ -1403,6 +1432,50 @@ impl GenomeMutation {
        }
    }
 
+   /// Duplicates the [`Genome`] and randomly mutates an educt [`Substrate`] of a [`GenomicCatalyticCentre`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`] if 1 or more [`GenomicReceptor`] and educt [`Substrate`]s were present.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
+   /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_catalytic_centre_educt_mutation(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       if genome.get_gene(random_gene_index).receptors.len() > 0 {
+           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+           genome.get_gene(random_gene_index).receptors[random_receptor].enzyme.get_random_educt().and_then(|random_educt| {
+               let mut mutated_genome = genome.duplicate();
+               mutated_genome.genes[random_gene_index].receptors[random_receptor].enzyme.educts[random_educt] = mutated_genome.get_gene(random_gene_index).get_random_substrate();
+               Some(mutated_genome)
+           })
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly mutates an product [`Substrate`] of a [`GenomicCatalyticCentre`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`] if 1 or more [`GenomicReceptor`] and product [`Substrate`]s were present.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
+   /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_catalytic_centre_product_mutation(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       if genome.get_gene(random_gene_index).receptors.len() > 0 {
+           let random_receptor = genome.get_gene(random_gene_index).get_random_receptor();
+           genome.get_gene(random_gene_index).receptors[random_receptor].enzyme.get_random_product().and_then(|random_product| {
+               let mut mutated_genome = genome.duplicate();
+               mutated_genome.genes[random_gene_index].receptors[random_receptor].enzyme.products[random_product] = mutated_genome.get_gene(random_gene_index).get_random_substrate();
+               Some(mutated_genome)
+           })
+       } else {
+           None
+       }
+   }
+
 }
 
 /// Generates a random binary [`Substrate`].
@@ -1441,7 +1514,7 @@ fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
 
 impl Distribution<GenomeMutation> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenomeMutation {
-        match rng.gen_range(0u8, 22) {
+        match rng.gen_range(0u8, 24) {
             0 => GenomeMutation::InputAssociation,
             1 => GenomeMutation::InputDissociation,
             2 => GenomeMutation::OutputAssociation,
@@ -1464,6 +1537,8 @@ impl Distribution<GenomeMutation> for Standard {
             19 => GenomeMutation::GeneMutationReceptorMutationStateMutation,
             20 => GenomeMutation::GeneMutationReceptorMutationSubstratesMutation,
             21 => GenomeMutation::GeneMutationReceptorMutationEnzymeMutation,
+            22 => GenomeMutation::GeneMutationCatalyticCentreMutationEductMutation,
+            23 => GenomeMutation::GeneMutationCatalyticCentreMutationProductMutation,
             _ => panic!("A random number with no matching genomic mutation was created."),
         }
     }
