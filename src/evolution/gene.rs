@@ -322,6 +322,32 @@ struct GeneSubstrate {
     substrate: usize,
 }
 
+impl GeneSubstrate {
+
+    /// Checks wether this `GeneSubstrate` references the [`Gene`] at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene_index` - the index of the gene to check for
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn is_gene(&self, gene_index: usize) -> bool {
+        self.gene == gene_index
+    }
+
+    /// Checks wether this `GeneSubstrate` references the [`Substrate`] at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrate_index` - the index of the substrate to check for
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn is_substrate(&self, substrate_index: usize) -> bool {
+        self.substrate == substrate_index
+    }
+
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 /// A `GeneAssociation` is a [`Substrate`] defined on [`Genome`] level that replaces [`Gene`] specific
 /// [`Substrate`]s upon translation. This process is used to interconnect different [`Gene`]s on a
@@ -433,6 +459,41 @@ impl Gene {
         }
     }
 
+    /// Removes the binary [`Substrate`]a the specified index from the `Gene` if possible and
+    /// returns the removed [`Substrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * `substrate_index` - the [`Substrate`]'s index to remove to the `Gene`
+    ///
+    /// # Panics
+    ///
+    /// If the specified [`Substrate`]'s index is out of bounds or there is just a single
+    /// [`Substrate`] present, as a `Gene` needs at least 1 [`Substrate`].
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn remove_substrate(&mut self, substrate_index: usize) -> BitBox<Local, u8>{
+        if self.number_of_substrates().get() <= 1 {
+            panic!("A genome needs to contain at least one substrate, so no substrate can be removed.");
+        }
+        // Remove all receptors and catalytic centres referencing the substrate.
+        // TODO: Replace with drain_filter once stabilased.
+        let mut i = 0;
+        while i != self.receptors.len() {
+            if self.receptors[i].referes_to_substrate(substrate_index) {
+                self.receptors.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+        // Adjust the indices of the remaining pointers.
+        for receptor in &mut self.receptors {
+            receptor.adjust_indices(substrate_index);
+        }
+        // Remove the substrate.
+        self.substrates.remove(substrate_index)
+    }
+
     /// Fuse this `Gene` with the specified `Gene` if possible and return the fusion.
     /// This function will fail if the fusion would overflow the internal [`Substrate`] or
     /// [`Receptor`] vector.
@@ -466,6 +527,29 @@ impl Gene {
     pub fn duplicate(&self) -> Self {
         // At the moment this is just a wrapper for cloning.
         self.clone()
+    }
+
+    /// Adjust the index of [`Substrate`] pointers after removal of a [`Substrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * `current_index` - the index of the [`Substrate`] pointer before removal of [`Substrate`]
+    /// at `removed_index`
+    /// * `removed_index` - the index of the removed [`Substrate`]
+    ///
+    /// # Panics
+    ///
+    /// If `current_index` equals `removed_index`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_index(current_index: usize, removed_index: usize) -> usize {
+        if current_index < removed_index {
+            current_index
+        } else if current_index > removed_index {
+            current_index - 1
+        } else {
+            panic!("Index {} should have been removed, but was still passed as current index.", current_index);
+        }
     }
 }
 
@@ -521,6 +605,35 @@ impl GenomicReceptor {
             state, state.get_substrate_number(), substrates.len());
         GenomicReceptor{triggers, substrates, state, enzyme}
     }
+
+    /// Checks wether this `GenomicReceptor` contains any reference to the specified [`Substrate`].
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn referes_to_substrate(&self, substrate_index: usize) -> bool {
+        self.enzyme.referes_to_substrate(substrate_index) || self.triggers.iter().chain(self.substrates.iter()).any(|element| element == &substrate_index)
+    }
+
+    /// Adjust the indices of [`Substrate`] pointers after removal of a [`Substrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_index` - the index of the removed [`Substrate`]
+    ///
+    /// # Panics
+    ///
+    /// If `removed_index` is still present as index pointer.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_indices(&mut self, removed_index: usize) {
+        for trigger in &mut self.triggers {
+            *trigger = Gene::adjust_index(*trigger, removed_index);
+        }
+        for substrate in &mut self.substrates {
+            *substrate = Gene::adjust_index(*substrate, removed_index);
+        }
+        self.enzyme.adjust_indices(removed_index);
+    }
+
 }
 
 /// A `GenomicCatalyticCentre` represents the information of an actual [`CatalyticCentre`] that
@@ -566,6 +679,34 @@ impl GenomicCatalyticCentre {
             reaction, reaction.get_product_number(), products.len());
         GenomicCatalyticCentre{educts, products, reaction}
     }
+
+    /// Checks wether this `GenomicCatalyticCentre` contains any reference to the specified [`Substrate`].
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn referes_to_substrate(&self, substrate_index: usize) -> bool {
+        self.educts.iter().chain(self.products.iter()).any(|element| element == &substrate_index)
+    }
+
+    /// Adjust the indices of [`Substrate`] pointers after removal of a [`Substrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_index` - the index of the removed [`Substrate`]
+    ///
+    /// # Panics
+    ///
+    /// If `removed_index` is still present as index pointer.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_indices(&mut self, removed_index: usize) {
+        for educt in &mut self.educts {
+            *educt = Gene::adjust_index(*educt, removed_index);
+        }
+        for product in &mut self.products {
+            *product = Gene::adjust_index(*product, removed_index);
+        }
+    }
+
 }
 
 pub struct MutagenicEnvironment {
@@ -915,11 +1056,9 @@ impl GenomeMutation {
        if genome.get_gene(random_gene_index).number_of_substrates().get() > 1 {
            let mut mutated_genome = genome.duplicate();
            let random_substrate_index = mutated_genome.genes[random_gene_index].get_random_substrate();
-           mutated_genome.genes[random_gene_index].substrates.remove(random_substrate_index);
+           mutated_genome.genes[random_gene_index].remove_substrate(random_substrate_index);
            // TODO: Remove all genome level associations
-           // TODO: Remove all GenomicReceptor pointers
-           // TODO: Remove all GenomicCatalyticCentre pointers
-           // TODO: Update all index based pointers (GenomicReceptor + GenomicCatalyticCentre)
+           // TODO: Update all index based pointers at genome level
            Some(mutated_genome)
        } else {
            None
