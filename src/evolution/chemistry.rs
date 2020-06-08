@@ -3,7 +3,7 @@
 extern crate bitvec;
 extern crate rand;
 
-use bitvec::{boxed::BitBox, vec::BitVec};
+use bitvec::{prelude::BitStore, boxed::BitBox, order::BitOrder, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, Rng};
 
 /// A `State` is an elementary operation for comparing binary substrates.
@@ -181,7 +181,8 @@ impl State {
     /// # Panics
     ///
     /// If the number of substrates is not exactly equal to the required one.
-    pub fn detect(&self, substrates: &[&BitBox]) -> bool {
+    pub fn detect<O,S>(&self, substrates: &[&BitBox<O,S>]) -> bool
+        where O: BitOrder, S: BitStore {
         assert_eq!(substrates.len(), self.get_substrate_number(),
             "The number of required substrates is {}, but {} substrates were supplied.",
             self.get_substrate_number(), substrates.len());
@@ -337,7 +338,8 @@ impl Reaction {
     ///
     /// If the number of supplied educts and created products is not
     /// exactly equal to the required one.
-    pub fn react(&self, educts: &[&BitBox]) -> Vec<BitBox> {
+    pub fn react<O, S>(&self, educts: &[&BitBox<O, S>]) -> Vec<BitBox<O, S>>
+        where O: BitOrder, S: BitStore {
         assert_eq!(educts.len(), self.get_educt_number(),
             "The number of required educts is {}, but {} educts were supplied.",
             self.get_educt_number(), educts.len());

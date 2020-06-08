@@ -4,7 +4,7 @@ extern crate bitvec;
 use std::cell::Ref;
 use core::cell::RefCell;
 use std::rc::Rc;
-use bitvec::boxed::BitBox;
+use bitvec::{boxed::BitBox, order::Local};
 use super::chemistry::{Reaction, State};
 
 /// A `Substrate` represents a chemical entity of a specific value. Additionally
@@ -13,13 +13,13 @@ use super::chemistry::{Reaction, State};
 /// [`Receptor`]: ./struct.Receptor.html
 #[derive(Clone)]
 pub struct Substrate {
-    value: BitBox,
+    value: BitBox<Local, u8>,
     receptors: Vec<Rc<Receptor>>,
 }
 
 impl Substrate {
     /// Creates a new `Substrate` with the specified binary value.
-    pub fn new(value: BitBox) -> Self {
+    pub fn new(value: BitBox<Local, u8>) -> Self {
             Substrate{value, receptors: vec!()}
     }
 
@@ -31,12 +31,12 @@ impl Substrate {
     /// * `value` - the new value of the substrate
     ///
     /// [`Receptor`]: ./struct.Receptor.html
-    pub fn set_value(&mut self, value: BitBox) {
+    pub fn set_value(&mut self, value: BitBox<Local, u8>) {
         self.value = value;
     }
 
     /// Returns the binary value of this substrate.
-    pub fn value(&self) -> &BitBox {
+    pub fn value(&self) -> &BitBox<Local, u8> {
         &self.value
     }
 
@@ -99,7 +99,7 @@ impl Receptor {
         let substrates: Vec<Ref<Substrate>> = self.substrates.iter()
             .map(|sub| sub.borrow())
             .collect();
-        let substrates: Vec<&BitBox> = substrates.iter()
+        let substrates: Vec<&BitBox<Local, u8>> = substrates.iter()
             .map(|sub| sub.value())
             .collect();
         self.state.detect(&substrates)
@@ -165,12 +165,12 @@ impl CatalyticCentre {
     /// [`Reaction`] specific for this catalytic centre.
     ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    fn calculate_product_values(&self) -> Vec<BitBox> {
+    fn calculate_product_values(&self) -> Vec<BitBox<Local, u8>> {
         // TODO: refactor this ugly code
         let educts: Vec<Ref<Substrate>> = self.educts.iter()
             .map(|sub| sub.borrow())
             .collect();
-        let educts: Vec<&BitBox> = educts.iter()
+        let educts: Vec<&BitBox<Local, u8>> = educts.iter()
             .map(|sub| sub.value())
             .collect();
         self.reaction.react(&educts)
