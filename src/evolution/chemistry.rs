@@ -2,12 +2,14 @@
 //! for the evolutionary network.
 extern crate bitvec;
 extern crate rand;
+extern crate serde;
 
 use bitvec::{prelude::BitStore, boxed::BitBox, order::BitOrder, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, Rng};
+use serde::{Deserialize, Serialize};
 
 /// A `State` is an elementary operation for comparing binary substrates.
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum State {
     /// A state operation comparing two substrates for equality.
     ///
@@ -244,7 +246,7 @@ impl Distribution<State> for Standard {
 }
 
 /// A `Reaction` represents an elementary operation for modification of binary substrates.
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Reaction {
     /// A binary `AND` operation.
     And,

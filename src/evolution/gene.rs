@@ -2,11 +2,13 @@
 //! replicate and mutate the evolutionary network.
 extern crate bitvec;
 extern crate rand;
+extern crate serde;
 
 use super::chemistry::{Reaction, State};
 use bitvec::{boxed::BitBox, order::Local, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
+use serde::{Deserialize, Serialize};
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
 ///
@@ -21,7 +23,7 @@ const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 64;
 /// A `Genome` is required to consist of 1 or more genes.
 ///
 /// [`Gene`]: ./struct.Gene.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Genome {
     input: Vec<Option<GeneSubstrate>>,
     output: Vec<Option<GeneSubstrate>>,
@@ -380,7 +382,7 @@ impl Default for Genome {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 /// A `GeneSubstrate` is an index based pointer to a [`Substrate`] encoded in a [`Gene`]
 /// contained within the respective [`Genome`].
 ///
@@ -420,7 +422,7 @@ impl GeneSubstrate {
 
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 /// A `GeneAssociation` is a [`Substrate`] defined on [`Genome`] level that replaces [`Gene`] specific
 /// [`Substrate`]s upon translation. This process is used to interconnect different [`Gene`]s on a
 /// [`Genome`] level.
@@ -504,7 +506,7 @@ impl GeneAssociation {
 /// A `Gene` is required to encode at least 1 [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Gene {
     substrates: Vec<BitBox<Local, u8>>,
     receptors: Vec<GenomicReceptor>,
@@ -700,7 +702,7 @@ impl Default for Gene {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct GenomicReceptor {
     triggers: Vec<usize>,
     substrates: Vec<usize>,
@@ -816,7 +818,7 @@ impl GenomicReceptor {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Substrate`]: ../protein/struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct GenomicCatalyticCentre {
     educts: Vec<usize>,
     products: Vec<usize>,
