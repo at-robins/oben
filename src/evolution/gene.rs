@@ -945,6 +945,12 @@ pub enum GenomeMutation {
     GeneMutationSubstrateDeletion,
     /// Random alteration of a substrate of a gene.
     GeneMutationSubstrateMutation,
+    /// Random flipping of a bit of a substrate of a gene.
+    GeneMutationSubstrateMutationFlip,
+    /// Random addition of a bit of a substrate of a gene.
+    GeneMutationSubstrateMutationInsertion,
+    /// Random removal of a bit of a substrate of a gene.
+    GeneMutationSubstrateMutationDeletion,
     /// Random addition of a receptor to a gene.
     GeneMutationReceptorInsertion,
     /// Random removal of a receptor from a gene.
@@ -995,6 +1001,9 @@ impl GenomeMutation {
             GenomeMutation::GeneMutationSubstrateInsertion => GenomeMutation::mutate_gene_substrate_insertion(genome),
             GenomeMutation::GeneMutationSubstrateDeletion => GenomeMutation::mutate_gene_substrate_deletion(genome),
             GenomeMutation::GeneMutationSubstrateMutation => GenomeMutation::mutate_gene_substrate_mutation(genome),
+            GenomeMutation::GeneMutationSubstrateMutationFlip => GenomeMutation::mutate_gene_substrate_mutation_flip(genome),
+            GenomeMutation::GeneMutationSubstrateMutationInsertion => GenomeMutation::mutate_gene_substrate_mutation_insertion(genome),
+            GenomeMutation::GeneMutationSubstrateMutationDeletion => GenomeMutation::mutate_gene_substrate_mutation_deletion(genome),
             GenomeMutation::GeneMutationReceptorInsertion => GenomeMutation::mutate_gene_receptor_insertion(genome),
             GenomeMutation::GeneMutationReceptorDeletion => GenomeMutation::mutate_gene_receptor_deletion(genome),
             GenomeMutation::GeneMutationReceptorMutationTriggerInsertion => GenomeMutation::mutate_gene_receptor_trigger_insertion(genome),
@@ -1308,6 +1317,60 @@ impl GenomeMutation {
        }
    }
 
+   /// Duplicates the [`Genome`] and randomly modifies a bit of a [`Substrate`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_mutation_flip(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       let random_substrate_index = genome.get_gene(random_gene_index).get_random_substrate();
+       if genome.get_gene(random_gene_index).substrates[random_substrate_index].len() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           mutate_substrate_single_bit(&mut mutated_genome.genes[random_gene_index].substrates[random_substrate_index]);
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
+   /// Duplicates the [`Genome`] and randomly adds a bit to a [`Substrate`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`].
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_mutation_insertion(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       let random_substrate_index = genome.get_gene(random_gene_index).get_random_substrate();
+           let mut mutated_genome = genome.duplicate();
+           let mut mutated_substrate = mutated_genome.genes[random_gene_index].substrates[random_substrate_index].clone();
+           mutated_substrate = mutate_substrate_single_bit_insertion(mutated_substrate);
+           mutated_genome.genes[random_gene_index].substrates[random_substrate_index] = mutated_substrate;
+           Some(mutated_genome)
+   }
+
+   /// Duplicates the [`Genome`] and randomly removes a bit of a [`Substrate`] of an existing [`Gene`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_gene_substrate_mutation_deletion(genome: &Genome) -> Option<Genome> {
+       let random_gene_index = genome.get_random_gene();
+       let random_substrate_index = genome.get_gene(random_gene_index).get_random_substrate();
+       if genome.get_gene(random_gene_index).substrates[random_substrate_index].len() > 0 {
+           let mut mutated_genome = genome.duplicate();
+           let mut mutated_substrate = mutated_genome.genes[random_gene_index].substrates[random_substrate_index].clone();
+           mutated_substrate = mutate_substrate_single_bit_deletion(mutated_substrate);
+           mutated_genome.genes[random_gene_index].substrates[random_substrate_index] = mutated_substrate;
+           Some(mutated_genome)
+       } else {
+           None
+       }
+   }
+
    /// Duplicates the [`Genome`] and randomly adds a [`GenomicReceptor`] to an existing [`Gene`].
    /// Returns the altered [`Genome`] if the addition was successful.
    ///
@@ -1556,7 +1619,7 @@ fn mutate_substrate_single_bit_deletion(base_substrate: BitBox<Local, u8>) -> Bi
 
 impl Distribution<GenomeMutation> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenomeMutation {
-        match rng.gen_range(0u8, 24) {
+        match rng.gen_range(0u8, 27) {
             0 => GenomeMutation::InputAssociation,
             1 => GenomeMutation::InputDissociation,
             2 => GenomeMutation::OutputAssociation,
@@ -1581,6 +1644,9 @@ impl Distribution<GenomeMutation> for Standard {
             21 => GenomeMutation::GeneMutationReceptorMutationEnzymeMutation,
             22 => GenomeMutation::GeneMutationCatalyticCentreMutationEductMutation,
             23 => GenomeMutation::GeneMutationCatalyticCentreMutationProductMutation,
+            24 => GenomeMutation::GeneMutationSubstrateMutationFlip,
+            25 => GenomeMutation::GeneMutationSubstrateMutationInsertion,
+            26 => GenomeMutation::GeneMutationSubstrateMutationDeletion,
             _ => panic!("A random number with no matching genomic mutation was created."),
         }
     }
