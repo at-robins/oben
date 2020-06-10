@@ -1654,8 +1654,12 @@ fn mutate_substrate_single_bit(base_substrate: &mut BitBox<Local, u8>) {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 fn mutate_substrate_single_bit_insertion(base_substrate: BitBox<Local, u8>) -> BitBox<Local, u8> {
     let mut mutated_substrate = BitVec::from_boxed_bitslice(base_substrate);
-    let random_bit_index = thread_rng().gen_range(0, mutated_substrate.len());
-    mutated_substrate.insert(random_bit_index, thread_rng().gen());
+    if mutated_substrate.is_empty() {
+        mutated_substrate.push(thread_rng().gen());
+    } else {
+        let random_bit_index = thread_rng().gen_range(0, mutated_substrate.len());
+        mutated_substrate.insert(random_bit_index, thread_rng().gen());
+    }
     mutated_substrate.into_boxed_bitslice()
 }
 
