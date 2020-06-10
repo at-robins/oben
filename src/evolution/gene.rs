@@ -935,6 +935,12 @@ pub enum GenomeMutation {
     AssociationDeletion,
     /// Random mutation of the value of a random genome level substrate association.
     AssociationMutationSubstrate,
+    /// Random mutation of a single bit of a random genome level substrate association.
+    AssociationMutationSubstrateMutationFlip,
+    /// Random addition of a single bit of a random genome level substrate association.
+    AssociationMutationSubstrateMutationInsertion,
+    /// Random removal of a single bit of a random genome level substrate association.
+    AssociationMutationSubstrateMutationDeletion,
     /// Random addition of a gene's substrate to be referenced by a genome level substrate association.
     AssociationMutationGeneInsertion,
     /// Random removal of a gene's substrate to be referenced by a genome level substrate association.
@@ -996,6 +1002,9 @@ impl GenomeMutation {
             GenomeMutation::AssociationInsertion => GenomeMutation::mutate_association_insertion(genome),
             GenomeMutation::AssociationDeletion => GenomeMutation::mutate_association_deletion(genome),
             GenomeMutation::AssociationMutationSubstrate => GenomeMutation::mutate_association_substrate(genome),
+            GenomeMutation::AssociationMutationSubstrateMutationFlip => GenomeMutation::mutate_association_substrate_mutation_flip(genome),
+            GenomeMutation::AssociationMutationSubstrateMutationInsertion => GenomeMutation::mutate_association_substrate_mutation_insertion(genome),
+            GenomeMutation::AssociationMutationSubstrateMutationDeletion => GenomeMutation::mutate_association_substrate_mutation_deletion(genome),
             GenomeMutation::AssociationMutationGeneInsertion => GenomeMutation::mutate_association_gene_insertion(genome),
             GenomeMutation::AssociationMutationGeneDeletion => GenomeMutation::mutate_association_gene_deletion(genome),
             GenomeMutation::GeneMutationSubstrateInsertion => GenomeMutation::mutate_gene_substrate_insertion(genome),
@@ -1219,6 +1228,60 @@ impl GenomeMutation {
        } else {
            None
        }
+   }
+
+   /// Duplicates the [`Genome`] and randomly modifies a bit of a [`Substrate`] of a [`GeneAssociation`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_association_substrate_mutation_flip(genome: &Genome) -> Option<Genome> {
+       genome.get_random_association().and_then(|random_association_index|{
+           if genome.associations[random_association_index].substrate.len() > 0 {
+               let mut mutated_genome = genome.duplicate();
+               mutate_substrate_single_bit(&mut mutated_genome.associations[random_association_index].substrate);
+               Some(mutated_genome)
+           } else {
+               None
+           }
+       })
+   }
+
+   /// Duplicates the [`Genome`] and randomly adds a bit to a [`Substrate`] of a [`GeneAssociation`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_association_substrate_mutation_insertion(genome: &Genome) -> Option<Genome> {
+       genome.get_random_association().and_then(|random_association_index|{
+               let mut mutated_genome = genome.duplicate();
+               let mut mutated_substrate = mutated_genome.associations[random_association_index].substrate.clone();
+               mutated_substrate = mutate_substrate_single_bit_insertion(mutated_substrate);
+               mutated_genome.associations[random_association_index].substrate = mutated_substrate;
+               Some(mutated_genome)
+       })
+   }
+
+   /// Duplicates the [`Genome`] and randomly removes a bit to a [`Substrate`] of a [`GeneAssociation`].
+   /// Returns the altered [`Genome`] if the modification was successful.
+   ///
+   /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+   /// [`Genome`]: ./struct.Genome.html
+   /// [`Substrate`]: ../protein/struct.Substrate.html
+   fn mutate_association_substrate_mutation_deletion(genome: &Genome) -> Option<Genome> {
+       genome.get_random_association().and_then(|random_association_index|{
+           if genome.associations[random_association_index].substrate.len() > 0 {
+               let mut mutated_genome = genome.duplicate();
+               let mut mutated_substrate = mutated_genome.associations[random_association_index].substrate.clone();
+               mutated_substrate = mutate_substrate_single_bit_deletion(mutated_substrate);
+               mutated_genome.associations[random_association_index].substrate = mutated_substrate;
+               Some(mutated_genome)
+           } else {
+               None
+           }
+       })
    }
 
    /// Duplicates the [`Genome`] and randomly adds a [`GeneSubstrate`] to an existing [`GeneAssociation`].
@@ -1619,7 +1682,7 @@ fn mutate_substrate_single_bit_deletion(base_substrate: BitBox<Local, u8>) -> Bi
 
 impl Distribution<GenomeMutation> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GenomeMutation {
-        match rng.gen_range(0u8, 27) {
+        match rng.gen_range(0u8, 30) {
             0 => GenomeMutation::InputAssociation,
             1 => GenomeMutation::InputDissociation,
             2 => GenomeMutation::OutputAssociation,
@@ -1647,6 +1710,9 @@ impl Distribution<GenomeMutation> for Standard {
             24 => GenomeMutation::GeneMutationSubstrateMutationFlip,
             25 => GenomeMutation::GeneMutationSubstrateMutationInsertion,
             26 => GenomeMutation::GeneMutationSubstrateMutationDeletion,
+            27 => GenomeMutation::AssociationMutationSubstrateMutationFlip,
+            28 => GenomeMutation::AssociationMutationSubstrateMutationInsertion,
+            29 => GenomeMutation::AssociationMutationSubstrateMutationDeletion,
             _ => panic!("A random number with no matching genomic mutation was created."),
         }
     }
