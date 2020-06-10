@@ -4,7 +4,7 @@ extern crate bitvec;
 extern crate rand;
 
 use super::chemistry::{Reaction, State};
-use bitvec::{boxed::BitBox, order::Local};
+use bitvec::{boxed::BitBox, order::Local, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
 
@@ -15,7 +15,7 @@ const RANDOM_SUBSTRATE_MIN_LENGTH: usize = 0;
 /// The maximal length in byte of a randomly created binary [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 128;
+const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 64;
 
 /// A `Genome` is a collection of individual [`Gene`]s and associations between them.
 /// A `Genome` is required to consist of 1 or more genes.
@@ -1494,6 +1494,64 @@ fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
     }
     let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
     BitBox::from_slice(&random_bytes)
+}
+
+/// Flips a random bit of the binary [`Substrate`].
+///
+/// # Parameters
+///
+/// * `base_substrate` - the [`Substrate`] to mutate
+///
+/// Panics
+///
+/// If `base_substrate` is empty.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+fn mutate_substrate_single_bit(base_substrate: &mut BitBox<Local, u8>) {
+    if base_substrate.is_empty() {
+        panic!("No byte can be flipped in an empty substrate.");
+    }
+    let random_bit_index = thread_rng().gen_range(0, base_substrate.len());
+    // The unwrap should always work, since the index being in range was checked for.
+    // The clone should be cheap as a bool primitive is cloned.
+    let random_bit = base_substrate.get(random_bit_index).unwrap().clone();
+    // Flip the bit.
+    base_substrate.set(random_bit_index, random_bit ^ true);
+}
+
+/// Adds a random bit to the binary [`Substrate`].
+///
+/// # Parameters
+///
+/// * `base_substrate` - the [`Substrate`] to mutate
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+fn mutate_substrate_single_bit_insertion(base_substrate: BitBox<Local, u8>) -> BitBox<Local, u8> {
+    let mut mutated_substrate = BitVec::from_boxed_bitslice(base_substrate);
+    let random_bit_index = thread_rng().gen_range(0, mutated_substrate.len());
+    mutated_substrate.insert(random_bit_index, thread_rng().gen());
+    mutated_substrate.into_boxed_bitslice()
+}
+
+/// Removes a random bit from the binary [`Substrate`].
+///
+/// # Parameters
+///
+/// * `base_substrate` - the [`Substrate`] to mutate
+///
+/// Panics
+///
+/// If `base_substrate` is empty.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+fn mutate_substrate_single_bit_deletion(base_substrate: BitBox<Local, u8>) -> BitBox<Local, u8> {
+    if base_substrate.is_empty() {
+        panic!("No byte can be removed from an empty substrate.");
+    }
+    let mut mutated_substrate = BitVec::from_boxed_bitslice(base_substrate);
+    let random_bit_index = thread_rng().gen_range(0, mutated_substrate.len());
+    mutated_substrate.remove(random_bit_index);
+    mutated_substrate.into_boxed_bitslice()
 }
 
 impl Distribution<GenomeMutation> for Standard {
