@@ -8,6 +8,9 @@ use super::chemistry::{Reaction, State};
 use bitvec::{boxed::BitBox, order::Local, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
+use std::error::Error;
+use std::fs::File;
+use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
@@ -368,6 +371,30 @@ impl Genome {
         for association in &mut self.associations {
             association.adjust_after_gene_substrate_removal(removed_substrate);
         }
+    }
+
+    /// Load a `Genome` from a JSON file if possible.
+    /// An error will be returned if parsing the file failed.
+    ///
+    /// # Parameters
+    ///
+    /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
+    pub fn load_from_file<P, E>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path>, {
+       let file = File::open(path_to_file)?;
+       let genome = serde_json::from_reader(file)?;
+       Ok(genome)
+    }
+
+    /// Write a `Genome` to a JSON file if possible.
+    /// An error will be returned if writing to the file failed.
+    ///
+    /// # Parameters
+    ///
+    /// * `path_to_file` - the JSON file the `Genome` should be written to
+    pub fn write_to_file<P, E>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path>, {
+       let file = File::create(path_to_file)?;
+       let write_success = serde_json::to_writer(file, self)?;
+       Ok(write_success)
     }
 }
 
@@ -916,6 +943,9 @@ pub struct MutagenicEnvironment {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
+/// All mutations that can be used to randomly modify a  [`Genome`].
+///
+/// [`Genome`]: ./struct.Genome.html
 pub enum GenomeMutation {
     /// Random association of an input.
     InputAssociation,
