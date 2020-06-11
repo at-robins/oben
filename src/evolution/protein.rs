@@ -11,7 +11,7 @@ use super::chemistry::{Reaction, State};
 /// a `Substrate` is aware of all [`Receptor`]s detecting its changes.
 ///
 /// [`Receptor`]: ./struct.Receptor.html
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Substrate {
     value: BitBox<Local, u8>,
     receptors: Vec<Rc<Receptor>>,
@@ -58,7 +58,7 @@ impl Substrate {
 ///
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Receptor {
     substrates: Vec<Rc<RefCell<Substrate>>>,
     state: State,
@@ -127,7 +127,7 @@ impl Receptor {
 ///
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CatalyticCentre {
     educts: Vec<Rc<RefCell<Substrate>>>,
     products: Vec<Rc<RefCell<Substrate>>>,
