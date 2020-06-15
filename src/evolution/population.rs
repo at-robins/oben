@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex};
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
+use std::collections::HashMap;
 
 pub struct Individual<'a> {
     substrates: Vec<Substrate>,
@@ -79,6 +80,25 @@ pub struct ClonalPopulation {
 }
 
 impl ClonalPopulation {
+    /// Founds a new `ClonalPopulation` with a single individual.
+    ///
+    /// # Parameters
+    ///
+    /// * `uuid` - the UUID of the `ClonalPopulation`
+    pub fn found(uuid: Uuid) -> Self {
+        ClonalPopulation{
+            source: uuid,
+            size: 1,
+            fitness: None,
+            death_counter: 0.0,
+        }
+    }
+
+    /// Returns the UUID of this `ClonalPopulation`.
+    pub fn uuid(&self) -> &Uuid {
+        &self.source
+    }
+
     /// Adds the specified fitness value by setting the fitness to the mean of old and
     /// and new fitness. If no fitness was set prevously, sets the specified fitness
     /// as new fitness.
@@ -151,7 +171,7 @@ impl ClonalPopulation {
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn get_genome(&self, environment: &Environment) -> Genome {
-        match Genome::load_from_file(environment.genome_path(self.source)) {
+        match Genome::load_from_file(environment.genome_path(&self.source)) {
             Ok(genome) => genome,
             // I/O is a subsistantial part of the system, so its advised to panic here instead
             // of performing error handling.
@@ -172,7 +192,7 @@ pub struct SerialisablePopulation {
 
 #[derive(Debug, Clone)]
 pub struct Population {
-    clonal_populations: Vec<Arc<Mutex<ClonalPopulation>>>,
+    clonal_populations: HashMap<Uuid, Arc<Mutex<ClonalPopulation>>>,
 }
 
 impl Population {
@@ -181,7 +201,7 @@ impl Population {
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
     pub fn snapshot(&self) -> SerialisablePopulation {
         let mut serialisable_population = SerialisablePopulation{clonal_populations: vec!()};
-        for clonal_population in &self.clonal_populations {
+        for clonal_population in self.clonal_populations.values() {
             match clonal_population.lock() {
                 Ok(cp) => serialisable_population.clonal_populations.push((*cp).clone()),
                 Err(err) => {
@@ -206,5 +226,83 @@ impl Population {
         let serialisable_population = self.snapshot();
         let write_success = serde_json::to_writer(file, &serialisable_population)?;
         Ok(write_success)
+    }
+
+    /// Returns the [`ClonalPopulation`]s that are part of this `Population`.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn clonal_populations(&self) -> Vec<&Arc<Mutex<ClonalPopulation>>> {
+        self.clonal_populations.values().collect()
+    }
+
+    /// Inserts all the [`ClonalPopulation`]s into the `Population` and returns a reference
+    /// to them.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_populations` - the [`ClonalPopulation`]s to append
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn append(&mut self, clonal_populations: Vec<ClonalPopulation>) -> Vec<Arc<Mutex<ClonalPopulation>>> {
+        clonal_populations.into_iter()
+            .map(|clonal_population| (clonal_population.uuid().clone(), Arc::new(Mutex::new(clonal_population))))
+            .map(|clonal_population| {
+                self.clonal_populations.insert(clonal_population.0, clonal_population.1.clone());
+                clonal_population.1
+            }).collect()
+    }
+
+    /// Remove the [`ClonalPopulation`] from the `Population`.
+    /// An error will be returned if there is no [`ClonalPopulation`] with the specified UUID or
+    /// if the correspondig [`Genome`] file could not be moved to the extinct sub-folder.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population_uuid` - the UUID of the [`ClonalPopulation`] to remove
+    /// * `environment` - the [`Environment`] the population is growing in
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+    /// [`Environment`]: ../environment/struct.Environment.html
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn remove(&mut self, clonal_population_uuid: &Uuid, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
+        let removed = self.clonal_populations.remove(&clonal_population_uuid)
+            .ok_or::<RemoveError>(RemoveError::new(clonal_population_uuid))?;
+        // Move the extinct genome to a backup folder.
+        {
+            // We do not care for the integrity of the clonal population since the UUID is immuatble.
+            let clonal_population = removed.lock().map_or_else(|val| val.into_inner(), |val| val);
+            std::fs::rename(environment.genome_path(clonal_population.uuid()), environment.extinct_genome_path(clonal_population.uuid()))?;
+        }
+        Ok(removed)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+/// A `RemoveError` is returned when a UUID with no matching [`ClonalPopulation`] is flagged for
+/// removal.
+pub struct RemoveError {
+    description: String,
+}
+
+impl RemoveError {
+    /// Creates a `RemoveError` from the specified UUID.
+    ///
+    /// # Parameters
+    ///
+    /// * `uuid` - the UUID flagged for removal
+    pub fn new(uuid: &Uuid) -> Self {
+        RemoveError {description: format!("No clonal population with UUID {} is present in the population.", uuid)}
+    }
+}
+
+impl std::fmt::Display for RemoveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description)
+    }
+}
+
+impl Error for RemoveError {
+    fn description(&self) -> &str {
+        &self.description
     }
 }

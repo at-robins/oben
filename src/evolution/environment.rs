@@ -6,7 +6,7 @@ extern crate rayon;
 use bitvec::boxed::BitBox;
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
-use super::population::Population;
+use super::population::{ClonalPopulation, Population};
 use std::time::{Duration, Instant, SystemTime};
 use rayon::{ThreadPool};
 use std::sync::{Arc, Mutex};
@@ -112,9 +112,24 @@ impl Environment {
     /// * `genome_uuid` - the UUID of the [`Genome`]
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn genome_path(&self, genome_uuid: Uuid) -> PathBuf {
+    pub fn genome_path(&self, genome_uuid: &Uuid) -> PathBuf {
         let mut path_to_genome: PathBuf = self.working_directory().into();
         path_to_genome.push(SUBFOLDER_GENOME);
+        path_to_genome.set_file_name(genome_uuid.to_string());
+        path_to_genome.set_extension(FILE_EXTENSION_GENOME);
+        path_to_genome
+    }
+
+    /// Returns the file path to the extinct [`Genome`] with the specified UUID.
+    ///
+    /// # Parameters
+    ///
+    /// * `genome_uuid` - the UUID of the extinct [`Genome`]
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+    pub fn extinct_genome_path(&self, genome_uuid: &Uuid) -> PathBuf {
+        let mut path_to_genome: PathBuf = self.working_directory().into();
+        path_to_genome.push(SUBFOLDER_GENOME_EXTINCT);
         path_to_genome.set_file_name(genome_uuid.to_string());
         path_to_genome.set_extension(FILE_EXTENSION_GENOME);
         path_to_genome
@@ -127,7 +142,7 @@ impl Environment {
     /// * `population_uuid` - the UUID of the [`Population`]
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn population_path(&self, population_uuid: Uuid) -> PathBuf {
+    pub fn population_path(&self, population_uuid: &Uuid) -> PathBuf {
         let mut path_to_genome: PathBuf = self.working_directory().into();
         path_to_genome.push(SUBFOLDER_POPULATION);
         path_to_genome.set_file_name(population_uuid.to_string());
@@ -198,22 +213,43 @@ impl Default for Environment {
 pub struct GlobalEnvironment {
     environment: Environment,
     population: Arc<Mutex<Population>>,
-    supplier_function: Box<dyn Fn() -> Vec<BitBox>>,
-    fitness_function: Box<dyn Fn(Vec<Option<BitBox>>) -> f64>,
-    pool: Arc<Mutex<ThreadPool>>,
+    supplier_function: Box<dyn Fn() -> Vec<BitBox>  + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<Option<BitBox>>) -> f64 + Send + Sync + 'static>,
+    pool: ThreadPool,
 }
 
 impl GlobalEnvironment {
     pub fn breath_life(&mut self) {
+        // Initialise the environment.
         self.environment.initialise();
-        let pool = self.pool.lock().expect("A thread panicked while having access to the complete threadpool.");
-        //for clonal_population in
+        // Start the network.
+        {
+            for clonal_population in self.population.lock().expect("").clonal_populations() {
+                // let sent_clonal_population = clonal_population.clone();
+                // let sent_population = self.population.clone();
+                // let sent_pool = self.pool.clone();
+                // let sent_environment = &self.environment;
+                // self.pool.install(move || {
+                //     let cp = sent_clonal_population.lock().unwrap();
+                //     // Calculate the deaths of the population and remove it if it went extinct.
+                //
+                //     if cp.is_extinct() {
+                //         sent_population.lock().unwrap().remove(cp.uuid(), &sent_environment).unwrap();
+                //     }
+                //     // Transcribe / translate the genome and test the organism.
+                //     let fitness = 0.0;
+                //     // Add the mutated offspring to the popuation.
+                //     // let mutated_offspring = cp.evaluate_new_fitness(fitness, &sent_environment).map();
+                //
+                // });
+            }
+        }
         // Save the population in regular intervalls with a timestamp.
         let mut start = Instant::now();
         loop {
             if start.elapsed() >= self.environment.population_save_intervall() {
                 let population_id = self.environment.generate_uuid();
-                let save_path = self.environment.population_path(population_id);
+                let save_path = self.environment.population_path(&population_id);
                 self.population.lock()
                     .expect("A thread paniced while holding the population lock.")
                     .snapshot_to_file(&save_path)
@@ -224,5 +260,42 @@ impl GlobalEnvironment {
             }
         }
         // TODO: Push all ClonalPopulations to threadpool
+    }
+
+    fn spawn_organism(&'static self, clonal_population: Arc<Mutex<ClonalPopulation>>) {
+        //TODO: Replace all unwraps.
+        &self.pool.spawn(move || {
+            {
+                // TODO: Kill function.
+                let cp = clonal_population.lock().unwrap();
+                // Calculate the deaths of the population and remove it if it went extinct.
+                if cp.is_extinct() {
+                    &self.population.lock().unwrap().remove(cp.uuid(), &self.environment).unwrap();
+                }
+            }
+            // Transcribe / translate the genome and test the organism.
+            // TODO: Translation and fitness function.
+            let fitness = 0.0;
+            let mutated_offspring;
+            {
+                let mut cp = clonal_population.lock().unwrap();
+                mutated_offspring = cp.evaluate_new_fitness(fitness, &self.environment);
+            }
+            let mutated_offspring: Vec<ClonalPopulation> = mutated_offspring.iter()
+                .map(|genome| {
+                    let uuid = self.environment.generate_uuid();
+                    genome.write_to_file(self.environment.genome_path(&uuid)).unwrap();
+                    ClonalPopulation::found(uuid)
+                }).collect();
+            // Restart this population.
+            &self.pool.spawn(move || self.spawn_organism(clonal_population));
+            // Add the mutated offspring to the popuation and start execution.
+            {
+                let mut p = self.population.lock().unwrap();
+                for offspring in p.append(mutated_offspring).into_iter() {
+                    &self.pool.spawn(move || self.spawn_organism(offspring));
+                }
+            }
+        });
     }
 }
