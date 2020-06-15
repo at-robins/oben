@@ -7,7 +7,7 @@ extern crate uuid;
 extern crate serde;
 
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 use std::rc::Rc;
 use bitvec::{boxed::BitBox, order::Local};
 use super::protein::{Substrate, Receptor};
@@ -16,19 +16,22 @@ use super::environment::Environment;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use rand_distr::{Binomial, Distribution};
+use std::sync::{Arc, Mutex};
+use std::error::Error;
+use std::fs::File;
+use std::path::Path;
 
 pub struct Individual<'a> {
     substrates: Vec<Substrate>,
     input: Vec<&'a Substrate>,
     output: Vec<&'a Substrate>,
-    lifespan: Duration,
 }
 
 impl<'a> Individual<'a> {
     /*pub fn new(input_substrates: u32, output_substrates: u32) -> Self {
 
     }*/
-    pub fn live(&self) {
+    pub fn live(&self, environment: &Environment) {
         let birth = Instant::now();
         let mut actions = VecDeque::<Rc<Receptor>>::new();
         // Add all receptors detecting changes to the input.
@@ -41,7 +44,7 @@ impl<'a> Individual<'a> {
         // which were modified during the run.
         // If the task takes longer than the specified threshold,
         // the run will be aborted.
-        while !actions.is_empty() && birth.elapsed() <= self.lifespan {
+        while !actions.is_empty() && birth.elapsed() <= environment.lifespan() {
             for cascading_receptor in actions.pop_front().unwrap().detect() {
                 actions.push_back(cascading_receptor);
             }
@@ -109,6 +112,19 @@ impl ClonalPopulation {
         }
     }
 
+    /// Generates mutated [`Genome`]s and updates the population size based on the evaluated fitness.
+    ///
+    /// # Parameters
+    ///
+    /// * `fitness` - the newly evaluated fitness of the population
+    /// * `environment` - the [`Environment`] the population is growing in
+    ///
+    /// # Panics
+    ///
+    /// If internal loading the source [`Genome`] from its associated file failed,
+    /// while generating mutants.
+    ///
+    /// [`Environment`]: ../environment/struct.Environment.html
     pub fn evaluate_new_fitness(&mut self, fitness: f64, environment: &Environment) -> Vec<Genome> {
         self.add_fitness(fitness);
         // The fitness was just set, so the unwrap call must succeed.
@@ -149,6 +165,46 @@ impl ClonalPopulation {
     }
 }
 
-pub struct Population {
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SerialisablePopulation {
+    clonal_populations: Vec<ClonalPopulation>,
+}
 
+#[derive(Debug, Clone)]
+pub struct Population {
+    clonal_populations: Vec<Arc<Mutex<ClonalPopulation>>>,
+}
+
+impl Population {
+    /// Create an immutable, serialisable snapshot of the current population.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn snapshot(&self) -> SerialisablePopulation {
+        let mut serialisable_population = SerialisablePopulation{clonal_populations: vec!()};
+        for clonal_population in &self.clonal_populations {
+            match clonal_population.lock() {
+                Ok(cp) => serialisable_population.clonal_populations.push((*cp).clone()),
+                Err(err) => {
+                    // A clonal population cannot end up in an invalid state, so serialising it
+                    // does no harm.
+                    let poisoned: ClonalPopulation = err.into_inner().clone();
+                    serialisable_population.clonal_populations.push(poisoned);
+                },
+            }
+        }
+        serialisable_population
+    }
+
+    /// Write this `Population` to a JSON file if possible.
+    /// An error will be returned if writing to the file failed.
+    ///
+    /// # Parameters
+    ///
+    /// * `path_to_file` - the JSON file the `Population` should be written to
+    pub fn snapshot_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error + 'static>> where P: AsRef<Path> {
+        let file = File::create(path_to_file)?;
+        let serialisable_population = self.snapshot();
+        let write_success = serde_json::to_writer(file, &serialisable_population)?;
+        Ok(write_success)
+    }
 }

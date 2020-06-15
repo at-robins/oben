@@ -379,7 +379,7 @@ impl Genome {
     /// # Parameters
     ///
     /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
-    pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path>, {
+    pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
        let file = File::open(path_to_file)?;
        let genome = serde_json::from_reader(file)?;
        Ok(genome)
@@ -391,7 +391,7 @@ impl Genome {
     /// # Parameters
     ///
     /// * `path_to_file` - the JSON file the `Genome` should be written to
-    pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path>, {
+    pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
        let file = File::create(path_to_file)?;
        let write_success = serde_json::to_writer(file, self)?;
        Ok(write_success)
