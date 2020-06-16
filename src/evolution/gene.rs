@@ -5,6 +5,8 @@ extern crate rand;
 extern crate serde;
 
 use super::chemistry::{Reaction, State};
+use super::population::Organism;
+use super::protein::{CatalyticCentre, Receptor, Substrate};
 use bitvec::{boxed::BitBox, order::Local, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
@@ -12,6 +14,9 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use serde::{Deserialize, Serialize};
+use core::cell::RefCell;
+use std::rc::Rc;
+use std::collections::HashMap;
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
 ///
@@ -207,6 +212,25 @@ impl Genome {
         &self.genes[gene]
     }
 
+    /// Returns the [`Gene`] at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to duplicate
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    fn get_gene_substrates(&self, gene: usize) -> Vec<GeneSubstrate, Rc<RefCell<BitBox<Local, u8>>>> {
+        let gene = &self.genes[gene];
+        (0..gene.number_of_substrates())
+            .map()
+            .map()
+            .collect()
+    }
+
     /// Returns the index of a random [`Gene`].
     ///
     /// [`Gene`]: ./struct.Gene.html
@@ -395,6 +419,21 @@ impl Genome {
        let file = File::create(path_to_file)?;
        let write_success = serde_json::to_writer(file, self)?;
        Ok(write_success)
+    }
+
+    pub fn translate(&self) -> Organism {
+        let mut gene_substrate_map: HashMap<GeneSubstrate, Rc<RefCell<BitBox<Local, u8>>>> = HashMap::new();
+        for gene_association in &self.associations {
+            let genome_level_substrate = Rc::new(RefCell::new(gene_association.substrate.clone()));
+            for gene_substrate in &gene_association.associations {
+                gene_substrate_map.entry(gene_substrate.clone()).or_insert(genome_level_substrate.clone());
+            }
+        }
+
+        let substrates = vec!();
+        let input = vec!();
+        let output = vec!();
+        Organism{substrates, input, output}
     }
 }
 

@@ -7,7 +7,7 @@ extern crate uuid;
 extern crate serde;
 
 use std::collections::VecDeque;
-use std::time::{Instant};
+use std::time::Instant;
 use std::rc::Rc;
 use bitvec::{boxed::BitBox, order::Local};
 use super::protein::{Substrate, Receptor};
@@ -22,13 +22,13 @@ use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
 
-pub struct Individual<'a> {
+pub struct Organism<'a> {
     substrates: Vec<Substrate>,
     input: Vec<&'a Substrate>,
     output: Vec<&'a Substrate>,
 }
 
-impl<'a> Individual<'a> {
+impl<'a> Organism<'a> {
     /*pub fn new(input_substrates: u32, output_substrates: u32) -> Self {
 
     }*/
@@ -55,6 +55,7 @@ impl<'a> Individual<'a> {
     pub fn get_result(&self) -> Vec<BitBox<Local, u8>> {
         self.output.iter().map(|sub| sub.value().clone()).collect()
     }
+
 }
 
 /// Generates the specified number of randomly mutated versions of the specified [`Genome`].

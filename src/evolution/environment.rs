@@ -41,10 +41,10 @@ pub struct Environment {
     max_clonal_population_size: u32,
     /// The rate in individualts / second at which individuals of a population die.
     death_rate: f64,
-    /// The amount of time an [`Individual`] of a [`ClonalPopulation`] has to complete a task.
+    /// The amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Organism`]: ../population/struct.Organism.html
     lifespan: Duration,
     /// The time intervall in which to save the current [`Population`] to a file.
     ///
@@ -151,9 +151,9 @@ impl Environment {
         path_to_genome
     }
 
-    /// Returns the amount of time an [`Individual`] of a [`ClonalPopulation`] has to complete a task.
+    /// Returns the amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
     ///
-    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Organism`]: ../population/struct.Organism.html
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     pub fn lifespan(&self) -> Duration {
         self.lifespan
