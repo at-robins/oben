@@ -437,7 +437,12 @@ impl Genome {
                 gene_substrate_map.entry(gene_substrate).or_insert(substrate);
             }
         }
-        // TODO: Translate receptors and catalytic centres.
+        // Translate receptors and catalytic centres.
+        for gene_index in 0..self.number_of_genes().get() {
+            for receptor in self.get_gene(gene_index).receptors.iter() {
+                receptor.translate(gene_index, &gene_substrate_map);
+            }
+        }
         let substrates = gene_substrate_map.values().map(|sub| sub.clone()).collect();
         let input = self.input.iter()
             .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
@@ -886,6 +891,40 @@ impl GenomicReceptor {
         self.enzyme.adjust_indices(removed_index);
     }
 
+    /// Translates the `GenomicReceptor` into a [`Receptor`] and directly associates them with their
+    /// triggering [`Substrate`]s.
+    ///
+    /// # Parameters
+    /// * `gene_index` - the index of the [`Gene`] containing this `Receptor` inside the
+    /// [`Genome`].
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`]s of the containing [`Genome`]
+    ///
+    /// # Panics
+    ///
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`]s.
+    ///
+    /// [`Receptor`]: ../protein/struct.Receptor.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`Genome`]: ./struct.Genome.html
+    /// [`Gene`]: ./struct.Gene.html
+    fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate>>>) {
+        let substrates = self.substrates.iter()
+            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
+                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
+                .clone()
+            ).collect();
+        let enzyme = self.enzyme.translate(gene_index, substrate_lookup);
+        let state = self.state.clone();
+        let receptor = Rc::new(Receptor::new(substrates, state, enzyme));
+        for trigger_index in self.triggers.iter() {
+            let gene_substrate = GeneSubstrate{gene: gene_index, substrate: *trigger_index};
+            substrate_lookup.get(&gene_substrate)
+                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
+                .borrow_mut().add_receptor(receptor.clone());
+        }
+    }
+
 }
 
 /// A `GenomicCatalyticCentre` represents the information of an actual [`CatalyticCentre`] that
@@ -981,6 +1020,38 @@ impl GenomicCatalyticCentre {
         } else {
             None
         }
+    }
+
+    /// Translates the `GenomicCatalyticCentre` into a [`CatalyticCentre`].
+    ///
+    /// # Parameters
+    /// * `gene_index` - the index of the [`Gene`] containing this `GenomicCatalyticCentre` inside the
+    /// [`Genome`].
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`]s of the containing [`Genome`]
+    ///
+    /// # Panics
+    ///
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`]s.
+    ///
+    /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`Genome`]: ./struct.Genome.html
+    /// [`Gene`]: ./struct.Gene.html
+    fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate>>>) -> CatalyticCentre {
+        let educts = self.educts.iter()
+            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
+                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
+                .clone()
+            ).collect();
+        let products = self.products.iter()
+            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
+                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
+                .clone()
+            ).collect();
+        let reaction = self.reaction.clone();
+        CatalyticCentre::new(educts, products, reaction)
     }
 
 }
