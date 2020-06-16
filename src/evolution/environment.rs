@@ -3,10 +3,11 @@
 extern crate bitvec;
 extern crate rayon;
 
-use bitvec::boxed::BitBox;
+use bitvec::{boxed::BitBox, order::Local};
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population};
+use super::gene::Genome;
 use std::time::{Duration, Instant, SystemTime};
 use rayon::ThreadPool;
 use std::sync::{Arc, Mutex};
@@ -214,8 +215,8 @@ impl Default for Environment {
 pub struct GlobalEnvironment {
     environment: Environment,
     population: Arc<Mutex<Population>>,
-    supplier_function: Box<dyn Fn() -> Vec<BitBox>  + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<Option<BitBox>>) -> f64 + Send + Sync + 'static>,
+    supplier_function: Box<dyn Fn() -> Vec<BitBox<Local, u8>>  + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>) -> f64 + Send + Sync + 'static>,
     pool: ThreadPool,
     death_timer: Arc<Mutex<HashMap<Uuid, Instant>>>,
 }
@@ -267,20 +268,29 @@ impl GlobalEnvironment {
     fn spawn_organism(&'static self, clonal_population: Arc<Mutex<ClonalPopulation>>) {
         //TODO: Replace all unwraps.
         &self.pool.spawn(move || {
+            let organism;
             {
-                // Calculate the deaths of the population and remove it if it went extinct.
-                let mut cp = clonal_population.lock().unwrap();
-                if let Some(last_death_event) = &self.death_timer.lock().unwrap().insert(cp.uuid().clone(), Instant::now()) {
-                    cp.death_event(last_death_event.elapsed().as_secs_f64() / &self.environment.death_rate());
+                let cp_genome_path;
+                {
+                    // Calculate the deaths of the population and remove it if it went extinct.
+                    let mut cp = clonal_population.lock().unwrap();
+                    if let Some(last_death_event) = &self.death_timer.lock().unwrap().insert(cp.uuid().clone(), Instant::now()) {
+                        cp.death_event(last_death_event.elapsed().as_secs_f64() / &self.environment.death_rate());
+                    }
+                    if cp.is_extinct() {
+                        &self.population.lock().unwrap().remove(cp.uuid(), &self.environment).unwrap();
+                        return;
+                    }
+                    let cp_uuid = cp.uuid();
+                    cp_genome_path = self.environment.genome_path(cp_uuid);
                 }
-                if cp.is_extinct() {
-                    &self.population.lock().unwrap().remove(cp.uuid(), &self.environment).unwrap();
-                }
+                // Transcribe / translate the genome and test the organism.
+                let input = (&self.supplier_function)();
+                let organism_genome = Genome::load_from_file(cp_genome_path).unwrap();
+                organism = organism_genome.translate();
             }
-            // Transcribe / translate the genome and test the organism.
-            let input = (&self.supplier_function)();
-            // TODO: Translation.
-            let output: Vec<Option<BitBox>> = vec!();
+            organism.live(&self.environment);
+            let output = organism.get_result();
             let fitness = (&self.fitness_function)(output);
             let mutated_offspring;
             {
