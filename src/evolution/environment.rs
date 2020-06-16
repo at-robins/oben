@@ -8,8 +8,9 @@ use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population};
 use std::time::{Duration, Instant, SystemTime};
-use rayon::{ThreadPool};
+use rayon::ThreadPool;
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes";
@@ -216,6 +217,7 @@ pub struct GlobalEnvironment {
     supplier_function: Box<dyn Fn() -> Vec<BitBox>  + Send + Sync + 'static>,
     fitness_function: Box<dyn Fn(Vec<Option<BitBox>>) -> f64 + Send + Sync + 'static>,
     pool: ThreadPool,
+    death_timer: Arc<Mutex<HashMap<Uuid, Instant>>>,
 }
 
 impl GlobalEnvironment {
@@ -266,16 +268,20 @@ impl GlobalEnvironment {
         //TODO: Replace all unwraps.
         &self.pool.spawn(move || {
             {
-                // TODO: Kill function.
-                let cp = clonal_population.lock().unwrap();
                 // Calculate the deaths of the population and remove it if it went extinct.
+                let mut cp = clonal_population.lock().unwrap();
+                if let Some(last_death_event) = &self.death_timer.lock().unwrap().insert(cp.uuid().clone(), Instant::now()) {
+                    cp.death_event(last_death_event.elapsed().as_secs_f64() / &self.environment.death_rate());
+                }
                 if cp.is_extinct() {
                     &self.population.lock().unwrap().remove(cp.uuid(), &self.environment).unwrap();
                 }
             }
             // Transcribe / translate the genome and test the organism.
-            // TODO: Translation and fitness function.
-            let fitness = 0.0;
+            let input = (&self.supplier_function)();
+            // TODO: Translation.
+            let output: Vec<Option<BitBox>> = vec!();
+            let fitness = (&self.fitness_function)(output);
             let mutated_offspring;
             {
                 let mut cp = clonal_population.lock().unwrap();

@@ -132,6 +132,27 @@ impl ClonalPopulation {
         }
     }
 
+    /// Kills the specified amount of individuals. The remainder is stored and taken into account
+    /// on subsequent death events.
+    ///
+    /// # Parameters
+    ///
+    /// * `death_count` - the number of individuals that died
+    ///
+    /// # Panics
+    ///
+    /// If `death_count` is negative.
+    pub fn death_event(&mut self, death_count: f64) {
+        if death_count < 0.0 {
+            panic!("Death count cannot be negative: {}", death_count);
+        } else {
+            self.death_counter += death_count;
+            let actual_deaths = self.death_counter.floor();
+            self.size -= actual_deaths as u32;
+            self.death_counter -= actual_deaths;
+        }
+    }
+
     /// Generates mutated [`Genome`]s and updates the population size based on the evaluated fitness.
     ///
     /// # Parameters
