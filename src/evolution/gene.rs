@@ -212,22 +212,23 @@ impl Genome {
         &self.genes[gene]
     }
 
-    /// Returns the [`Gene`] at the specified index.
+    /// Returns all substrates of the specified [`Gene`] combined with their [`GeneSubstrate`] pointer.
     ///
     /// # Parameters
     ///
-    /// * `gene` - the index of the gene to duplicate
+    /// * `gene` - the index of the gene
     ///
     /// # Panics
     ///
     /// If the index is out of bounds.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    fn get_gene_substrates(&self, gene: usize) -> Vec<GeneSubstrate, Rc<RefCell<BitBox<Local, u8>>>> {
-        let gene = &self.genes[gene];
-        (0..gene.number_of_substrates())
-            .map()
-            .map()
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    fn translate_get_gene_substrates(&self, gene: usize) -> Vec<(GeneSubstrate, Rc<RefCell<Substrate>>)> {
+        let gene_reference = &self.genes[gene];
+        (0..gene_reference.number_of_substrates().get())
+            .map(|substrate| GeneSubstrate{gene, substrate})
+            .map(|gene_substrate| (gene_substrate, Rc::new(RefCell::new(Substrate::new(gene_reference.substrates[gene_substrate.substrate].clone())))))
             .collect()
     }
 
@@ -422,18 +423,29 @@ impl Genome {
     }
 
     pub fn translate(&self) -> Organism {
-        let mut gene_substrate_map: HashMap<GeneSubstrate, Rc<RefCell<BitBox<Local, u8>>>> = HashMap::new();
+        let mut gene_substrate_map: HashMap<GeneSubstrate, Rc<RefCell<Substrate>>> = HashMap::new();
+        // Insert all genome level substrates.
         for gene_association in &self.associations {
-            let genome_level_substrate = Rc::new(RefCell::new(gene_association.substrate.clone()));
+            let genome_level_substrate = Rc::new(RefCell::new(Substrate::new(gene_association.substrate.clone())));
             for gene_substrate in &gene_association.associations {
                 gene_substrate_map.entry(gene_substrate.clone()).or_insert(genome_level_substrate.clone());
             }
         }
-
-        let substrates = vec!();
-        let input = vec!();
-        let output = vec!();
-        Organism{substrates, input, output}
+        // Insert all gene level substrates without overwriting genome level ones.
+        for gene_index in 0..self.number_of_genes().get() {
+            for (gene_substrate, substrate) in self.translate_get_gene_substrates(gene_index).into_iter() {
+                gene_substrate_map.entry(gene_substrate).or_insert(substrate);
+            }
+        }
+        // TODO: Translate receptors and catalytic centres.
+        let substrates = gene_substrate_map.values().map(|sub| sub.clone()).collect();
+        let input = self.input.iter()
+            .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
+            .collect();
+        let output = self.output.iter()
+            .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
+            .collect();
+        Organism::new(substrates, input, output)
     }
 }
 

@@ -9,6 +9,7 @@ extern crate serde;
 use std::collections::VecDeque;
 use std::time::Instant;
 use std::rc::Rc;
+use std::cell::RefCell;
 use bitvec::{boxed::BitBox, order::Local};
 use super::protein::{Substrate, Receptor};
 use super::gene::{Genome, GenomeMutation};
@@ -22,22 +23,25 @@ use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
 
-pub struct Organism<'a> {
-    substrates: Vec<Substrate>,
-    input: Vec<&'a Substrate>,
-    output: Vec<&'a Substrate>,
+pub struct Organism {
+    substrates: Vec<Rc<RefCell<Substrate>>>,
+    input: Vec<Option<Rc<RefCell<Substrate>>>>,
+    output: Vec<Option<Rc<RefCell<Substrate>>>>,
 }
 
-impl<'a> Organism<'a> {
-    /*pub fn new(input_substrates: u32, output_substrates: u32) -> Self {
+impl Organism {
+    pub fn new(substrates: Vec<Rc<RefCell<Substrate>>>,
+    input: Vec<Option<Rc<RefCell<Substrate>>>>,
+    output: Vec<Option<Rc<RefCell<Substrate>>>>) -> Self {
+        Organism{substrates, input, output}
+    }
 
-    }*/
     pub fn live(&self, environment: &Environment) {
         let birth = Instant::now();
         let mut actions = VecDeque::<Rc<Receptor>>::new();
         // Add all receptors detecting changes to the input.
-        for input_substrate in &self.input {
-            for receptor in input_substrate.receptors() {
+        for input_substrate in self.input.iter().filter_map(|val| val.as_ref()) {
+            for receptor in input_substrate.borrow().receptors() {
                 actions.push_back(receptor);
             }
         }
@@ -52,8 +56,8 @@ impl<'a> Organism<'a> {
         }
     }
 
-    pub fn get_result(&self) -> Vec<BitBox<Local, u8>> {
-        self.output.iter().map(|sub| sub.value().clone()).collect()
+    pub fn get_result(&self) -> Vec<Option<BitBox<Local, u8>>> {
+        self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
     }
 
 }
