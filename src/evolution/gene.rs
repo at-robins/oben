@@ -492,6 +492,7 @@ impl GeneSubstrate {
         self.gene == gene_index
     }
 
+    // This function was never used but might be usefull at some point.
     /// Checks wether this `GeneSubstrate` references the [`Substrate`] at the specified index.
     ///
     /// # Parameters
@@ -499,7 +500,7 @@ impl GeneSubstrate {
     /// * `substrate_index` - the index of the substrate to check for
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn is_substrate(&self, substrate_index: usize) -> bool {
+    fn _is_substrate(&self, substrate_index: usize) -> bool {
         self.substrate == substrate_index
     }
 

@@ -30,12 +30,33 @@ pub struct Organism {
 }
 
 impl Organism {
+    /// Creates a new `Organism` from the specified [`Substrate`]s.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrates` - all [`Substrate`]s that make up the organism
+    /// * `input` - the [`Substrate`]s linked to sensorical input
+    /// * `output` - the [`Substrate`]s linked to the output
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn new(substrates: Vec<Rc<RefCell<Substrate>>>,
-    input: Vec<Option<Rc<RefCell<Substrate>>>>,
-    output: Vec<Option<Rc<RefCell<Substrate>>>>) -> Self {
+        input: Vec<Option<Rc<RefCell<Substrate>>>>,
+        output: Vec<Option<Rc<RefCell<Substrate>>>>) -> Self {
         Organism{substrates, input, output}
     }
 
+    /// Starts activity of all [`Receptor`]s and [`CatalyticCentre`]s linked to the [`Substrate`]s
+    /// of this `Organism`. Execution will be aborted if the execution takes longer than the
+    /// lifespan defined by the [`Environment`].
+    ///
+    /// # Parameters
+    ///
+    /// * `environment` - the [`Environment`] the `Organism` lives in
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
+    /// [`Receptor`]: ../protein/struct.Receptor.html
+    /// [`Environment`]: ../environment/struct.Environment.html
     pub fn live(&self, environment: &Environment) {
         let birth = Instant::now();
         let mut actions = VecDeque::<Rc<Receptor>>::new();
@@ -56,10 +77,39 @@ impl Organism {
         }
     }
 
+    /// Returns the number of [`Substrate`]s this `Organism` consists of.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_substrates(&self) -> usize {
+        self.substrates.len()
+    }
+
+    /// Returns the values of output [`Substrate`]s if any.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_result(&self) -> Vec<Option<BitBox<Local, u8>>> {
         self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
     }
 
+    /// Sets the input of the `Organism` to the specified values.
+    ///
+    /// # Prameters
+    ///
+    /// * `input` - the input values to set
+    ///
+    /// # Panics
+    ///
+    /// If the length of `input` is not equal to the number of inputs specified by the organism.
+    pub fn set_input(&self, input: Vec<BitBox<Local, u8>>) {
+        if input.len() != self.input.len() {
+            panic!("The organism needs {} inputs, but {} were specified.", self.input.len(), input.len());
+        }
+        for ip in input.into_iter().enumerate() {
+            if let Some(substrate) = self.input[ip.0].as_ref() {
+                substrate.borrow_mut().set_value(ip.1);
+            }
+        }
+    }
 }
 
 /// Generates the specified number of randomly mutated versions of the specified [`Genome`].
@@ -77,6 +127,9 @@ fn produce_mutated_genomes(number_of_mutated_genomes: u32, genome: &Genome) -> V
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+/// A `ClonalPopulation` is a population of individuals with exactly the same [`Genome`].
+///
+/// [`Genome`]: ../gene/struct.Genome.html
 pub struct ClonalPopulation {
     source: Uuid,
     size: u32,
@@ -212,22 +265,18 @@ impl ClonalPopulation {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct SerialisablePopulation {
+/// A `SerialisablePopulation` is a simplified version of a [`Population`] that can easily
+/// be serialised and deserialised.
+///
+/// [`Population`]: ./struct.Population.html
+struct SerialisablePopulation {
     clonal_populations: Vec<ClonalPopulation>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Population {
-    clonal_populations: HashMap<Uuid, Arc<Mutex<ClonalPopulation>>>,
-}
-
-impl Population {
-    /// Create an immutable, serialisable snapshot of the current population.
-    ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn snapshot(&self) -> SerialisablePopulation {
+impl From<&Population> for SerialisablePopulation {
+    fn from(pop: &Population) -> Self {
         let mut serialisable_population = SerialisablePopulation{clonal_populations: vec!()};
-        for clonal_population in self.clonal_populations.values() {
+        for clonal_population in pop.clonal_populations.values() {
             match clonal_population.lock() {
                 Ok(cp) => serialisable_population.clonal_populations.push((*cp).clone()),
                 Err(err) => {
@@ -240,6 +289,31 @@ impl Population {
         }
         serialisable_population
     }
+}
+
+#[derive(Debug, Clone)]
+/// A `Population` is a population of clonal sub-populations with different [`Genome`]s.
+///
+/// [`Genome`]: ../gene/struct.Genome.html
+pub struct Population {
+    clonal_populations: HashMap<Uuid, Arc<Mutex<ClonalPopulation>>>,
+}
+
+impl Population {
+    /// Creates a new `Population` from the specified clonal sub-populations.
+    ///
+    /// # Parameters
+    ///
+    /// `sub_populations` - the [`ClonalPopulation`]s to group into a `Population`
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn new(sub_populations: Vec<ClonalPopulation>) -> Self {
+        let mut clonal_populations = HashMap::new();
+        for cp in sub_populations.into_iter() {
+            clonal_populations.insert(*cp.uuid(), Arc::new(Mutex::new(cp)));
+        }
+        Population{clonal_populations}
+    }
 
     /// Write this `Population` to a JSON file if possible.
     /// An error will be returned if writing to the file failed.
@@ -249,9 +323,21 @@ impl Population {
     /// * `path_to_file` - the JSON file the `Population` should be written to
     pub fn snapshot_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error + 'static>> where P: AsRef<Path> {
         let file = File::create(path_to_file)?;
-        let serialisable_population = self.snapshot();
+        let serialisable_population: SerialisablePopulation = self.into();
         let write_success = serde_json::to_writer(file, &serialisable_population)?;
         Ok(write_success)
+    }
+
+    /// Load a `Population` from a JSON file if possible.
+    /// An error will be returned if parsing the file failed.
+    ///
+    /// # Parameters
+    ///
+    /// * `path_to_file` - the JSON file from which the `Population` should be loaded
+    pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
+       let file = File::open(path_to_file)?;
+       let serialisable_population: SerialisablePopulation = serde_json::from_reader(file)?;
+       Ok(serialisable_population.into())
     }
 
     /// Returns the [`ClonalPopulation`]s that are part of this `Population`.
@@ -300,6 +386,12 @@ impl Population {
             std::fs::rename(environment.genome_path(clonal_population.uuid()), environment.extinct_genome_path(clonal_population.uuid()))?;
         }
         Ok(removed)
+    }
+}
+
+impl From<SerialisablePopulation> for Population {
+    fn from(serial: SerialisablePopulation) -> Self {
+        Self::new(serial.clonal_populations)
     }
 }
 
