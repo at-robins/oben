@@ -3,6 +3,7 @@
 extern crate bitvec;
 extern crate rand;
 extern crate serde;
+extern crate rmp_serde;
 
 use super::chemistry::{Reaction, State};
 use super::population::Organism;
@@ -406,10 +407,10 @@ impl Genome {
     ///
     /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
     pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
-       let mut file = File::open(path_to_file)?;
-       let mut file_content = String::new();
-       file.read_to_string(&mut file_content)?;
-       let genome = serde_json::from_str(&file_content)?;
+       let mut file = File::open(&path_to_file)?;
+       let mut file_content = Vec::new();
+       file.read_to_end(&mut file_content)?;
+       let genome = rmp_serde::from_read_ref(&file_content)?;
        Ok(genome)
     }
 
@@ -421,9 +422,9 @@ impl Genome {
     /// * `path_to_file` - the JSON file the `Genome` should be written to
     pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
        let mut file = File::create(path_to_file)?;
-       let ser = serde_json::to_string(self)?.into_bytes();
-       let write_success = file.write_all(&ser)?;
-       Ok(write_success)
+       let ser = rmp_serde::to_vec(&self)?;
+       file.write_all(&ser)?;
+       Ok(file.sync_all()?)
     }
 
     pub fn translate(&self) -> Organism {

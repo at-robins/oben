@@ -2,7 +2,7 @@
 extern crate bitvec;
 extern crate rand;
 extern crate rand_distr;
-extern crate serde_json;
+extern crate rmp_serde;
 extern crate uuid;
 extern crate serde;
 
@@ -22,6 +22,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
+use std::io::{Read, Write};
 
 pub struct Organism {
     substrates: Vec<Rc<RefCell<Substrate>>>,
@@ -205,9 +206,14 @@ impl ClonalPopulation {
             panic!("Death count cannot be negative: {}", death_count);
         } else {
             self.death_counter += death_count;
-            let actual_deaths = self.death_counter.floor();
-            self.size -= actual_deaths as u32;
-            self.death_counter -= actual_deaths;
+            if self.death_counter >= self.size as f64 {
+                self.size = 0;
+                self.death_counter = 0.0;
+            } else {
+                let actual_deaths = self.death_counter.floor();
+                self.size -= actual_deaths as u32;
+                self.death_counter -= actual_deaths;
+            }
         }
     }
 
@@ -338,12 +344,14 @@ impl Population {
     ///
     /// * `path_to_file` - the JSON file the `Population` should be written to
     pub fn snapshot_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error + 'static>> where P: AsRef<Path> {
-        let file = File::create(&path_to_file)?;
+        let mut file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
         let (id, fitness) = serialisable_population.fittest_individual();
         println!("Population: {:?}\nID: {:?}\nFitness: {:?}", path_to_file.as_ref(), id, fitness);
-        Ok(serde_json::to_writer(file, &serialisable_population)?)
+        let ser = rmp_serde::to_vec(&serialisable_population)?;
+        file.write_all(&ser)?;
+        Ok(file.sync_all()?)
     }
 
     /// Load a `Population` from a JSON file if possible.
@@ -353,16 +361,18 @@ impl Population {
     ///
     /// * `path_to_file` - the JSON file from which the `Population` should be loaded
     pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
-       let file = File::open(path_to_file)?;
-       let serialisable_population: SerialisablePopulation = serde_json::from_reader(file)?;
-       Ok(serialisable_population.into())
+        let mut file = File::open(&path_to_file)?;
+        let mut file_content = Vec::new();
+        file.read_to_end(&mut file_content)?;
+        let serialisable_population: SerialisablePopulation = rmp_serde::from_read_ref(&file_content)?;
+        Ok(serialisable_population.into())
     }
 
     /// Returns the [`ClonalPopulation`]s that are part of this `Population`.
     ///
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn clonal_populations(&self) -> Vec<&Arc<Mutex<ClonalPopulation>>> {
-        self.clonal_populations.values().collect()
+    pub fn clonal_populations(&self) -> Vec<Arc<Mutex<ClonalPopulation>>> {
+        self.clonal_populations.values().map(|val| val.clone()).collect()
     }
 
     /// Inserts all the [`ClonalPopulation`]s into the `Population` and returns a reference
@@ -388,17 +398,17 @@ impl Population {
     ///
     /// # Parameters
     ///
-    /// * `clonal_population_uuid` - the [`ClonalPopulation`] to remove
+    /// * `clonal_population_uuid` - the UUID of the [`ClonalPopulation`] to remove
     /// * `environment` - the [`Environment`] the population is growing in
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn remove(&mut self, clonal_population: &ClonalPopulation, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
-        let removed = self.clonal_populations.remove(clonal_population.uuid())
-            .ok_or::<RemoveError>(RemoveError::new(clonal_population.uuid()))?;
+    pub fn remove(&mut self, clonal_population_uuid: Uuid, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
+        let removed = self.clonal_populations.remove(&clonal_population_uuid)
+            .ok_or::<RemoveError>(RemoveError::new(&clonal_population_uuid))?;
         // Move the extinct genome to a backup folder.
-        std::fs::rename(environment.genome_path(clonal_population.uuid()), environment.extinct_genome_path(clonal_population.uuid()))?;
+        std::fs::rename(environment.genome_path(&clonal_population_uuid), environment.extinct_genome_path(&clonal_population_uuid))?;
         Ok(removed)
     }
 }
