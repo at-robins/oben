@@ -9,7 +9,7 @@ use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population};
 use super::gene::Genome;
 use std::time::{Duration, Instant, SystemTime};
-use rayon::{ThreadPool, ThreadPoolBuilder, ThreadPoolBuildError};
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
@@ -237,8 +237,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     pub fn new(environment: Environment,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I) -> f64 + Send + Sync + 'static>,
-        write_verification: HashMap<Uuid, bool>) -> Self {
+        fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
                 state: Arc::new(Mutex::new(GlobalEnvironmentState::Execution)),
@@ -247,8 +246,7 @@ impl<I: 'static> GlobalEnvironment<I> {
                 supplier_function,
                 fitness_function,
                 pool: ThreadPoolBuilder::new().num_threads(THREAD_NUMBER).build().unwrap(),
-                death_timer: Arc::new(Mutex::new(HashMap::new())),
-                write_verification
+                death_timer: Arc::new(Mutex::new(HashMap::new()))
             })
         }
     }
@@ -360,7 +358,6 @@ struct InnerGlobalEnvironment<I> {
     fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I) -> f64 + Send + Sync + 'static>,
     pool: ThreadPool,
     death_timer: Arc<Mutex<HashMap<Uuid, Instant>>>,
-    write_verification: HashMap<Uuid, bool>,
     state: Arc<Mutex<GlobalEnvironmentState>>
 }
 
@@ -480,7 +477,6 @@ impl<I> InnerGlobalEnvironment<I> {
         }
         if cp.is_extinct() {
             self.remove_clonal_population(*cp.uuid());
-            // self.write_verification.lock().unwrap().remove(cp.uuid());
             true
         } else {
             false
@@ -501,17 +497,9 @@ impl<I> InnerGlobalEnvironment<I> {
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     fn load_genome(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Genome {
-        let clonal_population_uuid = clonal_population.lock()
+        clonal_population.lock()
             .expect("Another thread panicked while holding the clonal popuation lock.")
-            .uuid()
-            .clone();
-        //         while self.write_verification.lock().unwrap().get(&cp_uuid).is_none() {
-        //             std::thread::sleep(Duration::from_millis(100));
-        //         }
-        match Genome::load_from_file(self.environment.genome_path(&clonal_population_uuid)) {
-            Ok(genome) => genome,
-            Err(err) => panic!("Genome {} could not be loaded: {}", clonal_population_uuid, err),
-        }
+            .get_genome(&self.environment)
     }
 
     /// Add the [`ClonalPopulation`]s to the [`Population`].
