@@ -227,7 +227,7 @@ impl ClonalPopulation {
     pub fn evaluate_new_fitness(&mut self, fitness: f64, environment: &Environment) -> Vec<Genome> {
         self.add_fitness(fitness);
         // The fitness was just set, so the unwrap call must succeed.
-        let total_offspring = (self.size as f64 * self.fitness.unwrap()) as u64;
+        let total_offspring = (self.size as f64 * self.fitness.unwrap()).ceil() as u64;
         // Determine the number of genetically different offspring.
         let mutated_offspring = Binomial::new(total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());
         // Grow the population by the non-mutated offspring.
@@ -271,6 +271,22 @@ impl ClonalPopulation {
 /// [`Population`]: ./struct.Population.html
 struct SerialisablePopulation {
     clonal_populations: Vec<ClonalPopulation>,
+}
+
+impl SerialisablePopulation {
+    /// Returns the UUID and fitness of the fittest individual of the population.
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>) {
+        let (mut uuid, mut fitness) = (None, None);
+        for individual in &self.clonal_populations {
+            match fitness {
+                Some(fit) if individual.fitness.is_some() && fit >= individual.fitness.unwrap() => {},
+                _ => { uuid = Some(*individual.uuid());
+                    fitness = individual.fitness;
+                }
+            }
+        }
+        (uuid, fitness)
+    }
 }
 
 impl From<&Population> for SerialisablePopulation {
@@ -322,10 +338,12 @@ impl Population {
     ///
     /// * `path_to_file` - the JSON file the `Population` should be written to
     pub fn snapshot_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error + 'static>> where P: AsRef<Path> {
-        let file = File::create(path_to_file)?;
+        let file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
-        let write_success = serde_json::to_writer(file, &serialisable_population)?;
-        Ok(write_success)
+        // TODO: Remove debug print statement and return an PopulationInformation struct instead.
+        let (id, fitness) = serialisable_population.fittest_individual();
+        println!("Population: {:?}\nID: {:?}\nFitness: {:?}", path_to_file.as_ref(), id, fitness);
+        Ok(serde_json::to_writer(file, &serialisable_population)?)
     }
 
     /// Load a `Population` from a JSON file if possible.
@@ -370,21 +388,17 @@ impl Population {
     ///
     /// # Parameters
     ///
-    /// * `clonal_population_uuid` - the UUID of the [`ClonalPopulation`] to remove
+    /// * `clonal_population_uuid` - the [`ClonalPopulation`] to remove
     /// * `environment` - the [`Environment`] the population is growing in
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn remove(&mut self, clonal_population_uuid: &Uuid, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
-        let removed = self.clonal_populations.remove(&clonal_population_uuid)
-            .ok_or::<RemoveError>(RemoveError::new(clonal_population_uuid))?;
+    pub fn remove(&mut self, clonal_population: &ClonalPopulation, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
+        let removed = self.clonal_populations.remove(clonal_population.uuid())
+            .ok_or::<RemoveError>(RemoveError::new(clonal_population.uuid()))?;
         // Move the extinct genome to a backup folder.
-        {
-            // We do not care for the integrity of the clonal population since the UUID is immuatble.
-            let clonal_population = removed.lock().map_or_else(|val| val.into_inner(), |val| val);
-            std::fs::rename(environment.genome_path(clonal_population.uuid()), environment.extinct_genome_path(clonal_population.uuid()))?;
-        }
+        std::fs::rename(environment.genome_path(clonal_population.uuid()), environment.extinct_genome_path(clonal_population.uuid()))?;
         Ok(removed)
     }
 }
