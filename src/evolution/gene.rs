@@ -12,6 +12,7 @@ use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
 use std::error::Error;
 use std::fs::File;
+use std::io::{Read, Write};
 use std::path::Path;
 use serde::{Deserialize, Serialize};
 use core::cell::RefCell;
@@ -405,8 +406,10 @@ impl Genome {
     ///
     /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
     pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
-       let file = File::open(path_to_file)?;
-       let genome = serde_json::from_reader(file)?;
+       let mut file = File::open(path_to_file)?;
+       let mut file_content = String::new();
+       file.read_to_string(&mut file_content)?;
+       let genome = serde_json::from_str(&file_content)?;
        Ok(genome)
     }
 
@@ -417,8 +420,9 @@ impl Genome {
     ///
     /// * `path_to_file` - the JSON file the `Genome` should be written to
     pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
-       let file = File::create(path_to_file)?;
-       let write_success = serde_json::to_writer(file, self)?;
+       let mut file = File::create(path_to_file)?;
+       let ser = serde_json::to_string(self)?.into_bytes();
+       let write_success = file.write_all(&ser)?;
        Ok(write_success)
     }
 
@@ -451,6 +455,21 @@ impl Genome {
             .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
             .collect();
         Organism::new(substrates, input, output)
+    }
+
+    /// Creates an empty `Genome` with the specified number of non-associated inputs and outputs.
+    ///
+    /// # Parameters
+    ///
+    /// * `input` - number of inputs
+    /// * `output` - number of outputs
+    pub fn empty_genome(input: usize, output: usize) -> Self {
+        Genome {
+            input: (0..input).map(|_| None).collect(),
+            output: (0..output).map(|_| None).collect(),
+            genes: vec!(Gene::default()),
+            associations: vec!(),
+        }
     }
 }
 
