@@ -6,7 +6,7 @@ extern crate rayon;
 use bitvec::{boxed::BitBox, order::Local};
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
-use super::population::{ClonalPopulation, Population};
+use super::population::{ClonalPopulation, Population, OrganismInformation};
 use super::gene::Genome;
 use std::time::{Duration, Instant, SystemTime};
 use rayon::{ThreadPool, ThreadPoolBuilder};
@@ -237,7 +237,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     pub fn new(environment: Environment,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I) -> f64 + Send + Sync + 'static>) -> Self {
+        fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
                 state: Arc::new(Mutex::new(GlobalEnvironmentState::Execution)),
@@ -312,7 +312,8 @@ impl<I: 'static> GlobalEnvironment<I> {
             organism.set_input(input);
             organism.live(&inner.environment);
             let output = organism.get_result();
-            let fitness = (inner.fitness_function)(output, result_information);
+            let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), Duration::from_secs(0), *(&inner.environment.lifespan));
+            let fitness = (inner.fitness_function)(output, result_information, oi);
             let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.environment.clone());
             // Restart this population.
             let b = inner.clone();
@@ -331,9 +332,6 @@ impl<I: 'static> GlobalEnvironment<I> {
         let mutated_offspring;
         {
             let mut cp = clonal_population.lock().unwrap();
-            // while write_verification.lock().unwrap().get(cp.uuid()).is_none() {
-            //     std::thread::sleep(Duration::from_millis(100));
-            // }
             mutated_offspring = cp.evaluate_new_fitness(fitness, &environment);
         }
         mutated_offspring.iter()
@@ -344,8 +342,8 @@ impl<I: 'static> GlobalEnvironment<I> {
                     // integral part of the network.
                     panic!("Writing mutated genome {} to a file filed: {}", &uuid, err);
                 }
-                // write_verification.lock().unwrap().insert(uuid, true);
-                ClonalPopulation::found(uuid)
+                let size = std::fs::metadata(environment.genome_path(&uuid)).expect("Just written!").len();
+                ClonalPopulation::found(uuid, size)
             }).collect()
     }
 
@@ -355,7 +353,7 @@ struct InnerGlobalEnvironment<I> {
     environment: Arc<Environment>,
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I) -> f64 + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
     pool: ThreadPool,
     death_timer: Arc<Mutex<HashMap<Uuid, Instant>>>,
     state: Arc<Mutex<GlobalEnvironmentState>>

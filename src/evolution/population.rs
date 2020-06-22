@@ -7,7 +7,7 @@ extern crate uuid;
 extern crate serde;
 
 use std::collections::VecDeque;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::rc::Rc;
 use std::cell::RefCell;
 use bitvec::{boxed::BitBox, order::Local};
@@ -127,6 +127,49 @@ fn produce_mutated_genomes(number_of_mutated_genomes: u32, genome: &Genome) -> V
         .collect()
 }
 
+
+/// Information of about an [`Organism`]s performance.
+///
+/// [`Organism`]: ./struct.Organism.html
+pub struct OrganismInformation {
+    bytes: u64,
+    run_time: Duration,
+    max_run_time: Duration,
+}
+
+impl OrganismInformation {
+    /// Creates a new `OrganismInformation` containig information about the performance of an
+    /// [`Organism`] during a specific task.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn new(bytes: u64, run_time: Duration, max_run_time: Duration) -> Self {
+        OrganismInformation{bytes, run_time, max_run_time}
+    }
+
+    /// The size of the [`Organism`]s [`Genome`] in bytes.
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
+    /// The time it took the [`Organism`] to perform a task.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn run_time(&self) -> Duration {
+        self.run_time
+    }
+
+    /// The maximal time a [`Organism`] is allowed to spend before timing out.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn max_runtime(&self) -> Duration {
+        self.max_run_time
+    }
+}
+
+
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 /// A `ClonalPopulation` is a population of individuals with exactly the same [`Genome`].
 ///
@@ -136,6 +179,7 @@ pub struct ClonalPopulation {
     size: u32,
     fitness: Option<f64>,
     death_counter: f64,
+    bytes: u64,
 }
 
 impl ClonalPopulation {
@@ -144,18 +188,24 @@ impl ClonalPopulation {
     /// # Parameters
     ///
     /// * `uuid` - the UUID of the `ClonalPopulation`
-    pub fn found(uuid: Uuid) -> Self {
+    pub fn found(uuid: Uuid, byte_length: u64) -> Self {
         ClonalPopulation{
             source: uuid,
             size: 1,
             fitness: None,
             death_counter: 0.0,
+            bytes: byte_length,
         }
     }
 
     /// Returns the UUID of this `ClonalPopulation`.
     pub fn uuid(&self) -> &Uuid {
         &self.source
+    }
+
+    /// Returns the number of bytes this `ClonalPopulation` contains.
+    pub fn bytes(&self) -> u64 {
+        self.bytes
     }
 
     /// Adds the specified fitness value by setting the fitness to the mean of old and
