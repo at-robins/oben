@@ -48,7 +48,7 @@ impl Organism {
 
     /// Starts activity of all [`Receptor`]s and [`CatalyticCentre`]s linked to the [`Substrate`]s
     /// of this `Organism`. Execution will be aborted if the execution takes longer than the
-    /// lifespan defined by the [`Environment`].
+    /// lifespan defined by the [`Environment`]. Returns the execution time.
     ///
     /// # Parameters
     ///
@@ -58,7 +58,7 @@ impl Organism {
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Receptor`]: ../protein/struct.Receptor.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn live(&self, environment: &Environment) {
+    pub fn live(&self, environment: &Environment) -> Duration {
         let birth = Instant::now();
         let mut actions = VecDeque::<Rc<Receptor>>::new();
         // Add all receptors detecting changes to the input.
@@ -71,10 +71,17 @@ impl Organism {
         // which were modified during the run.
         // If the task takes longer than the specified threshold,
         // the run will be aborted.
-        while !actions.is_empty() && birth.elapsed() <= environment.lifespan() {
+        while !actions.is_empty() && birth.elapsed() < environment.lifespan() {
             for cascading_receptor in actions.pop_front().unwrap().detect() {
                 actions.push_back(cascading_receptor);
             }
+        }
+        // Return the time it took to perform the task, but never more than the lifespan.
+        let run_time = birth.elapsed();
+        if run_time < environment.lifespan() {
+            run_time
+        } else {
+            environment.lifespan()
         }
     }
 
@@ -127,7 +134,7 @@ fn produce_mutated_genomes(number_of_mutated_genomes: u32, genome: &Genome) -> V
         .collect()
 }
 
-
+#[derive(Debug, PartialEq, Clone)]
 /// Information of about an [`Organism`]s performance.
 ///
 /// [`Organism`]: ./struct.Organism.html
@@ -176,9 +183,8 @@ impl OrganismInformation {
 /// [`Genome`]: ../gene/struct.Genome.html
 pub struct ClonalPopulation {
     source: Uuid,
-    size: u32,
+    size: f64,
     fitness: Option<f64>,
-    death_counter: f64,
     bytes: u64,
 }
 
@@ -188,12 +194,11 @@ impl ClonalPopulation {
     /// # Parameters
     ///
     /// * `uuid` - the UUID of the `ClonalPopulation`
-    pub fn found(uuid: Uuid, byte_length: u64) -> Self {
+    pub fn found(uuid: Uuid, byte_length: u64, environment: &Environment) -> Self {
         ClonalPopulation{
             source: uuid,
-            size: 1,
+            size: 1.0 / environment.population_size() as f64,
             fitness: None,
-            death_counter: 0.0,
             bytes: byte_length,
         }
     }
@@ -208,6 +213,28 @@ impl ClonalPopulation {
         self.bytes
     }
 
+    /// Returns the relative size of this `ClonalPopulation`.
+    pub fn relative_size(&self) -> f64 {
+        self.size
+    }
+
+    /// Checks whether the fitness value of this `ClonalPopulation` was already set.
+    pub fn has_fitness(&self) -> bool {
+        self.fitness.is_some()
+    }
+
+    /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference
+    /// [`Population`].
+    ///
+    /// # Parameters
+    ///
+    /// * `reference` - the reference population's size
+    ///
+    /// [`Population`]: ./struct.Population.html
+    pub fn adjust_size_to_reference(&mut self, reference: f64) {
+        self.fitness = self.fitness.map(|f| f / reference);
+    }
+
     /// Adds the specified fitness value by setting the fitness to the mean of old and
     /// and new fitness. If no fitness was set prevously, sets the specified fitness
     /// as new fitness.
@@ -217,53 +244,9 @@ impl ClonalPopulation {
     /// * `fitness` - the new fitness to add to the current fitness value
     fn add_fitness(&mut self, fitness: f64) {
         if let Some(old_fitness) = self.fitness {
-            self.fitness = Some((fitness + old_fitness) / 2f64);
+            self.fitness = Some((fitness + old_fitness) / 2.0);
         } else {
             self.fitness = Some(fitness);
-        }
-    }
-
-    /// Sets adds the specified value to the size of the `ClonalPopulation` if it does not
-    /// exceed the internally specified maximum population size.
-    ///
-    /// # Parameters
-    ///
-    /// * `size` - the population size by which to grow the `ClonalPopulation`
-    /// * `environment` - the [`Environment`] the population is growing in
-    ///
-    /// [`Environment`]: ../environment/struct.Environment.html
-    fn grow(&mut self, size: u32, environment: &Environment) {
-        let new_size = self.size + size;
-        if new_size > environment.max_clonal_population_size() {
-            self.size = environment.max_clonal_population_size();
-        } else {
-            self.size = new_size;
-        }
-    }
-
-    /// Kills the specified amount of individuals. The remainder is stored and taken into account
-    /// on subsequent death events.
-    ///
-    /// # Parameters
-    ///
-    /// * `death_count` - the number of individuals that died
-    ///
-    /// # Panics
-    ///
-    /// If `death_count` is negative.
-    pub fn death_event(&mut self, death_count: f64) {
-        if death_count < 0.0 {
-            panic!("Death count cannot be negative: {}", death_count);
-        } else {
-            self.death_counter += death_count;
-            if self.death_counter >= self.size as f64 {
-                self.size = 0;
-                self.death_counter = 0.0;
-            } else {
-                let actual_deaths = self.death_counter.floor();
-                self.size -= actual_deaths as u32;
-                self.death_counter -= actual_deaths;
-            }
         }
     }
 
@@ -283,14 +266,15 @@ impl ClonalPopulation {
     pub fn evaluate_new_fitness(&mut self, fitness: f64, environment: &Environment) -> Vec<Genome> {
         self.add_fitness(fitness);
         // The fitness was just set, so the unwrap call must succeed.
-        let total_offspring = (self.size as f64 * self.fitness.unwrap()).ceil() as u64;
+        let relative_total_offspring = self.size * self.fitness.unwrap();
         // Determine the number of genetically different offspring.
-        let mutated_offspring = Binomial::new(total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());
+        let absolute_total_offspring = relative_total_offspring.floor() as u64;
+        let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());
         // Grow the population by the non-mutated offspring.
-        self.grow((total_offspring - mutated_offspring) as u32, environment);
+        self.size += relative_total_offspring - (absolute_mutated_offspring as f64 / environment.population_size() as f64);
         // Generate the mutations.
         let genome = self.get_genome(environment);
-        produce_mutated_genomes(mutated_offspring as u32, &genome)
+        produce_mutated_genomes(absolute_mutated_offspring as u32, &genome)
     }
 
     /// Loads the [`Genome`] from its associated file.
@@ -312,11 +296,6 @@ impl ClonalPopulation {
             // of performing error handling.
             Err(err) => panic!("Loading of genome {} resulted in error: {}", self.source, err),
         }
-    }
-
-    /// Checks if this `ClonalPopulation` is already extinct.
-    pub fn is_extinct(&self) -> bool {
-        self.size == 0
     }
 }
 

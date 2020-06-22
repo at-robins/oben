@@ -9,9 +9,8 @@ use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population, OrganismInformation};
 use super::gene::Genome;
 use std::time::{Duration, Instant, SystemTime};
-use rayon::{ThreadPool, ThreadPoolBuilder};
+use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes/dummy";
@@ -23,10 +22,6 @@ const SUBFOLDER_POPULATION: &str = "populations/dummy";
 const FILE_EXTENSION_GENOME: &str = "genome";
 /// The file extension of population files.
 const FILE_EXTENSION_POPULATION: &str = "population";
-/// The number of threads to handle the computation of individuals.
-const THREAD_NUMBER: usize = 10;
-/// The time the main loop sleeps before updating.
-const UPDATE_MAIN_LOOP: Duration = Duration::from_secs(5);
 /// The context for UUID creation.
 const UUID_CONTEXT: Context = Context::new(0);
 
@@ -39,9 +34,10 @@ pub struct Environment {
     /// The maximum size a [`ClonalPopulation`] can grow to.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    max_clonal_population_size: u32,
-    /// The rate in individualts / second at which individuals of a population die.
-    death_rate: f64,
+    population_size: u32,
+    /// The relative size of clonal sub-populations that can still be detected.
+    /// Any population with a smaller size will go extinct.
+    extinction_threshold: f64,
     /// The amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
@@ -59,15 +55,15 @@ impl Environment {
     // TODO: Implement an environment builder.
     pub fn new(working_directory: PathBuf,
         mutation_rate: f64,
-        max_clonal_population_size: u32,
-        death_rate: f64,
+        population_size: u32,
+        extinction_threshold: f64,
         lifespan: Duration,
         population_save_intervall: Duration,
         uuid_node: [u8; 6]) -> Self {
         Environment{working_directory,
             mutation_rate,
-            max_clonal_population_size,
-            death_rate,
+            population_size,
+            extinction_threshold,
             lifespan,
             population_save_intervall,
             uuid_node}
@@ -83,18 +79,19 @@ impl Environment {
         self.mutation_rate
     }
 
-    /// Returns the maximum size a [`ClonalPopulation`] can grow to.
+    /// Returns the size in individuals a [`Population`] can grow to.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    pub fn max_clonal_population_size(&self) -> u32 {
-        self.max_clonal_population_size
+    /// [`Population`]: ../population/struct.Population.html
+    pub fn population_size(&self) -> u32 {
+        self.population_size
     }
 
-    /// Returns the rate in individualts / second at which individuals of a [`ClonalPopulation`] die.
+    /// Returns the threshold of relative populaion size which is still detectable before
+    /// a [`ClonalPopulation`] goes extinct.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    pub fn death_rate(&self) -> f64 {
-        self.death_rate
+    pub fn extinction_threshold(&self) -> f64 {
+        self.extinction_threshold
     }
 
     /// Returns the node for UUID creation.
@@ -220,8 +217,8 @@ impl Default for Environment {
         Environment {
             working_directory: PathBuf::from("./working_directory"),
             mutation_rate: 0.001,
-            max_clonal_population_size: 1_000_000,
-            death_rate: 1.0,
+            population_size: 1_000_000,
+            extinction_threshold: 1.0 / 10_000_000.0,
             lifespan: Duration::from_secs(1),
             population_save_intervall: Duration::from_secs(1800),
             uuid_node: rand::random(),
@@ -245,8 +242,6 @@ impl<I: 'static> GlobalEnvironment<I> {
                 population: Arc::new(Mutex::new(population)),
                 supplier_function,
                 fitness_function,
-                pool: ThreadPoolBuilder::new().num_threads(THREAD_NUMBER).build().unwrap(),
-                death_timer: Arc::new(Mutex::new(HashMap::new()))
             })
         }
     }
@@ -269,24 +264,39 @@ impl<I: 'static> GlobalEnvironment<I> {
         self.initialise();
         // Start the network.
         println!("Starting execution...");
-        for clonal_population in self.inner.clonal_populations() {
-            Self::spawn_organism(self.inner.clone(), clonal_population.clone());
-        }
-        println!("Starting the save loop...");
-        // Save the population in regular intervalls with a timestamp and print some information.
+        let mut generation: u64 = 0;
         let mut start = Instant::now();
         loop {
+            generation += 1;
+            println!("Generation {}", generation);
+            let clonal_populations = self.inner.clonal_populations();
+            // Challenge the organisms in the population and add the offspring to the population.
+            clonal_populations.par_iter().for_each(|clonal_population| {
+                Self::spawn_organism(self.inner.clone(), clonal_population.clone());
+            });
+            // Calculate the new relative amount of individuals per clonal population.
+            let total_population_size: f64 = clonal_populations.par_iter()
+                .map(|clonal_population| self.inner.get_relative_size(clonal_population.clone()))
+                .sum();
+            clonal_populations.par_iter().for_each(|clonal_population| {
+                    self.inner.adjust_size_to_reference(clonal_population.clone(), total_population_size);
+                });
+            // Remove extinct populations that are below the dection threshold.
+            clonal_populations.par_iter()
+                .filter(|clonal_population| self.inner.is_extinct((*clonal_population).clone()))
+                .for_each(|clonal_population| {
+                    self.inner.remove_clonal_population(clonal_population.clone());
+                });
+            // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
                 println!("Waiting to save...");
                 self.inner.set_state(GlobalEnvironmentState::Saving);
                 let population_id = self.environment().generate_uuid();
                 let save_path = self.environment().population_path(&population_id);
                 self.inner.save_population(save_path);
-                    println!("Saved!");
+                println!("Saved!");
                 start = Instant::now();
                 self.inner.set_state(GlobalEnvironmentState::Execution);
-            } else {
-                std::thread::sleep(UPDATE_MAIN_LOOP);
             }
         }
     }
@@ -294,41 +304,21 @@ impl<I: 'static> GlobalEnvironment<I> {
 
 
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
-        //TODO: Replace all unwraps.
-        inner.clone().pool.spawn(move || {
-            // Stop execution while the network is saving. This might cause catastrophic death
-            // events and may need to be altered.
-            while !inner.is_executing() {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            // Calculate the deaths of the population and stop execution if it went extinct.
-            if inner.calculate_deaths(clonal_population.clone()) {
-                return
-            }
-            // Transcribe / translate the genome and test the organism.
-            let (input, result_information) = (inner.supplier_function)();
-            let organism_genome = inner.load_genome(clonal_population.clone());
-            let organism = organism_genome.translate();
-            organism.set_input(input);
-            organism.live(&inner.environment);
-            let output = organism.get_result();
-            let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), Duration::from_secs(0), *(&inner.environment.lifespan));
-            let fitness = (inner.fitness_function)(output, result_information, oi);
-            let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.environment.clone());
-            // Restart this population.
-            let b = inner.clone();
-            inner.pool.spawn(move || Self::spawn_organism(b, clonal_population));
-            // Add the mutated offspring to the popuation and start execution.
-            let mutated_offspring = inner.append_population(mutated_offspring);
-            for offspring in mutated_offspring.into_iter() {
-                let b = inner.clone();
-                inner.pool.spawn(move || Self::spawn_organism(b, offspring));
-            }
-        });
+        // Transcribe / translate the genome and test the organism.
+        let (input, result_information) = (inner.supplier_function)();
+        let organism_genome = inner.load_genome(clonal_population.clone());
+        let organism = organism_genome.translate();
+        organism.set_input(input);
+        let run_time = organism.live(&inner.environment);
+        let output = organism.get_result();
+        let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), run_time, *(&inner.environment.lifespan));
+        let fitness = (inner.fitness_function)(output, result_information, oi);
+        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.environment.clone());
+        // Add the mutated offspring to the popuation.
+        inner.append_population(mutated_offspring);
     }
 
     fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, environment: Arc<Environment>) -> Vec<ClonalPopulation> {
-        // fn get_mutated_offspring(clonal_population: &Arc<Mutex<ClonalPopulation>>, fitness: f64, write_verification: Arc<Mutex<HashMap<Uuid, bool>>>, environment: &Environment) -> Vec<ClonalPopulation> {
         let mutated_offspring;
         {
             let mut cp = clonal_population.lock().unwrap();
@@ -343,7 +333,7 @@ impl<I: 'static> GlobalEnvironment<I> {
                     panic!("Writing mutated genome {} to a file filed: {}", &uuid, err);
                 }
                 let size = std::fs::metadata(environment.genome_path(&uuid)).expect("Just written!").len();
-                ClonalPopulation::found(uuid, size)
+                ClonalPopulation::found(uuid, size, &environment)
             }).collect()
     }
 
@@ -354,21 +344,80 @@ struct InnerGlobalEnvironment<I> {
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I) + Send + Sync + 'static>,
     fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
-    pool: ThreadPool,
-    death_timer: Arc<Mutex<HashMap<Uuid, Instant>>>,
     state: Arc<Mutex<GlobalEnvironmentState>>
 }
 
 impl<I> InnerGlobalEnvironment<I> {
-    /// Checks whether the [`GlobalEnvironment`] is currently executing the network.
+    /// Checks if the specified [`ClonalPopulation`] is already extinct.
+    /// A populaion cannot go extinct before its fitness was determined.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`] to check for extinction
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the state lock.
+    /// If another thread paniced while holding the clonal population's lock.
     ///
-    /// [`GlobalEnvironment`]: ./struct.GlobalEnvironment.html
-    fn is_executing(&self) -> bool {
-        self.state.lock().expect("Could not read the state of the environment.").is_executing()
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn is_extinct(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
+    }
+
+    /// Return the UUID of the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn get_uuid(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Uuid {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        *cp.uuid()
+    }
+
+    /// Return the relative size of the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn get_relative_size(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> f64 {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.relative_size()
+    }
+
+    /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference
+    /// [`Population`].
+    ///
+    /// # Parameters
+    ///
+    /// * `reference` - the reference population's size
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`Population`]: ../population/struct.Population.html
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn adjust_size_to_reference(&self, clonal_population: Arc<Mutex<ClonalPopulation>>, reference: f64) {
+        let mut cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.adjust_size_to_reference(reference);
     }
 
     /// Sets the [`GlobalEnvironmentState`] the [`GlobalEnvironment`] as specified.
@@ -422,7 +471,7 @@ impl<I> InnerGlobalEnvironment<I> {
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the UUID of the [`ClonalPopulation`] to remove
+    /// * `clonal_population` - the [`ClonalPopulation`] to remove
     ///
     /// # Panics
     ///
@@ -430,55 +479,12 @@ impl<I> InnerGlobalEnvironment<I> {
     /// could not be removed.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn remove_clonal_population(&self, clonal_population: Uuid) {
+    fn remove_clonal_population(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) {
+        let uuid = self.get_uuid(clonal_population);
         &self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .remove(clonal_population, &self.environment)
+            .remove(uuid, &self.environment)
             .expect("Clonal population could not be removed.");
-    }
-
-    /// Sets the current death event of a [`ClonalPopulation`] and returns the last one.
-    ///
-    /// # Parameters
-    ///
-    /// * `clone_id` - the UUID of the clonal population
-    ///
-    /// # Panics
-    ///
-    /// If another thread paniced while holding the death event lock.
-    ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn set_death_event(&self, clone_id: Uuid) -> Option<Instant> {
-        self.death_timer.lock()
-            .expect("A thread paniced while holding the death event lock.")
-            .insert(clone_id, Instant::now())
-    }
-
-    /// Calculates the deathhs in the specified [`ClonalPopulation`] and returns if the population
-    /// went extinct.
-    ///
-    /// # Parameters
-    ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
-    ///
-    /// # Panics
-    ///
-    /// If another thread paniced while holding the population lock, the death timer lock or if the [`ClonalPopulation`]
-    /// could not be removed.
-    ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn calculate_deaths(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool{
-        // Calculate the deaths of the population and remove it if it went extinct.
-        let mut cp = clonal_population.lock().unwrap();
-        if let Some(last_death_event) = self.set_death_event(cp.uuid().clone()) {
-            cp.death_event(last_death_event.elapsed().as_secs_f64() / self.environment.death_rate());
-        }
-        if cp.is_extinct() {
-            self.remove_clonal_population(*cp.uuid());
-            true
-        } else {
-            false
-        }
     }
 
     /// Load the [`Genome`] of the specified [`ClonalPopulation`]
@@ -528,16 +534,4 @@ enum GlobalEnvironmentState {
     Execution,
     /// Saving the network.
     Saving,
-}
-
-impl GlobalEnvironmentState {
-    /// Checks whether the [`GlobalEnvironment`] is currently executing the network.
-    ///
-    /// [`GlobalEnvironment`]: ./struct.GlobalEnvironment.html
-    fn is_executing(&self) -> bool {
-        match self {
-            GlobalEnvironmentState::Execution => true,
-            _ => false
-        }
-    }
 }
