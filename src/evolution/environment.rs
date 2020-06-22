@@ -6,8 +6,7 @@ extern crate rayon;
 use bitvec::{boxed::BitBox, order::Local};
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
-use super::population::{ClonalPopulation, Population, OrganismInformation};
-use super::gene::Genome;
+use super::population::{ClonalPopulation, Population, Organism, OrganismInformation};
 use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -306,8 +305,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
         // Transcribe / translate the genome and test the organism.
         let (input, result_information) = (inner.supplier_function)();
-        let organism_genome = inner.load_genome(clonal_population.clone());
-        let organism = organism_genome.translate();
+        let organism = inner.load_organism(clonal_population.clone());
         organism.set_input(input);
         let run_time = organism.live(&inner.environment);
         let output = organism.get_result();
@@ -324,16 +322,10 @@ impl<I: 'static> GlobalEnvironment<I> {
             let mut cp = clonal_population.lock().unwrap();
             mutated_offspring = cp.evaluate_new_fitness(fitness, &environment);
         }
-        mutated_offspring.iter()
+        mutated_offspring.into_iter()
             .map(|genome| {
                 let uuid = environment.generate_uuid();
-                if let Err(err) = genome.write_to_file(environment.genome_path(&uuid)) {
-                    // Panicing on an error is fine, since writing genomes to files is an
-                    // integral part of the network.
-                    panic!("Writing mutated genome {} to a file filed: {}", &uuid, err);
-                }
-                let size = std::fs::metadata(environment.genome_path(&uuid)).expect("Just written!").len();
-                ClonalPopulation::found(uuid, size, &environment)
+                ClonalPopulation::found(uuid, genome, &environment)
             }).collect()
     }
 
@@ -487,23 +479,23 @@ impl<I> InnerGlobalEnvironment<I> {
             .expect("Clonal population could not be removed.");
     }
 
-    /// Load the [`Genome`] of the specified [`ClonalPopulation`]
+    /// Load the [`Organism`] corresponding to the specified [`ClonalPopulation`]
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to load the genome from
+    /// * `clonal_population` - the [`ClonalPopulation`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population lock or the [`Genome`]
-    /// could not be loaded.
+    /// If another thread paniced while holding the clonal population lock.
     ///
-    /// [`Genome`]: ../gene/struct.Genome.html
+    /// [`Organism`]: ../population/struct.population.html
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn load_genome(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Genome {
+    fn load_organism(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Organism {
         clonal_population.lock()
             .expect("Another thread panicked while holding the clonal popuation lock.")
-            .get_genome(&self.environment)
+            .genome()
+            .translate()
     }
 
     /// Add the [`ClonalPopulation`]s to the [`Population`].

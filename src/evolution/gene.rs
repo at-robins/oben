@@ -427,6 +427,15 @@ impl Genome {
        Ok(file.sync_all()?)
     }
 
+    /// Returns the binary siyze of this `Genome`.
+    ///
+    /// # Panics
+    ///
+    /// If the underlying serialisation fails.
+    pub fn binary_size(&self) -> usize {
+        rmp_serde::to_vec(&self).expect("Serialisation of the genome failed.").len()
+    }
+
     pub fn translate(&self) -> Organism {
         let mut gene_substrate_map: HashMap<GeneSubstrate, Rc<RefCell<Substrate>>> = HashMap::new();
         // Insert all genome level substrates.

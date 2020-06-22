@@ -139,7 +139,7 @@ fn produce_mutated_genomes(number_of_mutated_genomes: u32, genome: &Genome) -> V
 ///
 /// [`Organism`]: ./struct.Organism.html
 pub struct OrganismInformation {
-    bytes: u64,
+    bytes: usize,
     run_time: Duration,
     max_run_time: Duration,
 }
@@ -149,7 +149,7 @@ impl OrganismInformation {
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(bytes: u64, run_time: Duration, max_run_time: Duration) -> Self {
+    pub fn new(bytes: usize, run_time: Duration, max_run_time: Duration) -> Self {
         OrganismInformation{bytes, run_time, max_run_time}
     }
 
@@ -157,7 +157,7 @@ impl OrganismInformation {
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Organism`]: ./struct.Organism.html
-    pub fn bytes(&self) -> u64 {
+    pub fn bytes(&self) -> usize {
         self.bytes
     }
 
@@ -177,15 +177,16 @@ impl OrganismInformation {
 }
 
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// A `ClonalPopulation` is a population of individuals with exactly the same [`Genome`].
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
 pub struct ClonalPopulation {
     source: Uuid,
+    genome: Genome,
     size: f64,
     fitness: Option<f64>,
-    bytes: u64,
+    bytes: usize,
 }
 
 impl ClonalPopulation {
@@ -194,12 +195,19 @@ impl ClonalPopulation {
     /// # Parameters
     ///
     /// * `uuid` - the UUID of the `ClonalPopulation`
-    pub fn found(uuid: Uuid, byte_length: u64, environment: &Environment) -> Self {
+    /// * `genome` - the [`Genome`] of the population
+    /// * `environment` - the [`Environment`] the population is living in
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+    /// [`Environment`]: ../environment/struct.Environment.html
+    pub fn found(uuid: Uuid, genome: Genome, environment: &Environment) -> Self {
+        let bytes = genome.binary_size();
         ClonalPopulation{
             source: uuid,
+            genome,
             size: 1.0 / environment.population_size() as f64,
             fitness: None,
-            bytes: byte_length,
+            bytes,
         }
     }
 
@@ -209,7 +217,7 @@ impl ClonalPopulation {
     }
 
     /// Returns the number of bytes this `ClonalPopulation` contains.
-    pub fn bytes(&self) -> u64 {
+    pub fn bytes(&self) -> usize {
         self.bytes
     }
 
@@ -273,29 +281,18 @@ impl ClonalPopulation {
         // Grow the population by the non-mutated offspring.
         self.size += relative_total_offspring - (absolute_mutated_offspring as f64 / environment.population_size() as f64);
         // Generate the mutations.
-        let genome = self.get_genome(environment);
-        produce_mutated_genomes(absolute_mutated_offspring as u32, &genome)
+        produce_mutated_genomes(absolute_mutated_offspring as u32, &self.genome)
     }
 
-    /// Loads the [`Genome`] from its associated file.
-    ///
-    /// # Parameter
-    ///
-    /// * `environment` - the [`Environment`] the population is growing in
+    /// Returns the [`Genome`] of this [`ClonalPopulation`].
     ///
     /// # Panics
     ///
     /// If loading the [`Genome`] from its associated file failed.
     ///
-    /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn get_genome(&self, environment: &Environment) -> Genome {
-        match Genome::load_from_file(environment.genome_path(&self.source)) {
-            Ok(genome) => genome,
-            // I/O is a subsistantial part of the system, so its advised to panic here instead
-            // of performing error handling.
-            Err(err) => panic!("Loading of genome {} resulted in error: {}", self.source, err),
-        }
+    pub fn genome(&self) -> &Genome {
+        &self.genome
     }
 }
 
