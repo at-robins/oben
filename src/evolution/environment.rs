@@ -297,6 +297,9 @@ impl<I: 'static> GlobalEnvironment<I> {
                 start = Instant::now();
                 self.inner.set_state(GlobalEnvironmentState::Execution);
             }
+            // if generation > 300 {
+            //     break;
+            // }
         }
     }
 
@@ -355,7 +358,7 @@ impl<I> InnerGlobalEnvironment<I> {
     fn is_extinct(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
-        cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
+        !cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
     }
 
     /// Return the UUID of the specified [`ClonalPopulation`].
@@ -475,7 +478,7 @@ impl<I> InnerGlobalEnvironment<I> {
         let uuid = self.get_uuid(clonal_population);
         &self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .remove(uuid, &self.environment)
+            .remove(uuid)
             .expect("Clonal population could not be removed.");
     }
 

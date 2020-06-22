@@ -174,6 +174,12 @@ impl OrganismInformation {
     pub fn max_runtime(&self) -> Duration {
         self.max_run_time
     }
+
+    /// Returns the execution time relative to the maximal run time allowed for execution
+    /// of a task.
+    pub fn relative_run_time(&self) -> f64 {
+        self.run_time().as_secs_f64() / self.max_runtime().as_secs_f64()
+    }
 }
 
 
@@ -240,7 +246,7 @@ impl ClonalPopulation {
     ///
     /// [`Population`]: ./struct.Population.html
     pub fn adjust_size_to_reference(&mut self, reference: f64) {
-        self.fitness = self.fitness.map(|f| f / reference);
+        self.size /= reference;
     }
 
     /// Adds the specified fitness value by setting the fitness to the mean of old and
@@ -276,7 +282,7 @@ impl ClonalPopulation {
         // The fitness was just set, so the unwrap call must succeed.
         let relative_total_offspring = self.size * self.fitness.unwrap();
         // Determine the number of genetically different offspring.
-        let absolute_total_offspring = relative_total_offspring.floor() as u64;
+        let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
         let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());
         // Grow the population by the non-mutated offspring.
         self.size += relative_total_offspring - (absolute_mutated_offspring as f64 / environment.population_size() as f64);
@@ -307,17 +313,33 @@ struct SerialisablePopulation {
 
 impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
-    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>) {
-        let (mut uuid, mut fitness) = (None, None);
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>) {
+        let (mut uuid, mut fitness, mut size) = (None, None, None);
         for individual in &self.clonal_populations {
             match fitness {
-                Some(fit) if individual.fitness.is_some() && fit >= individual.fitness.unwrap() => {},
+                Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
                 _ => { uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
+                    size = Some(individual.relative_size());
                 }
             }
         }
-        (uuid, fitness)
+        (uuid, fitness, size)
+    }
+
+    /// Returns the UUID and fitness of the biggest sub-population of the population.
+    fn biggest_subpopulation(&self) -> (Option<Uuid>, Option<f64>, Option<f64>) {
+        let (mut uuid, mut fitness, mut size) = (None, None, None);
+        for individual in &self.clonal_populations {
+            match size {
+                Some(s) if s >= individual.relative_size() => {},
+                _ => { uuid = Some(*individual.uuid());
+                    fitness = individual.fitness;
+                    size = Some(individual.relative_size());
+                }
+            }
+        }
+        (uuid, fitness, size)
     }
 }
 
@@ -373,8 +395,12 @@ impl Population {
         let mut file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
-        let (id, fitness) = serialisable_population.fittest_individual();
-        println!("Population: {:?}\nID: {:?}\nFitness: {:?}", path_to_file.as_ref(), id, fitness);
+        let (id, fitness, size) = serialisable_population.fittest_individual();
+        println!("Fittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\n",
+        path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len());
+        let (id, fitness, size) = serialisable_population.biggest_subpopulation();
+        println!("Biggest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\n\n",
+        path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len());
         let ser = rmp_serde::to_vec(&serialisable_population)?;
         file.write_all(&ser)?;
         Ok(file.sync_all()?)
@@ -430,11 +456,9 @@ impl Population {
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn remove(&mut self, clonal_population_uuid: Uuid, environment: &Environment) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
+    pub fn remove(&mut self, clonal_population_uuid: Uuid) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
         let removed = self.clonal_populations.remove(&clonal_population_uuid)
             .ok_or::<RemoveError>(RemoveError::new(&clonal_population_uuid))?;
-        // Move the extinct genome to a backup folder.
-        std::fs::rename(environment.genome_path(&clonal_population_uuid), environment.extinct_genome_path(&clonal_population_uuid))?;
         Ok(removed)
     }
 }
