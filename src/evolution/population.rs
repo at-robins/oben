@@ -193,6 +193,7 @@ pub struct ClonalPopulation {
     size: f64,
     fitness: Option<f64>,
     bytes: usize,
+    age: u32
 }
 
 impl ClonalPopulation {
@@ -214,6 +215,7 @@ impl ClonalPopulation {
             size: 1.0 / environment.population_size() as f64,
             fitness: None,
             bytes,
+            age: 0,
         }
     }
 
@@ -258,10 +260,13 @@ impl ClonalPopulation {
     /// * `fitness` - the new fitness to add to the current fitness value
     fn add_fitness(&mut self, fitness: f64) {
         if let Some(old_fitness) = self.fitness {
-            self.fitness = Some((fitness + old_fitness) / 2.0);
+            // Calculate the mean of the current and all previous fitness values.
+            let f_old = old_fitness * (self.age as f64);
+            self.fitness = Some((fitness  + f_old) / ((self.age + 1) as f64));
         } else {
             self.fitness = Some(fitness);
         }
+        self.age += 1;
     }
 
     /// Generates mutated [`Genome`]s and updates the population size based on the evaluated fitness.
