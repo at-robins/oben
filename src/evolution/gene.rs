@@ -57,6 +57,13 @@ impl Genome {
         self.input.len()
     }
 
+    /// Get the number of associated input [`Substrate`]s in this `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_associated_inputs(&self) -> usize {
+        self.input.iter().filter(|i| i.is_some()).count()
+    }
+
     /// Get the number of output [`Substrate`]s in this `Genome`.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html

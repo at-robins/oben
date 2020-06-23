@@ -142,6 +142,7 @@ pub struct OrganismInformation {
     bytes: usize,
     run_time: Duration,
     max_run_time: Duration,
+    associated_inputs: usize,
 }
 
 impl OrganismInformation {
@@ -149,8 +150,8 @@ impl OrganismInformation {
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(bytes: usize, run_time: Duration, max_run_time: Duration) -> Self {
-        OrganismInformation{bytes, run_time, max_run_time}
+    pub fn new(bytes: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize) -> Self {
+        OrganismInformation{bytes, run_time, max_run_time, associated_inputs}
     }
 
     /// The size of the [`Organism`]s [`Genome`] in bytes.
@@ -179,6 +180,13 @@ impl OrganismInformation {
     /// of a task.
     pub fn relative_run_time(&self) -> f64 {
         self.run_time().as_secs_f64() / self.max_runtime().as_secs_f64()
+    }
+
+    /// The number of inputs of the [`Organism`] that are already associated.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn associated_inputs(&self) -> usize {
+        self.associated_inputs
     }
 }
 
@@ -247,6 +255,11 @@ impl ClonalPopulation {
     /// Checks whether the fitness value of this `ClonalPopulation` was already set.
     pub fn has_fitness(&self) -> bool {
         self.fitness.is_some()
+    }
+
+    /// Returns the number of associated inputs for this `ClonalPopulation` contains.
+    pub fn associated_inputs(&self) -> usize {
+        self.genome().number_of_associated_inputs()
     }
 
     /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference
@@ -349,7 +362,7 @@ impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
     fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
         let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
-        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 50).collect();
+        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 25).collect();
         for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},

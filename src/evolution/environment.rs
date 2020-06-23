@@ -351,7 +351,7 @@ impl<I: 'static> GlobalEnvironment<I> {
             organism.set_input(input);
             let run_time = organism.live(&inner.environment);
             let output = organism.get_result();
-            let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), run_time, *(&inner.environment.lifespan));
+            let oi = OrganismInformation::new(inner.get_bytes(clonal_population.clone()), run_time, *(&inner.environment.lifespan), inner.get_associated_inputs(clonal_population.clone()));
             fitness = (inner.fitness_function)(output, result_information, oi);
         } else {
             fitness = clonal_population.lock().unwrap().fitness().expect("The sub-population should have been tested before.");
@@ -438,6 +438,40 @@ impl<I> InnerGlobalEnvironment<I> {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
         *cp.uuid()
+    }
+
+    /// Return the size in bytes of the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn get_bytes(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.bytes()
+    }
+
+    /// Return the number of associated inputs for the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn get_associated_inputs(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.associated_inputs()
     }
 
     /// Return the relative size of the specified [`ClonalPopulation`].
