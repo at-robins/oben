@@ -305,10 +305,19 @@ impl ClonalPopulation {
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
     pub fn grow(&mut self, environment: &Environment) -> Vec<Genome> {
-        let relative_total_offspring = self.size * self.fitness.expect("Fitness was not set, so updating the population is not possible");
+        let relative_total_offspring = self.size * self.fitness
+            .expect("Fitness was not set, so updating the population is not possible");
+        let mut relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, environment.clonal_population_growth_sd())
+            .expect("The standard deviation for calculating the total offspring must not be negative.")
+            .sample(&mut rand::thread_rng());
+        if relative_total_offspring < 0.0 {
+            relative_total_offspring = 0.0;
+        }
         // Determine the number of genetically different offspring.
         let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
-        let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());
+        let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate())
+            .expect("The mutation rate is not set between 0 and 1.")
+            .sample(&mut rand::thread_rng());
         // Grow the population by the non-mutated offspring.
         self.size += relative_total_offspring - (absolute_mutated_offspring as f64 / environment.population_size() as f64);
         // Generate the mutations.
@@ -338,33 +347,36 @@ struct SerialisablePopulation {
 
 impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
-    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>) {
-        let (mut uuid, mut fitness, mut size) = (None, None, None);
-        for individual in &self.clonal_populations {
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
+        let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
+        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 50).collect();
+        for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
                 _ => { uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
                     size = Some(individual.relative_size());
+                    cp = Some(individual.clone());
                 }
             }
         }
-        (uuid, fitness, size)
+        (uuid, fitness, size, cp)
     }
 
     /// Returns the UUID and fitness of the biggest sub-population of the population.
-    fn biggest_subpopulation(&self) -> (Option<Uuid>, Option<f64>, Option<f64>) {
-        let (mut uuid, mut fitness, mut size) = (None, None, None);
+    fn biggest_subpopulation(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
+        let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
         for individual in &self.clonal_populations {
             match size {
                 Some(s) if s >= individual.relative_size() => {},
                 _ => { uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
                     size = Some(individual.relative_size());
+                    cp = Some(individual.clone());
                 }
             }
         }
-        (uuid, fitness, size)
+        (uuid, fitness, size, cp)
     }
 }
 
@@ -420,12 +432,14 @@ impl Population {
         let mut file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
-        let (id, fitness, size) = serialisable_population.fittest_individual();
-        println!("Fittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\n",
-        path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len());
-        let (id, fitness, size) = serialisable_population.biggest_subpopulation();
-        println!("Biggest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\n\n",
-        path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len());
+        let (id, fitness, size, cp) = serialisable_population.fittest_individual();
+        println!("\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\n\n{:#?}\n",
+            path_to_file.as_ref(), id, fitness, size, cp);
+        let (id, fitness, size, cp) = serialisable_population.biggest_subpopulation();
+        println!("Biggest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\nF-Mean: {}\n\n{:#?}\n",
+            path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len(),
+            serialisable_population.clonal_populations.iter().filter_map(|cp| cp.fitness()).sum::<f64>() /
+            (serialisable_population.clonal_populations.len() as f64), cp);
         let ser = rmp_serde::to_vec(&serialisable_population)?;
         file.write_all(&ser)?;
         Ok(file.sync_all()?)

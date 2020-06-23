@@ -57,6 +57,10 @@ pub struct Environment {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     clonal_population_founding_size: f64,
+    /// The standard deviation of the fitness dependent growth of a [`ClonalPopulation`].
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    clonal_population_growth_sd: f64,
 }
 
 impl Environment {
@@ -69,7 +73,8 @@ impl Environment {
         population_save_intervall: Duration,
         uuid_node: [u8; 6],
         max_testing_age: Option<u32>,
-        clonal_population_founding_size: f64,) -> Self {
+        clonal_population_founding_size: f64,
+        clonal_population_growth_sd: f64) -> Self {
         Environment{working_directory,
             mutation_rate,
             population_size,
@@ -78,7 +83,8 @@ impl Environment {
             population_save_intervall,
             uuid_node,
             max_testing_age,
-            clonal_population_founding_size}
+            clonal_population_founding_size,
+            clonal_population_growth_sd}
     }
 
     /// Returns the path to the working directory.
@@ -119,6 +125,11 @@ impl Environment {
     /// Returns the starting size of a newly found clonal population.
     pub fn clonal_population_founding_size(&self) -> f64 {
         self.clonal_population_founding_size
+    }
+
+    /// Returns the growth standard deviation of clonal populations.
+    pub fn clonal_population_growth_sd(&self) -> f64 {
+        self.clonal_population_growth_sd
     }
 
     /// Returns the timestamp for UUID creation.
@@ -246,6 +257,7 @@ impl Default for Environment {
             uuid_node: rand::random(),
             max_testing_age: None,
             clonal_population_founding_size: 1.0 / 1_000_000.0,
+            clonal_population_growth_sd: 10.0 / 1_000_000.0,
         }
     }
 }
@@ -304,7 +316,7 @@ impl<I: 'static> GlobalEnvironment<I> {
                 .sum();
             clonal_populations.par_iter().for_each(|clonal_population| {
                     self.inner.adjust_size_to_reference(clonal_population.clone(), total_population_size);
-                });
+            });
             // Remove extinct populations that are below the dection threshold.
             clonal_populations.par_iter()
                 .filter(|clonal_population| self.inner.is_extinct((*clonal_population).clone()))
