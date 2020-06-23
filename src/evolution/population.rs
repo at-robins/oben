@@ -212,7 +212,7 @@ impl ClonalPopulation {
         ClonalPopulation{
             source: uuid,
             genome,
-            size: 1.0 / environment.population_size() as f64,
+            size: environment.clonal_population_founding_size(),
             fitness: None,
             bytes,
             age: 0,
@@ -227,6 +227,16 @@ impl ClonalPopulation {
     /// Returns the number of bytes this `ClonalPopulation` contains.
     pub fn bytes(&self) -> usize {
         self.bytes
+    }
+
+    /// Returns the age of this `ClonalPopulation`.
+    pub fn age(&self) -> u32 {
+        self.age
+    }
+
+    /// Returns the fitness of this `ClonalPopulation` if any.
+    pub fn fitness(&self) -> Option<f64> {
+        self.fitness
     }
 
     /// Returns the relative size of this `ClonalPopulation`.
@@ -276,16 +286,26 @@ impl ClonalPopulation {
     /// * `fitness` - the newly evaluated fitness of the population
     /// * `environment` - the [`Environment`] the population is growing in
     ///
-    /// # Panics
-    ///
-    /// If internal loading the source [`Genome`] from its associated file failed,
-    /// while generating mutants.
-    ///
     /// [`Environment`]: ../environment/struct.Environment.html
     pub fn evaluate_new_fitness(&mut self, fitness: f64, environment: &Environment) -> Vec<Genome> {
         self.add_fitness(fitness);
-        // The fitness was just set, so the unwrap call must succeed.
-        let relative_total_offspring = self.size * self.fitness.unwrap();
+        // The fitness was just set, so the call must succeed.
+        self.grow(environment)
+    }
+
+    /// Generates mutated [`Genome`]s and updates the population size based on its fitness.
+    ///
+    /// # Parameters
+    ///
+    /// * `environment` - the [`Environment`] the population is growing in
+    ///
+    /// # Panics
+    ///
+    /// If the fitness has not been set before.
+    ///
+    /// [`Environment`]: ../environment/struct.Environment.html
+    pub fn grow(&mut self, environment: &Environment) -> Vec<Genome> {
+        let relative_total_offspring = self.size * self.fitness.expect("Fitness was not set, so updating the population is not possible");
         // Determine the number of genetically different offspring.
         let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
         let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate()).expect("The mutation rate is not set between 0 and 1.").sample(&mut rand::thread_rng());

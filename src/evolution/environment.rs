@@ -47,7 +47,16 @@ pub struct Environment {
     /// [`Population`]: ../population/struct.Population.html
     population_save_intervall: Duration,
     /// The node for UUID creation.
-    uuid_node: [u8; 6]
+    uuid_node: [u8; 6],
+    /// The maximum age of a [`ClonalPopulation`] until testing and fitness determination is
+    /// performed.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    max_testing_age: Option<u32>,
+    /// The size of a newly founded, mutated [`ClonalPopulation`].
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    clonal_population_founding_size: f64,
 }
 
 impl Environment {
@@ -58,14 +67,18 @@ impl Environment {
         extinction_threshold: f64,
         lifespan: Duration,
         population_save_intervall: Duration,
-        uuid_node: [u8; 6]) -> Self {
+        uuid_node: [u8; 6],
+        max_testing_age: Option<u32>,
+        clonal_population_founding_size: f64,) -> Self {
         Environment{working_directory,
             mutation_rate,
             population_size,
             extinction_threshold,
             lifespan,
             population_save_intervall,
-            uuid_node}
+            uuid_node,
+            max_testing_age,
+            clonal_population_founding_size}
     }
 
     /// Returns the path to the working directory.
@@ -96,6 +109,16 @@ impl Environment {
     /// Returns the node for UUID creation.
     pub fn uuid_node(&self) -> &[u8; 6] {
         &self.uuid_node
+    }
+
+    /// Returns the maximum age until an individual is tested to determine the mean fitness.
+    pub fn max_testing_age(&self) -> Option<u32> {
+        self.max_testing_age
+    }
+
+    /// Returns the starting size of a newly found clonal population.
+    pub fn clonal_population_founding_size(&self) -> f64 {
+        self.clonal_population_founding_size
     }
 
     /// Returns the timestamp for UUID creation.
@@ -221,6 +244,8 @@ impl Default for Environment {
             lifespan: Duration::from_secs(1),
             population_save_intervall: Duration::from_secs(1800),
             uuid_node: rand::random(),
+            max_testing_age: None,
+            clonal_population_founding_size: 1.0 / 1_000_000.0,
         }
     }
 }
@@ -306,29 +331,37 @@ impl<I: 'static> GlobalEnvironment<I> {
 
 
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
-        // Transcribe / translate the genome and test the organism.
-        let (input, result_information) = (inner.supplier_function)();
-        let organism = inner.load_organism(clonal_population.clone());
-        organism.set_input(input);
-        let run_time = organism.live(&inner.environment);
-        let output = organism.get_result();
-        let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), run_time, *(&inner.environment.lifespan));
-        let fitness = (inner.fitness_function)(output, result_information, oi);
-        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.environment.clone());
+        let fitness;
+        if inner.is_juvenil(clonal_population.clone()) {
+            // Transcribe / translate the genome and test the organism.
+            let (input, result_information) = (inner.supplier_function)();
+            let organism = inner.load_organism(clonal_population.clone());
+            organism.set_input(input);
+            let run_time = organism.live(&inner.environment);
+            let output = organism.get_result();
+            let oi = OrganismInformation::new(clonal_population.lock().unwrap().bytes(), run_time, *(&inner.environment.lifespan));
+            fitness = (inner.fitness_function)(output, result_information, oi);
+        } else {
+            fitness = clonal_population.lock().unwrap().fitness().expect("The sub-population should have been tested before.");
+        }
+        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.clone());
         // Add the mutated offspring to the popuation.
         inner.append_population(mutated_offspring);
     }
 
-    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, environment: Arc<Environment>) -> Vec<ClonalPopulation> {
+    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<ClonalPopulation> {
         let mutated_offspring;
-        {
+        if inner.is_juvenil (clonal_population.clone()) {
             let mut cp = clonal_population.lock().unwrap();
-            mutated_offspring = cp.evaluate_new_fitness(fitness, &environment);
+            mutated_offspring = cp.evaluate_new_fitness(fitness, &inner.environment);
+        } else {
+            let mut cp = clonal_population.lock().unwrap();
+            mutated_offspring = cp.grow(&inner.environment);
         }
         mutated_offspring.into_iter()
             .map(|genome| {
-                let uuid = environment.generate_uuid();
-                ClonalPopulation::found(uuid, genome, &environment)
+                let uuid = inner.environment.generate_uuid();
+                ClonalPopulation::found(uuid, genome, &inner.environment)
             }).collect()
     }
 
@@ -359,6 +392,23 @@ impl<I> InnerGlobalEnvironment<I> {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
         !cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
+    }
+
+    /// Checks if the specified [`ClonalPopulation`] is juvenil and still needs testing.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn is_juvenil(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        self.environment.max_testing_age().map_or(true, |max_age| cp.age() < max_age)
     }
 
     /// Return the UUID of the specified [`ClonalPopulation`].
