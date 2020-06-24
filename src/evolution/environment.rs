@@ -403,7 +403,7 @@ impl<I> InnerGlobalEnvironment<I> {
     fn is_extinct(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
-        !cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
+        cp.has_fitness() && self.environment.extinction_threshold() > cp.relative_size()
     }
 
     /// Checks if the specified [`ClonalPopulation`] is juvenil and still needs testing.
