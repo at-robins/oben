@@ -254,10 +254,10 @@ pub enum Reaction {
     Or,
     /// A binary `XOR` operation.
     XOr,
-    /// A binary right shift operation.
-    ShiftRight,
-    /// A binary left shift operation.
-    ShiftLeft,
+    // /// A binary right shift operation.
+    // ShiftRight,
+    // /// A binary left shift operation.
+    // ShiftLeft,
     /// An operation, appending a binary value to another one.
     ///
     /// # Example
@@ -348,8 +348,8 @@ impl Reaction {
             Reaction::And => vec!(educts[0].clone() & educts[1].clone()),
             Reaction::Or => vec!(educts[0].clone() | educts[1].clone()),
             Reaction::XOr => vec!(educts[0].clone() ^ educts[1].clone()),
-            Reaction::ShiftRight => vec!(educts[0].clone() >> educts[1].len()),
-            Reaction::ShiftLeft => vec!(educts[0].clone() << educts[1].len()),
+            // Reaction::ShiftRight => vec!(educts[0].clone() >> educts[1].len()),
+            // Reaction::ShiftLeft => vec!(educts[0].clone() << educts[1].len()),
             Reaction::Append => {
                 let mut a = BitVec::from(educts[0].clone());
                 let mut b = BitVec::from(educts[1].clone());
@@ -386,8 +386,8 @@ impl Reaction {
             Reaction::And => 2,
             Reaction::Or => 2,
             Reaction::XOr => 2,
-            Reaction::ShiftRight => 2,
-            Reaction::ShiftLeft => 2,
+            // Reaction::ShiftRight => 2,
+            // Reaction::ShiftLeft => 2,
             Reaction::Append => 2,
             Reaction::Inverse => 1,
             Reaction::Reverse => 1,
@@ -403,8 +403,8 @@ impl Reaction {
             Reaction::And => 1,
             Reaction::Or => 1,
             Reaction::XOr => 1,
-            Reaction::ShiftRight => 1,
-            Reaction::ShiftLeft => 1,
+            // Reaction::ShiftRight => 1,
+            // Reaction::ShiftLeft => 1,
             Reaction::Append => 1,
             Reaction::Inverse => 1,
             Reaction::Reverse => 1,
@@ -417,18 +417,18 @@ impl Reaction {
 
 impl Distribution<Reaction> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Reaction {
-        match rng.gen_range(0u8, 11) {
+        match rng.gen_range(0u8, 9) {
             0 => Reaction::And,
             1 => Reaction::Or,
             2 => Reaction::XOr,
-            3 => Reaction::ShiftRight,
-            4 => Reaction::ShiftLeft,
-            5 => Reaction::Append,
-            6 => Reaction::Inverse,
-            7 => Reaction::Reverse,
-            8 => Reaction::Duplicate,
-            9 => Reaction::Misfunction,
-            10 => Reaction::Random,
+            // 3 => Reaction::ShiftRight,
+            // 4 => Reaction::ShiftLeft,
+            3 => Reaction::Append,
+            4 => Reaction::Inverse,
+            5 => Reaction::Reverse,
+            6 => Reaction::Duplicate,
+            7 => Reaction::Misfunction,
+            8 => Reaction::Random,
             _ => panic!("A random number with no matching reaction was created.")
         }
     }
