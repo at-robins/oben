@@ -58,6 +58,7 @@ pub struct Environment {
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     clonal_population_founding_size: f64,
     /// The standard deviation of the fitness dependent growth of a [`ClonalPopulation`].
+    /// It is specified in percentage of the sub-population's size.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     clonal_population_growth_sd: f64,
@@ -127,7 +128,7 @@ impl Environment {
         self.clonal_population_founding_size
     }
 
-    /// Returns the growth standard deviation of clonal populations.
+    /// Returns the growth standard deviation of clonal populations in percentage of their size.
     pub fn clonal_population_growth_sd(&self) -> f64 {
         self.clonal_population_growth_sd
     }

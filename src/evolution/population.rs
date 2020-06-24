@@ -320,7 +320,7 @@ impl ClonalPopulation {
     pub fn grow(&mut self, environment: &Environment) -> Vec<Genome> {
         let relative_total_offspring = self.size * self.fitness
             .expect("Fitness was not set, so updating the population is not possible");
-        let mut relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, environment.clonal_population_growth_sd())
+        let mut relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, relative_total_offspring * environment.clonal_population_growth_sd())
             .expect("The standard deviation for calculating the total offspring must not be negative.")
             .sample(&mut rand::thread_rng());
         if relative_total_offspring < 0.0 {
@@ -454,8 +454,7 @@ impl Population {
             serialisable_population.clonal_populations.iter().filter_map(|cp| cp.fitness()).sum::<f64>() /
             (serialisable_population.clonal_populations.len() as f64), cp);
         let ser = rmp_serde::to_vec(&serialisable_population)?;
-        file.write_all(&ser)?;
-        Ok(file.sync_all()?)
+        Ok(file.write_all(&ser)?)
     }
 
     /// Load a `Population` from a JSON file if possible.
