@@ -27,7 +27,7 @@ const RANDOM_SUBSTRATE_MIN_LENGTH: usize = 0;
 /// The maximal length in byte of a randomly created binary [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 64;
+const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 1;
 
 /// A `Genome` is a collection of individual [`Gene`]s and associations between them.
 /// A `Genome` is required to consist of 1 or more genes.
@@ -481,10 +481,21 @@ impl Genome {
     /// * `input` - number of inputs
     /// * `output` - number of outputs
     pub fn empty_genome(input: usize, output: usize) -> Self {
+        let mut gene = Gene{substrates: Vec::new(), receptors: Vec::new()};
+        for _ in 0..input {
+            gene.add_substrate(BitBox::empty());
+        }
+        for _ in 0..output {
+            gene.add_substrate(BitBox::empty());
+        }
+        // Make sure that a gene always has at least one substrate.
+        if input+output == 0 {
+            gene.add_substrate(BitBox::empty());
+        }
         Genome {
-            input: (0..input).map(|_| None).collect(),
-            output: (0..output).map(|_| None).collect(),
-            genes: vec!(Gene::default()),
+            input: (0..input).map(|i| Some(GeneSubstrate{gene: 0, substrate: i})).collect(),
+            output: (input..(output+input)).map(|o| Some(GeneSubstrate{gene: 0, substrate: o})).collect(),
+            genes: vec!(gene),
             associations: vec!(),
         }
     }
@@ -1777,7 +1788,7 @@ impl GenomeMutation {
 fn random_substrate() -> BitBox<Local, u8> {
     let length: usize = thread_rng().gen_range(RANDOM_SUBSTRATE_MIN_LENGTH, RANDOM_SUBSTRATE_MAX_LENGTH + 1);
     let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
-    BitBox::from_slice(&random_bytes)
+    BitVec::from_vec(random_bytes).into_boxed_bitslice()
 }
 
 /// Generates a random binary [`Substrate`] based on the specified length in byte.
@@ -1802,7 +1813,7 @@ fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
         length = thread_rng().gen_range(min_length, max_length);
     }
     let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
-    BitBox::from_slice(&random_bytes)
+    BitVec::from_vec(random_bytes).into_boxed_bitslice()
 }
 
 /// Flips a random bit of the binary [`Substrate`].
