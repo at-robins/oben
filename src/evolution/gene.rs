@@ -189,6 +189,14 @@ impl Genome {
         self.genes[gene].duplicate()
     }
 
+    /// Duplicates a random [`Gene`] and returns it
+    /// for further processing.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn duplicate_random_gene(&self) -> Gene {
+        self.get_gene(self.get_random_gene()).duplicate()
+    }
+
     /// Duplicates the [`Gene`] at the specified index and adds it directly to the genome
     /// if possible.
     /// This function will fail if the underlying vector would overflow due to the duplication.
@@ -1778,6 +1786,21 @@ impl GenomeMutation {
                Some(mutated_genome)
            })
        })
+   }
+
+   /// Transfers the specified [`Gene`] into the specified acceptor [`Genome`] if possible and
+   /// Returns the altered [`Genome`].
+   ///
+   /// # Parameters
+   ///
+   /// * `acceptor` - the [`Genome`] accepting a lateral gene transfer
+   /// * `donor_gene` - the gene to be inserted into the acceptor [`Genome`]
+   ///
+   /// [`Gene`]: ./struct.Gene.html
+   /// [`Genome`]: ./struct.Genome.html
+   pub fn lateral_gene_transfer(acceptor: &Genome, donor_gene: Gene) -> Option<Genome> {
+       let mut mutated_genome = acceptor.duplicate();
+       mutated_genome.add_gene(donor_gene).and(Some(mutated_genome))
    }
 
 }

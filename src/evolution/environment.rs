@@ -2,14 +2,17 @@
 
 extern crate bitvec;
 extern crate rayon;
+extern crate rand;
 
 use bitvec::{boxed::BitBox, order::Local};
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population, Organism, OrganismInformation};
+use super::gene::{Gene, GenomeMutation};
 use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
+use rand::{thread_rng, Rng};
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes/dummy";
@@ -49,7 +52,7 @@ pub struct Environment {
     /// The node for UUID creation.
     uuid_node: [u8; 6],
     /// The maximum age of a [`ClonalPopulation`] until testing and fitness determination is
-    /// performed.
+    /// always performed. After this age testing is performed by chance.
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     max_testing_age: Option<u32>,
@@ -62,6 +65,13 @@ pub struct Environment {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     clonal_population_growth_sd: f64,
+    /// The chance per growth event that a lateral gene transfer between two
+    /// sub-populations happens.
+    lateral_gene_transfer_chance: f64,
+    /// The 50 percent midpoint of test cycles of the chance determining sigmoid for testing a [`ClonalPopulation`].
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    testing_chance_sigmoid_midpoint: f64,
 }
 
 impl Environment {
@@ -75,7 +85,9 @@ impl Environment {
         uuid_node: [u8; 6],
         max_testing_age: Option<u32>,
         clonal_population_founding_size: f64,
-        clonal_population_growth_sd: f64) -> Self {
+        clonal_population_growth_sd: f64,
+        lateral_gene_transfer_chance: f64,
+        testing_chance_sigmoid_midpoint: f64) -> Self {
         Environment{working_directory,
             mutation_rate,
             population_size,
@@ -85,7 +97,9 @@ impl Environment {
             uuid_node,
             max_testing_age,
             clonal_population_founding_size,
-            clonal_population_growth_sd}
+            clonal_population_growth_sd,
+            lateral_gene_transfer_chance,
+            testing_chance_sigmoid_midpoint}
     }
 
     /// Returns the path to the working directory.
@@ -123,6 +137,27 @@ impl Environment {
         self.max_testing_age
     }
 
+    /// The midpoint of the testing chance sigmoid in test cycles.
+    pub fn testing_chance_sigmoid_midpoint(&self) -> f64 {
+        self.testing_chance_sigmoid_midpoint
+    }
+
+    /// Returns the chance for testing a sub-population.
+    ///
+    /// # Parameters
+    ///
+    /// * `size` - the relative size of the sub-population
+    /// * `age` - the number of times the sub-population was already tested
+    pub fn testing_chance(&self, size: f64, age: u32) -> f64 {
+        // Asymptote.
+        let a = 1.0;
+        // Midpoint.
+        let m = self.testing_chance_sigmoid_midpoint();
+        // Steepness.
+        let s = self.testing_chance_sigmoid_midpoint() * 0.2;
+        0.5 * size + 0.5 * (a / (1.0 + (((age as f64) - m) / s).exp()))
+    }
+
     /// Returns the starting size of a newly found clonal population.
     pub fn clonal_population_founding_size(&self) -> f64 {
         self.clonal_population_founding_size
@@ -131,6 +166,10 @@ impl Environment {
     /// Returns the growth standard deviation of clonal populations in percentage of their size.
     pub fn clonal_population_growth_sd(&self) -> f64 {
         self.clonal_population_growth_sd
+    }
+
+    pub fn lateral_gene_transfer(&self) -> bool {
+        thread_rng().gen_range(0.0, 1.0) <= self.lateral_gene_transfer_chance
     }
 
     /// Returns the timestamp for UUID creation.
@@ -250,7 +289,7 @@ impl Default for Environment {
     fn default() -> Self {
         Environment {
             working_directory: PathBuf::from("./working_directory"),
-            mutation_rate: 0.001,
+            mutation_rate: 0.0001,
             population_size: 1_000_000,
             extinction_threshold: 1.0 / 10_000_000.0,
             lifespan: Duration::from_secs(1),
@@ -258,7 +297,9 @@ impl Default for Environment {
             uuid_node: rand::random(),
             max_testing_age: None,
             clonal_population_founding_size: 1.0 / 1_000_000.0,
-            clonal_population_growth_sd: 10.0 / 1_000_000.0,
+            clonal_population_growth_sd: 0.1,
+            lateral_gene_transfer_chance: 0.00001,
+            testing_chance_sigmoid_midpoint: 100.0
         }
     }
 }
@@ -324,6 +365,15 @@ impl<I: 'static> GlobalEnvironment<I> {
                 .for_each(|clonal_population| {
                     self.inner.remove_clonal_population(clonal_population.clone());
                 });
+            let mut bytes = 0usize;
+            let mut fitness = 0.0;
+            for cp in self.inner.population.lock().unwrap().clonal_populations() {
+                let c = cp.lock().unwrap();
+                bytes += c.bytes();
+                fitness += c.fitness().unwrap_or(0.0);
+            }
+            fitness /= self.inner.population.lock().unwrap().clonal_populations().len() as f64;
+            println!("Size: {} : Bytes: {} ; Fitness: {}", self.inner.population.lock().unwrap().clonal_populations().len(), bytes, fitness);
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
                 println!("Waiting to save...");
@@ -335,6 +385,7 @@ impl<I: 'static> GlobalEnvironment<I> {
                 start = Instant::now();
                 self.inner.set_state(GlobalEnvironmentState::Execution);
             }
+
             // if generation > 300 {
             //     break;
             // }
@@ -345,7 +396,8 @@ impl<I: 'static> GlobalEnvironment<I> {
 
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
         let fitness;
-        if inner.is_juvenil(clonal_population.clone()) {
+        let tested = inner.testing(clonal_population.clone());
+        if tested {
             // Transcribe / translate the genome and test the organism.
             let (input, result_information) = (inner.supplier_function)();
             let organism = inner.load_organism(clonal_population.clone());
@@ -357,19 +409,30 @@ impl<I: 'static> GlobalEnvironment<I> {
         } else {
             fitness = clonal_population.lock().unwrap().fitness().expect("The sub-population should have been tested before.");
         }
-        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.clone());
+        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.clone(), tested);
         // Add the mutated offspring to the popuation.
         inner.append_population(mutated_offspring);
     }
 
-    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<ClonalPopulation> {
-        let mutated_offspring;
-        if inner.is_juvenil (clonal_population.clone()) {
+    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, inner: Arc<InnerGlobalEnvironment<I>>, tested: bool) -> Vec<ClonalPopulation> {
+        let mut mutated_offspring;
+        if tested {
             let mut cp = clonal_population.lock().unwrap();
             mutated_offspring = cp.evaluate_new_fitness(fitness, &inner.environment);
         } else {
             let mut cp = clonal_population.lock().unwrap();
             mutated_offspring = cp.grow(&inner.environment);
+        }
+        // Perform lateral gene transfer by chance.
+        if inner.environment.lateral_gene_transfer() {
+            // This must be called before aquiring the clonal population's lock since lateral
+            // gene transfer from the same clonal population is possible. This specifically
+            // would result into a dead lock.
+            let gene = inner.get_random_gene();
+            let cp = clonal_population.lock().unwrap();
+            if let Some(mutated_genome) = GenomeMutation::lateral_gene_transfer(cp.genome(), gene) {
+                mutated_offspring.push(mutated_genome);
+            }
         }
         mutated_offspring.into_iter()
             .map(|genome| {
@@ -422,6 +485,38 @@ impl<I> InnerGlobalEnvironment<I> {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
         self.environment.max_testing_age().map_or(true, |max_age| cp.age() < max_age)
+    }
+
+    /// Checks if the specified [`ClonalPopulation`] should be testedby chance.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn testing_by_chance(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(cp.relative_size(), cp.age())
+    }
+
+    /// Checks if the specified [`ClonalPopulation`] should be tested.
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn testing(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
+        self.is_juvenil(clonal_population.clone()) || self.testing_by_chance(clonal_population)
     }
 
     /// Return the UUID of the specified [`ClonalPopulation`].
@@ -490,6 +585,22 @@ impl<I> InnerGlobalEnvironment<I> {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
         cp.relative_size()
+    }
+
+    /// Returns the copy of a random gene in a random [`ClonalPopulation`].
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock or the population is
+    /// completely extinct.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    fn get_random_gene(&self) -> Gene {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .random_gene()
+            // Unwrapping is safe here since we cannot call this function on empty populations.
+            .unwrap()
     }
 
     /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference
@@ -610,10 +721,10 @@ impl<I> InnerGlobalEnvironment<I> {
     ///
     /// [`Population`]: ../population/struct.Population.html
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn append_population(&self, clonal_populations: Vec<ClonalPopulation>) -> Vec<Arc<Mutex<ClonalPopulation>>>{
+    fn append_population(&self, clonal_populations: Vec<ClonalPopulation>) {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .append(clonal_populations)
+            .append(clonal_populations);
     }
 
 }

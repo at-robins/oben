@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use bitvec::{boxed::BitBox, order::Local};
 use super::protein::{Substrate, Receptor};
-use super::gene::{Genome, GenomeMutation};
+use super::gene::{Gene, Genome, GenomeMutation};
 use super::environment::Environment;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
@@ -23,6 +23,7 @@ use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use rand::{thread_rng, Rng};
 
 pub struct Organism {
     substrates: Vec<Rc<RefCell<Substrate>>>,
@@ -478,21 +479,42 @@ impl Population {
         self.clonal_populations.values().map(|val| val.clone()).collect()
     }
 
-    /// Inserts all the [`ClonalPopulation`]s into the `Population` and returns a reference
-    /// to them.
+    /// Inserts all the [`ClonalPopulation`]s into the `Population`.
     ///
     /// # Parameters
     ///
     /// * `clonal_populations` - the [`ClonalPopulation`]s to append
     ///
     /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn append(&mut self, clonal_populations: Vec<ClonalPopulation>) -> Vec<Arc<Mutex<ClonalPopulation>>> {
-        clonal_populations.into_iter()
-            .map(|clonal_population| (clonal_population.uuid().clone(), Arc::new(Mutex::new(clonal_population))))
-            .map(|clonal_population| {
-                self.clonal_populations.insert(clonal_population.0, clonal_population.1.clone());
-                clonal_population.1
-            }).collect()
+    pub fn append(&mut self, clonal_populations: Vec<ClonalPopulation>) {
+        for cp in clonal_populations.into_iter() {
+            self.clonal_populations.insert(*cp.uuid(), Arc::new(Mutex::new(cp)));
+        }
+    }
+
+    /// Returns the copy of a random gene in a random [`ClonalPopulation`] if there are any.
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn random_gene(&self) -> Option<Gene> {
+        if self.clonal_populations.len() == 0 {
+            None
+        } else {
+            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
+            for (index, value) in self.clonal_populations.values().enumerate() {
+                if random_population_index == index {
+                    return Some(value.lock()
+                        .expect("A thread paniced while holding the clonal population's lock.")
+                        .genome()
+                        .duplicate_random_gene())
+                }
+            }
+            // This None is unreachable as the value must have been set before.
+            None
+        }
     }
 
     /// Remove the [`ClonalPopulation`] from the `Population`.
