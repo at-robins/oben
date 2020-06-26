@@ -1803,6 +1803,38 @@ impl GenomeMutation {
        mutated_genome.add_gene(donor_gene).and(Some(mutated_genome))
    }
 
+   /// Mutates the specified [`Genome`] the specified amount of times. If any of the mutations
+   /// was not successful `None` is returned.
+   ///
+   /// # Parameters
+   ///
+   /// * `number_of_mutations` - the number of times the genome should be mutated
+   /// * `genome` - the [`Genome`] to mutate
+   ///
+   /// [`Genome`]: ./struct.Genome.html
+    pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome) -> Option<Genome> {
+       if number_of_mutations == 0 {
+           Some(genome.duplicate())
+       } else {
+           let mut mutated_genome = None;
+           for i in 0..number_of_mutations {
+               if i == 0 {
+                   // If this is the first mutation, mutate the original genome.
+                   mutated_genome = rand::random::<GenomeMutation>().mutate(genome);
+               } else if mutated_genome.is_some() {
+                   // If this is not the first mutation and the previous mutation was
+                   // successful, continue mutating.
+                   // Unwrapping must succeed as it was checked beforehand.
+                   mutated_genome = rand::random::<GenomeMutation>().mutate(&mutated_genome.unwrap());
+               } else {
+                   // If this is not the first mutation and the previous mutation was not
+                   // successful, stop mutating.
+                   break;
+               }
+           }
+           mutated_genome
+       }
+    }
 }
 
 /// Generates a random binary [`Substrate`].

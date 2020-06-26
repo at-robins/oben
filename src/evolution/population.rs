@@ -125,15 +125,22 @@ impl Organism {
 ///
 /// # Parameters
 ///
-/// * `number_of_mutated_genomes` - the number of mutated [`Genome`]s to produce
+/// * `number_of_mutated_genomes` - the number of mutated [`Genome`]s to produce ordered by the
+/// number of mutations per genome
 /// * `genome` - the source [`Genome`] to mutate
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
-fn produce_mutated_genomes(number_of_mutated_genomes: u32, genome: &Genome) -> Vec<Genome>{
-    (0..number_of_mutated_genomes).map(|_| rand::random::<GenomeMutation>())
-        .filter_map(|mutation| mutation.mutate(genome))
+fn produce_mutated_genomes(number_of_mutated_genomes: Vec<u64>, genome: &Genome) -> Vec<Genome>{
+    number_of_mutated_genomes.into_iter()
+        .enumerate()
+        .flat_map(|(number_of_mutations, number_of_genomes)| {
+            (0..number_of_genomes).map(move |_| GenomeMutation::mutate_n_times(number_of_mutations + 1, genome))
+        })
+        .filter_map(|mutation| mutation)
         .collect()
 }
+
+
 
 #[derive(Debug, PartialEq, Clone)]
 /// Information of about an [`Organism`]s performance.
@@ -321,21 +328,33 @@ impl ClonalPopulation {
     pub fn grow(&mut self, environment: &Environment) -> Vec<Genome> {
         let relative_total_offspring = self.size * self.fitness
             .expect("Fitness was not set, so updating the population is not possible");
-        let mut relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, relative_total_offspring * environment.clonal_population_growth_sd())
+        let relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, relative_total_offspring * environment.clonal_population_growth_sd())
             .expect("The standard deviation for calculating the total offspring must not be negative.")
             .sample(&mut rand::thread_rng());
         if relative_total_offspring < 0.0 {
-            relative_total_offspring = 0.0;
+            Vec::new()
+        } else {
+            // Determine the number of genetically different offspring.
+            let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
+            let mut absolute_mutated_offspring: Vec<u64> = vec!(
+                Binomial::new(absolute_total_offspring, environment.mutation_rate())
+                    .expect("The mutation rate is not set between 0 and 1.")
+                    .sample(&mut rand::thread_rng())
+            );
+            // As long as mutated individuals are produced check if another mutation happend
+            // within the mutated genomes.
+            while *absolute_mutated_offspring.last().unwrap() > 0 {
+                // At least one element is present in the vector so the unwrap must succeed.
+                absolute_mutated_offspring.push(Binomial::new(*absolute_mutated_offspring.last().unwrap(), environment.mutation_rate())
+                    .expect("The mutation rate is not set between 0 and 1.")
+                    .sample(&mut rand::thread_rng()));
+            }
+            // Grow the population by the non-mutated offspring.
+            let mutated_offspring: f64 = absolute_mutated_offspring.iter().map(|f| *f as f64).sum();
+            self.size += relative_total_offspring - (mutated_offspring / environment.population_size() as f64);
+            // Generate the mutations.
+            produce_mutated_genomes(absolute_mutated_offspring, &self.genome)
         }
-        // Determine the number of genetically different offspring.
-        let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
-        let absolute_mutated_offspring = Binomial::new(absolute_total_offspring, environment.mutation_rate())
-            .expect("The mutation rate is not set between 0 and 1.")
-            .sample(&mut rand::thread_rng());
-        // Grow the population by the non-mutated offspring.
-        self.size += relative_total_offspring - (absolute_mutated_offspring as f64 / environment.population_size() as f64);
-        // Generate the mutations.
-        produce_mutated_genomes(absolute_mutated_offspring as u32, &self.genome)
     }
 
     /// Returns the [`Genome`] of this [`ClonalPopulation`].
@@ -533,6 +552,18 @@ impl Population {
         let removed = self.clonal_populations.remove(&clonal_population_uuid)
             .ok_or::<RemoveError>(RemoveError::new(&clonal_population_uuid))?;
         Ok(removed)
+    }
+
+    /// Resets the fitness and age of all [`ClonalPopulation`] as if they were never tested.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn reset_fitness(&self) {
+        for clonal_population in self.clonal_populations.values() {
+            let mut cp = clonal_population.lock()
+                .expect("A thread paniced while holding the clonal population's lock.");
+            cp.fitness = None;
+            cp.age = 0;
+        }
     }
 }
 
