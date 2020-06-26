@@ -968,8 +968,8 @@ impl GenomicReceptor {
             .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-                .clone()
-            ).collect();
+            ).map(|strong| Rc::downgrade(strong))
+            .collect();
         let enzyme = self.enzyme.translate(gene_index, substrate_lookup);
         let state = self.state.clone();
         let receptor = Rc::new(Receptor::new(substrates, state, enzyme));
@@ -1098,14 +1098,14 @@ impl GenomicCatalyticCentre {
             .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-                .clone()
-            ).collect();
+            ).map(|strong| Rc::downgrade(strong))
+            .collect();
         let products = self.products.iter()
             .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-                .clone()
-            ).collect();
+            ).map(|strong| Rc::downgrade(strong))
+            .collect();
         let reaction = self.reaction.clone();
         CatalyticCentre::new(educts, products, reaction)
     }

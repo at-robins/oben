@@ -1,9 +1,8 @@
 //! The `protein` module contains the executive part of the evolutionary network.
 extern crate bitvec;
 
-use std::cell::Ref;
-use core::cell::RefCell;
-use std::rc::Rc;
+use std::cell::{Ref, RefCell};
+use std::rc::{Rc, Weak};
 use bitvec::{boxed::BitBox, order::Local};
 use super::chemistry::{Reaction, State};
 
@@ -11,7 +10,7 @@ use super::chemistry::{Reaction, State};
 /// a `Substrate` is aware of all [`Receptor`]s detecting its changes.
 ///
 /// [`Receptor`]: ./struct.Receptor.html
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Substrate {
     value: BitBox<Local, u8>,
     receptors: Vec<Rc<Receptor>>,
@@ -58,9 +57,9 @@ impl Substrate {
 ///
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Receptor {
-    substrates: Vec<Rc<RefCell<Substrate>>>,
+    substrates: Vec<Weak<RefCell<Substrate>>>,
     state: State,
     enzyme: CatalyticCentre,
 }
@@ -82,7 +81,7 @@ impl Receptor {
     ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    pub fn new(substrates: Vec<Rc<RefCell<Substrate>>>, state: State, enzyme: CatalyticCentre) -> Self {
+    pub fn new(substrates: Vec<Weak<RefCell<Substrate>>>, state: State, enzyme: CatalyticCentre) -> Self {
         assert_eq!(substrates.len(), state.get_substrate_number(),
             "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
             state, state.get_substrate_number(), substrates.len());
@@ -96,7 +95,12 @@ impl Receptor {
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
     fn should_trigger(&self) -> bool {
         // TODO: refactor this ugly code
-        let substrates: Vec<Ref<Substrate>> = self.substrates.iter()
+        let strong: Vec<Rc<RefCell<Substrate>>> = self.substrates.iter()
+            // This unwrap must succeed as the containing structure will always be dropped first
+            // and no substrate references are leaked.
+            .map(|weak| weak.upgrade().unwrap())
+            .collect();
+        let substrates: Vec<Ref<Substrate>> = strong.iter()
             .map(|sub| sub.borrow())
             .collect();
         let substrates: Vec<&BitBox<Local, u8>> = substrates.iter()
@@ -127,10 +131,10 @@ impl Receptor {
 ///
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub struct CatalyticCentre {
-    educts: Vec<Rc<RefCell<Substrate>>>,
-    products: Vec<Rc<RefCell<Substrate>>>,
+    educts: Vec<Weak<RefCell<Substrate>>>,
+    products: Vec<Weak<RefCell<Substrate>>>,
     reaction: Reaction,
 }
 
@@ -151,7 +155,7 @@ impl CatalyticCentre {
     ///
     /// [`Substrate`]: ./struct.Substrate.html
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    pub fn new(educts: Vec<Rc<RefCell<Substrate>>>, products: Vec<Rc<RefCell<Substrate>>>, reaction: Reaction) -> Self {
+    pub fn new(educts: Vec<Weak<RefCell<Substrate>>>, products: Vec<Weak<RefCell<Substrate>>>, reaction: Reaction) -> Self {
         assert_eq!(educts.len(), reaction.get_educt_number(),
             "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
             reaction, reaction.get_educt_number(), educts.len());
@@ -167,7 +171,12 @@ impl CatalyticCentre {
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
     fn calculate_product_values(&self) -> Vec<BitBox<Local, u8>> {
         // TODO: refactor this ugly code
-        let educts: Vec<Ref<Substrate>> = self.educts.iter()
+        let strong: Vec<Rc<RefCell<Substrate>>> = self.educts.iter()
+            // This unwrap must succeed as the containing structure will always be dropped first
+            // and no substrate references are leaked.
+            .map(|weak| weak.upgrade().unwrap())
+            .collect();
+        let educts: Vec<Ref<Substrate>> = strong.iter()
             .map(|sub| sub.borrow())
             .collect();
         let educts: Vec<&BitBox<Local, u8>> = educts.iter()
@@ -183,7 +192,9 @@ impl CatalyticCentre {
         let mut product_values = self.calculate_product_values();
         for product in &self.products {
             // TODO: maybe switch to VecDeque and use pop_first()
-            product.borrow_mut().set_value(product_values.remove(0));
+            // This unwrap must succeed as the containing structure will always be dropped first
+            // and no substrate references are leaked.
+            product.upgrade().unwrap().borrow_mut().set_value(product_values.remove(0));
         }
     }
 
@@ -192,6 +203,8 @@ impl CatalyticCentre {
     ///
     /// [`Substrate`]: ./struct.Substrate.html
     pub fn cascading_receptors(&self) -> Vec<Rc<Receptor>> {
-        self.products.iter().flat_map(|product| product.borrow().receptors()).collect()
+        // This unwrap must succeed as the containing structure will always be dropped first
+        // and no substrate references are leaked.
+        self.products.iter().flat_map(|product| product.upgrade().unwrap().borrow().receptors()).collect()
     }
 }
