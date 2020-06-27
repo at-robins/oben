@@ -75,6 +75,10 @@ pub struct EnvironmentBuilder {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     testing_chance_sigmoid_midpoint: f64,
+    /// The number of times a [`ClonalPopulation`] is tested per test cycle.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    testing_repetitions: u32,
 }
 
 impl EnvironmentBuilder {
@@ -92,7 +96,8 @@ impl EnvironmentBuilder {
             clonal_population_founding_size: None,
             clonal_population_growth_sd: 0.1,
             lateral_gene_transfer_chance: None,
-            testing_chance_sigmoid_midpoint: 50.0
+            testing_chance_sigmoid_midpoint: 50.0,
+            testing_repetitions: 1
         }
     }
 
@@ -110,7 +115,8 @@ impl EnvironmentBuilder {
             clonal_population_founding_size: self.clonal_population_founding_size_or_default(),
             clonal_population_growth_sd: self.clonal_population_growth_sd,
             lateral_gene_transfer_chance: self.lateral_gene_transfer_chance_or_default(),
-            testing_chance_sigmoid_midpoint: self.testing_chance_sigmoid_midpoint
+            testing_chance_sigmoid_midpoint: self.testing_chance_sigmoid_midpoint,
+            testing_repetitions: self.testing_repetitions
         }
     }
 
@@ -242,6 +248,17 @@ impl EnvironmentBuilder {
         self
     }
 
+    /// Sets the number of repetitions per testing cycle. The fitness function is called
+    /// that many times for evalution.
+    ///
+    /// # Parameters
+    ///
+    /// * `testing_repetitions` - the number of repetitions per testing cycle
+    pub fn testing_repetitions(&mut self, testing_repetitions: u32) -> &mut Self {
+        self.testing_repetitions = testing_repetitions;
+        self
+    }
+
     /// Returns the mutation rate if set. Otherwise defaults to a population size dependent value.
     fn mutation_rate_or_default(&self) -> f64 {
         if let Some(mutation_rate) = self.mutation_rate {
@@ -336,6 +353,10 @@ pub struct Environment {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     testing_chance_sigmoid_midpoint: f64,
+    /// The number of times a [`ClonalPopulation`] is tested per test cycle.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    testing_repetitions: u32,
 }
 
 impl Environment {
@@ -405,8 +426,14 @@ impl Environment {
         self.clonal_population_growth_sd
     }
 
+    /// Checks if lateral gene transfer happend on a statistical basis.
     pub fn lateral_gene_transfer(&self) -> bool {
         thread_rng().gen_range(0.0, 1.0) <= self.lateral_gene_transfer_chance
+    }
+
+    /// Returns the number of repetitions per testing cycle.
+    pub fn testing_repetitions(&self) -> u32 {
+        self.testing_repetitions
     }
 
     /// Returns the timestamp for UUID creation.
@@ -575,14 +602,19 @@ impl<I: 'static> GlobalEnvironment<I> {
         let mut generation: u64 = 0;
         let mut start = Instant::now();
         loop {
+            let counter = Arc::new(Mutex::new(0u32));
             generation += 1;
             println!("Generation {}", generation);
-            let clonal_populations = self.inner.clonal_populations();
             // Challenge the organisms in the population and add the offspring to the population.
-            clonal_populations.par_iter().for_each(|clonal_population| {
+            self.inner.clonal_populations().par_iter().for_each(|clonal_population| {
                 Self::spawn_organism(self.inner.clone(), clonal_population.clone());
+                *counter.lock().unwrap() += 1;
+                if *counter.lock().unwrap() % 1000 == 0 {
+                    println!("     Organism {}", *counter.lock().unwrap());
+                }
             });
             // Calculate the new relative amount of individuals per clonal population.
+            let clonal_populations = self.inner.clonal_populations();
             let total_population_size: f64 = clonal_populations.par_iter()
                 .map(|clonal_population| self.inner.get_relative_size(clonal_population.clone()))
                 .sum();
@@ -615,42 +647,71 @@ impl<I: 'static> GlobalEnvironment<I> {
                 start = Instant::now();
                 self.inner.set_state(GlobalEnvironmentState::Execution);
             }
-
-            // if generation > 300 {
-            //     break;
-            // }
         }
     }
 
 
 
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
-        let fitness;
         let tested = inner.testing(clonal_population.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
-            let (input, result_information) = (inner.supplier_function)();
             let organism = inner.load_organism(clonal_population.clone());
-            organism.set_input(input);
-            let run_time = organism.live(&inner.environment);
-            let output = organism.get_result();
-            let oi = OrganismInformation::new(inner.get_bytes(clonal_population.clone()), run_time, *(&inner.environment.lifespan), inner.get_associated_inputs(clonal_population.clone()));
-            fitness = (inner.fitness_function)(output, result_information, oi);
-        } else {
-            fitness = clonal_population.lock().unwrap().fitness().expect("The sub-population should have been tested before.");
+            for _ in 0..inner.environment.testing_repetitions() {
+                Self::add_fitness(clonal_population.clone(), Self::test_organism(inner.clone(), &organism, clonal_population.clone()));
+            }
         }
-        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), fitness, inner.clone(), tested);
+        let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(mutated_offspring);
     }
 
-    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64, inner: Arc<InnerGlobalEnvironment<I>>, tested: bool) -> Vec<ClonalPopulation> {
+    /// Tests the [`Organism`] and returns the evaluated fitness.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - the [`Environment`] the [`Organism`] is living in
+    /// * `organism` - the [`Organism`] to test
+    /// * `clonal_population` - the [`ClonalPopulation`] the [`Organism`] comes from
+    ///
+    /// [`Environment`]: ./struct.Environment.html
+    /// [`Organism`]: ../population/struct.Organism.html
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, organism: &Organism, clonal_population: Arc<Mutex<ClonalPopulation>>) -> f64 {
+        let (input, result_information) = (inner.supplier_function)();
+        organism.set_input(input);
+        let run_time = organism.live(&inner.environment);
+        let output = organism.get_result();
+        let oi = OrganismInformation::new(inner.get_bytes(clonal_population.clone()), run_time, *(&inner.environment.lifespan), inner.get_associated_inputs(clonal_population.clone()));
+        (inner.fitness_function)(output, result_information, oi)
+    }
+
+    /// Adds the specified fitness to the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `fitness` - the fitness to add
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn add_fitness(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64) {
+        let mut cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.evaluate_new_fitness(fitness)
+    }
+
+    fn get_mutated_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<ClonalPopulation> {
         let mut mutated_offspring;
-        if tested {
-            let mut cp = clonal_population.lock().unwrap();
-            mutated_offspring = cp.evaluate_new_fitness(fitness, &inner.environment);
-        } else {
-            let mut cp = clonal_population.lock().unwrap();
+        {
+            // This must be scoped since lateral
+            // gene transfer from the same clonal population is possible. This specifically
+            // would result into a dead lock.
+            let mut cp = clonal_population.lock()
+                .expect("A thread paniced while holding the clonal population's lock.");
             mutated_offspring = cp.grow(&inner.environment);
         }
         // Perform lateral gene transfer by chance.

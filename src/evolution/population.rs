@@ -300,18 +300,13 @@ impl ClonalPopulation {
         self.age += 1;
     }
 
-    /// Generates mutated [`Genome`]s and updates the population size based on the evaluated fitness.
+    /// Updates the `Population`'s fitness.
     ///
     /// # Parameters
     ///
     /// * `fitness` - the newly evaluated fitness of the population
-    /// * `environment` - the [`Environment`] the population is growing in
-    ///
-    /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn evaluate_new_fitness(&mut self, fitness: f64, environment: &Environment) -> Vec<Genome> {
+    pub fn evaluate_new_fitness(&mut self, fitness: f64) {
         self.add_fitness(fitness);
-        // The fitness was just set, so the call must succeed.
-        self.grow(environment)
     }
 
     /// Generates mutated [`Genome`]s and updates the population size based on its fitness.
@@ -382,7 +377,7 @@ impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
     fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
         let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
-        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 25).collect();
+        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 12).collect();
         for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
