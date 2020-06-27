@@ -39,6 +39,11 @@ impl Substrate {
         &self.value
     }
 
+    /// Returns the number of bits encoded by this `Substrate`.
+    pub fn binary_size(&self) -> usize {
+        self.value.len()
+    }
+
     /// Returns all receptors detecting this substrate.
     pub fn receptors(&self) -> Vec<Rc<Receptor>> {
         self.receptors.iter().map(Rc::clone).collect()

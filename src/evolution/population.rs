@@ -72,7 +72,7 @@ impl Organism {
         // which were modified during the run.
         // If the task takes longer than the specified threshold,
         // the run will be aborted.
-        while !actions.is_empty() && birth.elapsed() < environment.lifespan() {
+        while !actions.is_empty() && birth.elapsed() < environment.lifespan() && self.binary_size() < environment.max_organism_size() {
             for cascading_receptor in actions.pop_front().unwrap().detect() {
                 actions.push_back(cascading_receptor);
             }
@@ -84,6 +84,15 @@ impl Organism {
         } else {
             environment.lifespan()
         }
+    }
+
+    /// Returns the number of bits of all [`Substrate`]s that are part of the `Organism`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn binary_size(&self) -> usize {
+        self.substrates.iter()
+            .map(|s| s.borrow().binary_size())
+            .sum()
     }
 
     /// Returns the number of [`Substrate`]s this `Organism` consists of.
@@ -147,10 +156,11 @@ fn produce_mutated_genomes(number_of_mutated_genomes: Vec<u64>, genome: &Genome)
 ///
 /// [`Organism`]: ./struct.Organism.html
 pub struct OrganismInformation {
-    bytes: usize,
+    genome_size: usize,
     run_time: Duration,
     max_run_time: Duration,
     associated_inputs: usize,
+    organism_size: usize,
 }
 
 impl OrganismInformation {
@@ -158,16 +168,25 @@ impl OrganismInformation {
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(bytes: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize) -> Self {
-        OrganismInformation{bytes, run_time, max_run_time, associated_inputs}
+    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, organism_size: usize) -> Self {
+        OrganismInformation{genome_size, run_time, max_run_time, associated_inputs, organism_size}
     }
 
-    /// The size of the [`Organism`]s [`Genome`] in bytes.
+    /// The size of the [`Organism`]s [`Genome`] in bit.
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Organism`]: ./struct.Organism.html
-    pub fn bytes(&self) -> usize {
-        self.bytes
+    pub fn genome_size(&self) -> usize {
+        self.genome_size
+    }
+
+    /// The size of the [`Organism`]s in bit.
+    /// This currently only takes [`Substrate`] values into account.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn organism_size(&self) -> usize {
+        self.organism_size
     }
 
     /// The time it took the [`Organism`] to perform a task.

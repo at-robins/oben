@@ -79,6 +79,10 @@ pub struct EnvironmentBuilder {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     testing_repetitions: u32,
+    /// The maximum size a single [`Organism`] can grow to during testing in bit.
+    ///
+    /// [`Organism`]: ../population/struct.Organism.html
+    max_organism_size: usize,
 }
 
 impl EnvironmentBuilder {
@@ -97,7 +101,8 @@ impl EnvironmentBuilder {
             clonal_population_growth_sd: 0.1,
             lateral_gene_transfer_chance: None,
             testing_chance_sigmoid_midpoint: 50.0,
-            testing_repetitions: 1
+            testing_repetitions: 1,
+            max_organism_size: 8 * 1024 * 1024 * 50
         }
     }
 
@@ -116,7 +121,8 @@ impl EnvironmentBuilder {
             clonal_population_growth_sd: self.clonal_population_growth_sd,
             lateral_gene_transfer_chance: self.lateral_gene_transfer_chance_or_default(),
             testing_chance_sigmoid_midpoint: self.testing_chance_sigmoid_midpoint,
-            testing_repetitions: self.testing_repetitions
+            testing_repetitions: self.testing_repetitions,
+            max_organism_size: self.max_organism_size
         }
     }
 
@@ -202,6 +208,18 @@ impl EnvironmentBuilder {
     /// * `max_testing_age` - the maximum mandatory testing age
     pub fn max_testing_age(&mut self, max_testing_age: Option<u32>) -> &mut Self {
         self.max_testing_age = max_testing_age;
+        self
+    }
+
+    /// Sets the maximum size a single [`Organism`] can grow to during testing in bit.
+    ///
+    /// # Parameters
+    ///
+    /// * `max_testing_age` - the maximum size
+    ///
+    /// [`Organism`]: ../population/struct.Organism.html
+    pub fn max_organism_size(&mut self, max_organism_size: usize) -> &mut Self {
+        self.max_organism_size = max_organism_size;
         self
     }
 
@@ -357,6 +375,10 @@ pub struct Environment {
     ///
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     testing_repetitions: u32,
+    /// The maximum size a single [`Organism`] can grow to during testing in bit.
+    ///
+    /// [`Organism`]: ../population/struct.Organism.html
+    max_organism_size: usize,
 }
 
 impl Environment {
@@ -393,6 +415,11 @@ impl Environment {
     /// Returns the maximum age until an individual is tested to determine the mean fitness.
     pub fn max_testing_age(&self) -> Option<u32> {
         self.max_testing_age
+    }
+
+    /// Returns the maximum size an individual can grow to during testing in bit.
+    pub fn max_organism_size(&self) -> usize {
+        self.max_organism_size
     }
 
     /// The midpoint of the testing chance sigmoid in test cycles.
@@ -682,7 +709,13 @@ impl<I: 'static> GlobalEnvironment<I> {
         organism.set_input(input);
         let run_time = organism.live(&inner.environment);
         let output = organism.get_result();
-        let oi = OrganismInformation::new(inner.get_bytes(clonal_population.clone()), run_time, *(&inner.environment.lifespan), inner.get_associated_inputs(clonal_population.clone()));
+        let oi = OrganismInformation::new(
+            inner.get_bytes(clonal_population.clone()) * 8,
+            run_time,
+            *(&inner.environment.lifespan),
+            inner.get_associated_inputs(clonal_population.clone()),
+            organism.binary_size()
+        );
         (inner.fitness_function)(output, result_information, oi)
     }
 
