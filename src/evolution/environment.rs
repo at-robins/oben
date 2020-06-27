@@ -712,9 +712,10 @@ impl<I: 'static> GlobalEnvironment<I> {
         let oi = OrganismInformation::new(
             inner.get_bytes(clonal_population.clone()) * 8,
             run_time,
-            *(&inner.environment.lifespan),
+            *(&inner.environment.lifespan()),
             inner.get_associated_inputs(clonal_population.clone()),
-            organism.binary_size()
+            organism.binary_size(),
+            *(&inner.environment.max_organism_size())
         );
         (inner.fitness_function)(output, result_information, oi)
     }

@@ -161,6 +161,7 @@ pub struct OrganismInformation {
     max_run_time: Duration,
     associated_inputs: usize,
     organism_size: usize,
+    max_organism_size: usize,
 }
 
 impl OrganismInformation {
@@ -168,8 +169,8 @@ impl OrganismInformation {
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, organism_size: usize) -> Self {
-        OrganismInformation{genome_size, run_time, max_run_time, associated_inputs, organism_size}
+    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
+        OrganismInformation{genome_size, run_time, max_run_time, associated_inputs, organism_size, max_organism_size}
     }
 
     /// The size of the [`Organism`]s [`Genome`] in bit.
@@ -187,6 +188,15 @@ impl OrganismInformation {
     /// [`Organism`]: ./struct.Organism.html
     pub fn organism_size(&self) -> usize {
         self.organism_size
+    }
+
+    /// The maximum size of an [`Organism`]s in bit.
+    /// This currently only takes [`Substrate`] values into account.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn max_organism_size(&self) -> usize {
+        self.max_organism_size
     }
 
     /// The time it took the [`Organism`] to perform a task.
@@ -207,6 +217,14 @@ impl OrganismInformation {
     /// of a task.
     pub fn relative_run_time(&self) -> f64 {
         self.run_time().as_secs_f64() / self.max_runtime().as_secs_f64()
+    }
+
+    /// Returns the size of an [`Organism`] relative to the maximal size.
+    /// This can be more than 1 since the maximum size only is a cap for further task execution.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn relative_organism_size(&self) -> f64 {
+        self.organism_size() as f64 / self.max_organism_size() as f64
     }
 
     /// The number of inputs of the [`Organism`] that are already associated.
