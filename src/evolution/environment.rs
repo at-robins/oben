@@ -599,7 +599,6 @@ impl<I: 'static> GlobalEnvironment<I> {
         fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
-                state: Arc::new(Mutex::new(GlobalEnvironmentState::Execution)),
                 environment: Arc::new(environment),
                 population: Arc::new(Mutex::new(population)),
                 supplier_function,
@@ -665,19 +664,20 @@ impl<I: 'static> GlobalEnvironment<I> {
             println!("Size: {} : Bytes: {} ; Fitness: {}", self.inner.population.lock().unwrap().clonal_populations().len(), bytes, fitness);
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
-                println!("Waiting to save...");
-                self.inner.set_state(GlobalEnvironmentState::Saving);
-                let population_id = self.environment().generate_uuid();
-                let save_path = self.environment().population_path(&population_id);
-                self.inner.save_population(save_path);
-                println!("Saved!");
+                self.save_population();
                 start = Instant::now();
-                self.inner.set_state(GlobalEnvironmentState::Execution);
             }
         }
     }
 
-
+    /// Saves the current population.
+    fn save_population(&self) {
+        println!("Waiting to save...");
+        let population_id = self.environment().generate_uuid();
+        let save_path = self.environment().population_path(&population_id);
+        self.inner.save_population(save_path);
+        println!("Saved!");
+    }
 
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) {
         let tested = inner.testing(clonal_population.clone());
@@ -773,7 +773,6 @@ struct InnerGlobalEnvironment<I> {
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I) + Send + Sync + 'static>,
     fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
-    state: Arc<Mutex<GlobalEnvironmentState>>
 }
 
 impl<I> InnerGlobalEnvironment<I> {
@@ -948,22 +947,6 @@ impl<I> InnerGlobalEnvironment<I> {
         cp.adjust_size_to_reference(reference);
     }
 
-    /// Sets the [`GlobalEnvironmentState`] the [`GlobalEnvironment`] as specified.
-    ///
-    /// # Parameters
-    ///
-    /// * `state` - the new state to set
-    ///
-    /// # Panics
-    ///
-    /// If another thread paniced while holding the state lock.
-    ///
-    /// [`GlobalEnvironmentState`]: ./enum.GlobalEnvironmentState.html
-    /// [`GlobalEnvironment`]: ./struct.GlobalEnvironment.html
-    fn set_state(&self, state: GlobalEnvironmentState) {
-        *self.state.lock().expect("Could not set the state of the environment.") = state;
-    }
-
     /// Write a snapshot of the current [`Population`] to a JSON file.
     ///
     /// # Parameters
@@ -1052,14 +1035,4 @@ impl<I> InnerGlobalEnvironment<I> {
             .append(clonal_populations);
     }
 
-}
-
-/// The state the [`GlobalEnvironment`] is in.
-///
-/// [`GlobalEnvironment`]: ./struct.GlobalEnvironment.html
-enum GlobalEnvironmentState {
-    /// Execution of the network.
-    Execution,
-    /// Saving the network.
-    Saving,
 }
