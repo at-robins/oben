@@ -653,15 +653,10 @@ impl<I: 'static> GlobalEnvironment<I> {
                 .for_each(|clonal_population| {
                     self.inner.remove_clonal_population(clonal_population.clone());
                 });
-            let mut bytes = 0usize;
-            let mut fitness = 0.0;
-            for cp in self.inner.population.lock().unwrap().clonal_populations() {
-                let c = cp.lock().unwrap();
-                bytes += c.bytes();
-                fitness += c.fitness().unwrap_or(0.0);
-            }
-            fitness /= self.inner.population.lock().unwrap().clonal_populations().len() as f64;
-            println!("Size: {} : Bytes: {} ; Fitness: {}", self.inner.population.lock().unwrap().clonal_populations().len(), bytes, fitness);
+            println!("Size: {} : Bytes: {} ; Fitness: {}",
+                self.inner.population_size(),
+                self.inner.population_mean_genome_size(),
+                self.inner.population_mean_fitness());
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
                 self.save_population();
@@ -976,6 +971,49 @@ impl<I> InnerGlobalEnvironment<I> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .clonal_populations()
+    }
+
+    /// Returns the number of [`ClonalPopulation`]s in the [`Population`].
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the population lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn population_size(&self) -> usize {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .size()
+    }
+
+    /// Returns the mean fitness of all [`ClonalPopulation`]s in the [`Population`].
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the population lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn population_mean_fitness(&self) -> f64 {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .mean_fitness()
+    }
+
+    /// Returns the mean [`Genome`] size in byte of all [`ClonalPopulation`]s in the [`Population`].
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the population lock.
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn population_mean_genome_size(&self) -> f64 {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .mean_genome_size()
     }
 
     /// Removes the specified [`ClonalPopulation`].

@@ -597,6 +597,46 @@ impl Population {
             cp.age = 0;
         }
     }
+
+    /// Returns the number of [`ClonalPopulation`]s that are part of this `Population`.
+    pub fn size(&self) -> usize {
+        self.clonal_populations.len()
+    }
+
+    /// Calculates the mean fitness of the [`ClonalPopulation`]s that are part of this `Population`.
+    pub fn mean_fitness(&self) -> f64 {
+        if self.size() > 0 {
+            let mut fitness = 0.0;
+            for clonal_population in self.clonal_populations.values() {
+                let cp = clonal_population.lock()
+                    .expect("A thread paniced while holding the clonal population's lock.");
+                if let Some(f) = cp.fitness() {
+                    fitness += f;
+                }
+            }
+            fitness / (self.size() as f64)
+        } else {
+            // If the population is empty, the fitness is zero.
+            0.0
+        }
+    }
+
+    /// Calculates the mean genome size in bytes of the [`ClonalPopulation`]s
+    /// that are part of this `Population`.
+    pub fn mean_genome_size(&self) -> f64 {
+        if self.size() > 0 {
+            let mut g_size = 0.0;
+            for clonal_population in self.clonal_populations.values() {
+                let cp = clonal_population.lock()
+                    .expect("A thread paniced while holding the clonal population's lock.");
+                g_size += cp.bytes() as f64;
+            }
+            g_size / (self.size() as f64)
+        } else {
+            // If the population is empty, the genome size is zero.
+            0.0
+        }
+    }
 }
 
 impl From<SerialisablePopulation> for Population {
