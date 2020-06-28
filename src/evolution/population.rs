@@ -160,6 +160,7 @@ pub struct OrganismInformation {
     run_time: Duration,
     max_run_time: Duration,
     associated_inputs: usize,
+    associated_outputs: usize,
     organism_size: usize,
     max_organism_size: usize,
 }
@@ -169,8 +170,16 @@ impl OrganismInformation {
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
-        OrganismInformation{genome_size, run_time, max_run_time, associated_inputs, organism_size, max_organism_size}
+    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, associated_outputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
+        OrganismInformation{
+            genome_size,
+            run_time,
+            max_run_time,
+            associated_inputs,
+            associated_outputs,
+            organism_size,
+            max_organism_size
+        }
     }
 
     /// The size of the [`Organism`]s [`Genome`] in bit.
@@ -232,6 +241,13 @@ impl OrganismInformation {
     /// [`Organism`]: ./struct.Organism.html
     pub fn associated_inputs(&self) -> usize {
         self.associated_inputs
+    }
+
+    /// The number of outputs of the [`Organism`] that are already associated.
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn associated_outputs(&self) -> usize {
+        self.associated_outputs
     }
 }
 
@@ -305,6 +321,11 @@ impl ClonalPopulation {
     /// Returns the number of associated inputs for this `ClonalPopulation` contains.
     pub fn associated_inputs(&self) -> usize {
         self.genome().number_of_associated_inputs()
+    }
+
+    /// Returns the number of associated outputs for this `ClonalPopulation` contains.
+    pub fn associated_outputs(&self) -> usize {
+        self.genome().number_of_associated_outputs()
     }
 
     /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference

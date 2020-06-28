@@ -64,6 +64,13 @@ impl Genome {
         self.input.iter().filter(|i| i.is_some()).count()
     }
 
+    /// Get the number of associated outputs [`Substrate`]s in this `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn number_of_associated_outputs(&self) -> usize {
+        self.output.iter().filter(|i| i.is_some()).count()
+    }
+
     /// Get the number of output [`Substrate`]s in this `Genome`.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
@@ -1324,12 +1331,12 @@ impl GenomeMutation {
            let mut mutated_genome = genome.duplicate();
            // It was checked before if there are any outputs, so the unwrap must work.
            let random_output = mutated_genome.get_random_output().unwrap();
-           if let None = mutated_genome.input[random_output] {
+           if let None = mutated_genome.output[random_output] {
                // If there is no association, return no change.
                None
            } else {
                // If there is an association, remove it.
-               mutated_genome.set_input(random_output, None);
+               mutated_genome.set_output(random_output, None);
                Some(mutated_genome)
            }
        } else {

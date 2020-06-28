@@ -709,6 +709,7 @@ impl<I: 'static> GlobalEnvironment<I> {
             run_time,
             *(&inner.environment.lifespan()),
             inner.get_associated_inputs(clonal_population.clone()),
+            inner.get_associated_outputs(clonal_population.clone()),
             organism.binary_size(),
             *(&inner.environment.max_organism_size())
         );
@@ -887,6 +888,23 @@ impl<I> InnerGlobalEnvironment<I> {
         let cp = clonal_population.lock()
             .expect("A thread paniced while holding the clonal population's lock.");
         cp.associated_inputs()
+    }
+
+    /// Return the number of associated outputs for the specified [`ClonalPopulation`].
+    ///
+    /// # Parameters
+    ///
+    /// * `clonal_population` - the [`ClonalPopulation`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    fn get_associated_outputs(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
+        let cp = clonal_population.lock()
+            .expect("A thread paniced while holding the clonal population's lock.");
+        cp.associated_outputs()
     }
 
     /// Return the relative size of the specified [`ClonalPopulation`].
