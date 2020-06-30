@@ -615,7 +615,7 @@ impl<I: 'static> GlobalEnvironment<I> {
         environment: Environment,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<Option<BinarySubstrate>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {
+        fitness_function: Box<dyn Fn(OrganismInformation<I>) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
                 environment: Arc::new(environment),
@@ -724,6 +724,8 @@ impl<I: 'static> GlobalEnvironment<I> {
         let run_time = organism.live(&inner.environment);
         let output = organism.get_result();
         let oi = OrganismInformation::new(
+            output,
+            result_information,
             inner.get_bytes(clonal_population.clone()) * 8,
             run_time,
             *(&inner.environment.lifespan()),
@@ -732,7 +734,7 @@ impl<I: 'static> GlobalEnvironment<I> {
             organism.binary_size(),
             *(&inner.environment.max_organism_size())
         );
-        (inner.fitness_function)(output, result_information, oi)
+        (inner.fitness_function)(oi)
     }
 
     /// Adds the specified fitness to the specified [`ClonalPopulation`].
@@ -787,7 +789,7 @@ struct InnerGlobalEnvironment<I> {
     environment: Arc<Environment>,
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<Option<BinarySubstrate>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(OrganismInformation<I>) -> f64 + Send + Sync + 'static>,
 }
 
 impl<I> InnerGlobalEnvironment<I> {

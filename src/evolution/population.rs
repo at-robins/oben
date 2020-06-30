@@ -154,7 +154,9 @@ fn produce_mutated_genomes(number_of_mutated_genomes: Vec<u64>, genome: &Genome)
 /// Information of about an [`Organism`]s performance.
 ///
 /// [`Organism`]: ./struct.Organism.html
-pub struct OrganismInformation {
+pub struct OrganismInformation<I> {
+    result: Vec<Option<BinarySubstrate>>,
+    result_info: I,
     genome_size: usize,
     run_time: Duration,
     max_run_time: Duration,
@@ -164,13 +166,15 @@ pub struct OrganismInformation {
     max_organism_size: usize,
 }
 
-impl OrganismInformation {
+impl<I> OrganismInformation<I> {
     /// Creates a new `OrganismInformation` containig information about the performance of an
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, associated_outputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
+    pub fn new(result: Vec<Option<BinarySubstrate>>, result_info: I, genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, associated_outputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
         OrganismInformation{
+            result,
+            result_info,
             genome_size,
             run_time,
             max_run_time,
@@ -179,6 +183,19 @@ impl OrganismInformation {
             organism_size,
             max_organism_size
         }
+    }
+
+    /// Returns the result of one testing run as calculated by the [`Organism`].
+    ///
+    /// [`Organism`]: ./struct.Organism.html
+    pub fn result(&self) -> &Vec<Option<BinarySubstrate>> {
+        &self.result
+    }
+
+    /// Returns the result related information about the testing run supplied by the
+    /// supplier function; e.g. the real result.
+    pub fn result_info(&self) -> &I {
+        &self.result_info
     }
 
     /// The size of the [`Organism`]s [`Genome`] in bit.
