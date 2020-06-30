@@ -1,5 +1,4 @@
 //! The `population` module contains the administrative part of the evolutionary network.
-extern crate bitvec;
 extern crate rand;
 extern crate rand_distr;
 extern crate rmp_serde;
@@ -10,7 +9,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use std::rc::Rc;
 use std::cell::RefCell;
-use bitvec::{boxed::BitBox, order::Local};
+use super::binary::BinarySubstrate;
 use super::protein::{Substrate, Receptor};
 use super::gene::{Gene, Genome, GenomeMutation};
 use super::environment::Environment;
@@ -105,7 +104,7 @@ impl Organism {
     /// Returns the values of output [`Substrate`]s if any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_result(&self) -> Vec<Option<BitBox<Local, u8>>> {
+    pub fn get_result(&self) -> Vec<Option<BinarySubstrate>> {
         self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
     }
 
@@ -118,7 +117,7 @@ impl Organism {
     /// # Panics
     ///
     /// If the length of `input` is not equal to the number of inputs specified by the organism.
-    pub fn set_input(&self, input: Vec<BitBox<Local, u8>>) {
+    pub fn set_input(&self, input: Vec<BinarySubstrate>) {
         if input.len() != self.input.len() {
             panic!("The organism needs {} inputs, but {} were specified.", self.input.len(), input.len());
         }

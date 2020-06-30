@@ -5,10 +5,11 @@ extern crate rand;
 extern crate serde;
 extern crate rmp_serde;
 
+use super::binary::BinarySubstrate;
 use super::chemistry::{Reaction, State};
 use super::population::Organism;
 use super::protein::{CatalyticCentre, Receptor, Substrate};
-use bitvec::{boxed::BitBox, order::Local, vec::BitVec};
+use bitvec::{boxed::BitBox, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use std::num::NonZeroUsize;
 use std::error::Error;
@@ -578,7 +579,7 @@ impl GeneSubstrate {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 struct GeneAssociation {
     // substrate value defined in the genome and shared between genes
-    substrate: BitBox<Local, u8>,
+    substrate: BinarySubstrate,
     // gene specific substrates pointing to the shared substrate
     associations: Vec<GeneSubstrate>,
 }
@@ -654,7 +655,7 @@ impl GeneAssociation {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Gene {
-    substrates: Vec<BitBox<Local, u8>>,
+    substrates: Vec<BinarySubstrate>,
     receptors: Vec<GenomicReceptor>,
 }
 
@@ -701,7 +702,7 @@ impl Gene {
     /// * `substrate` - the [`Substrate`] to add to the `Gene`
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn add_substrate(&mut self, substrate: BitBox<Local, u8>) -> Option<usize>{
+    fn add_substrate(&mut self, substrate: BinarySubstrate) -> Option<usize>{
         if let Some(new_index) = self.substrates.len().checked_add(1) {
             self.substrates.push(substrate);
             Some(new_index)
@@ -741,7 +742,7 @@ impl Gene {
     /// [`Substrate`] present, as a `Gene` needs at least 1 [`Substrate`].
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn remove_substrate(&mut self, substrate_index: usize) -> BitBox<Local, u8>{
+    fn remove_substrate(&mut self, substrate_index: usize) -> BinarySubstrate{
         if self.number_of_substrates().get() <= 1 {
             panic!("A genome needs to contain at least one substrate, so no substrate can be removed.");
         }
@@ -1847,7 +1848,7 @@ impl GenomeMutation {
 /// Generates a random binary [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-fn random_substrate() -> BitBox<Local, u8> {
+fn random_substrate() -> BinarySubstrate {
     let length: usize = thread_rng().gen_range(RANDOM_SUBSTRATE_MIN_LENGTH, RANDOM_SUBSTRATE_MAX_LENGTH + 1);
     let random_bytes: Vec<u8> = (0..length).map(|_| thread_rng().gen::<u8>()).collect();
     BitVec::from_vec(random_bytes).into_boxed_bitslice()
@@ -1858,7 +1859,7 @@ fn random_substrate() -> BitBox<Local, u8> {
 /// Otherwise the resulting length will be in range `base length / 2` to `base_length * 2`.
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
+fn mutate_substrate_based_on(base_length: usize) -> BinarySubstrate {
     let length: usize;
     if base_length == 0 {
         // If the substrate was empty, create the smallest possible substrate to begin with.
@@ -1889,7 +1890,7 @@ fn mutate_substrate_based_on(base_length: usize) -> BitBox<Local, u8> {
 /// If `base_substrate` is empty.
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-fn mutate_substrate_single_bit(base_substrate: &mut BitBox<Local, u8>) {
+fn mutate_substrate_single_bit(base_substrate: &mut BinarySubstrate) {
     if base_substrate.is_empty() {
         panic!("No byte can be flipped in an empty substrate.");
     }
@@ -1908,7 +1909,7 @@ fn mutate_substrate_single_bit(base_substrate: &mut BitBox<Local, u8>) {
 /// * `base_substrate` - the [`Substrate`] to mutate
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-fn mutate_substrate_single_bit_insertion(base_substrate: BitBox<Local, u8>) -> BitBox<Local, u8> {
+fn mutate_substrate_single_bit_insertion(base_substrate: BinarySubstrate) -> BinarySubstrate {
     let mut mutated_substrate = BitVec::from_boxed_bitslice(base_substrate);
     if mutated_substrate.is_empty() {
         mutated_substrate.push(thread_rng().gen());
@@ -1930,7 +1931,7 @@ fn mutate_substrate_single_bit_insertion(base_substrate: BitBox<Local, u8>) -> B
 /// If `base_substrate` is empty.
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-fn mutate_substrate_single_bit_deletion(base_substrate: BitBox<Local, u8>) -> BitBox<Local, u8> {
+fn mutate_substrate_single_bit_deletion(base_substrate: BinarySubstrate) -> BinarySubstrate {
     if base_substrate.is_empty() {
         panic!("No byte can be removed from an empty substrate.");
     }

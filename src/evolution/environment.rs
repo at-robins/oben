@@ -4,7 +4,7 @@ extern crate bitvec;
 extern crate rayon;
 extern crate rand;
 
-use bitvec::{boxed::BitBox, order::Local};
+use super::binary::BinarySubstrate;
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{ClonalPopulation, Population, Organism, OrganismInformation};
@@ -614,8 +614,8 @@ impl<I: 'static> GlobalEnvironment<I> {
     pub fn new(
         environment: Environment,
         population: Population,
-        supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {
+        supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I)  + Send + Sync + 'static>,
+        fitness_function: Box<dyn Fn(Vec<Option<BinarySubstrate>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
                 environment: Arc::new(environment),
@@ -786,8 +786,8 @@ impl<I: 'static> GlobalEnvironment<I> {
 struct InnerGlobalEnvironment<I> {
     environment: Arc<Environment>,
     population: Arc<Mutex<Population>>,
-    supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
+    supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I) + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<Option<BinarySubstrate>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>,
 }
 
 impl<I> InnerGlobalEnvironment<I> {
