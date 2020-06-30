@@ -615,7 +615,7 @@ impl<I: 'static> GlobalEnvironment<I> {
         environment: Environment,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(OrganismInformation<I>) -> f64 + Send + Sync + 'static>) -> Self {
+        fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>) -> Self {
         GlobalEnvironment {
             inner: Arc::new(InnerGlobalEnvironment {
                 environment: Arc::new(environment),
@@ -697,10 +697,7 @@ impl<I: 'static> GlobalEnvironment<I> {
         let tested = inner.testing(clonal_population.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
-            let organism = inner.load_organism(clonal_population.clone());
-            for _ in 0..inner.environment.testing_repetitions() {
-                Self::add_fitness(clonal_population.clone(), Self::test_organism(inner.clone(), &organism, clonal_population.clone()));
-            }
+            Self::add_fitness(clonal_population.clone(), Self::test_organism(inner.clone(), clonal_population.clone()));
         }
         let mutated_offspring = Self::get_mutated_offspring(clonal_population.clone(), inner.clone());
         // Add the mutated offspring to the population.
@@ -712,29 +709,36 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// # Parameters
     ///
     /// * `inner` - the [`Environment`] the [`Organism`] is living in
-    /// * `organism` - the [`Organism`] to test
-    /// * `clonal_population` - the [`ClonalPopulation`] the [`Organism`] comes from
+    /// * `clonal_population` - the [`ClonalPopulation`] the [`Organism`] to test comes from
     ///
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, organism: &Organism, clonal_population: Arc<Mutex<ClonalPopulation>>) -> f64 {
-        let (input, result_information) = (inner.supplier_function)();
-        organism.set_input(input);
-        let run_time = organism.live(&inner.environment);
-        let output = organism.get_result();
-        let oi = OrganismInformation::new(
-            output,
-            result_information,
-            inner.get_bytes(clonal_population.clone()) * 8,
-            run_time,
-            *(&inner.environment.lifespan()),
-            inner.get_associated_inputs(clonal_population.clone()),
-            inner.get_associated_outputs(clonal_population.clone()),
-            organism.binary_size(),
-            *(&inner.environment.max_organism_size())
-        );
-        (inner.fitness_function)(oi)
+    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) -> f64 {
+        let organism = inner.load_organism(clonal_population.clone());
+        let mut organism_informations = Vec::new();
+        // Repeatedly test the organism and supply all the testing information to the fitness
+        // function.
+        for _ in 0..inner.environment.testing_repetitions() {
+            let (input, result_information) = (inner.supplier_function)();
+            organism.set_input(input);
+            let run_time = organism.live(&inner.environment);
+            let output = organism.get_result();
+            organism_informations.push(
+                OrganismInformation::new(
+                    output,
+                    result_information,
+                    inner.get_bytes(clonal_population.clone()) * 8,
+                    run_time,
+                    *(&inner.environment.lifespan()),
+                    inner.get_associated_inputs(clonal_population.clone()),
+                    inner.get_associated_outputs(clonal_population.clone()),
+                    organism.binary_size(),
+                    *(&inner.environment.max_organism_size())
+                )
+            );
+        }
+        (inner.fitness_function)(organism_informations)
     }
 
     /// Adds the specified fitness to the specified [`ClonalPopulation`].
@@ -789,7 +793,7 @@ struct InnerGlobalEnvironment<I> {
     environment: Arc<Environment>,
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(OrganismInformation<I>) -> f64 + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>,
 }
 
 impl<I> InnerGlobalEnvironment<I> {
