@@ -107,6 +107,8 @@ impl EnvironmentBuilder {
     }
 
     /// Build an [`Environment`] to specify run time properties of an evolutionary network.
+    ///
+    /// [`Environment`]: ./struct.Environment.html
     pub fn build(&self) -> Environment {
         Environment {
             working_directory: self.working_directory.clone(),
@@ -588,12 +590,29 @@ impl<E> From<E> for Environment where E: AsRef<EnvironmentBuilder>{
     }
 }
 
+/// A `GlobalEnvironment` containing a [`Population`] and applying selective pressure.
+///
+/// [`Population`]: ../population/struct.Population.html
 pub struct GlobalEnvironment<I> {
     inner: Arc<InnerGlobalEnvironment<I>>,
 }
 
 impl<I: 'static> GlobalEnvironment<I> {
-    pub fn new(environment: Environment,
+    /// Creates a new `GlobalEnvironment` executing the evolutionary network by repeated
+    /// mutagenesis, fitness evaluation and growth of a [`Population`].
+    ///
+    /// # Parameters
+    ///
+    /// * `environment` - the [`Environment`] that defines the basic properties of the network
+    /// * `population` - the starting [`Population`] to alter during execution of the network
+    /// * `supplier_function` - the function supplying the [`Population`] with test examples
+    /// * `fitness_function` - the function evaluating the [`Population`]'s fitness based on
+    /// the result obtained after supplying an example
+    ///
+    /// [`Environment`]: ./struct.Environment.html
+    /// [`Population`]: ../population/struct.Population.html
+    pub fn new(
+        environment: Environment,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BitBox<Local, u8>>, I)  + Send + Sync + 'static>,
         fitness_function: Box<dyn Fn(Vec<Option<BitBox<Local, u8>>>, I, OrganismInformation) -> f64 + Send + Sync + 'static>) -> Self {

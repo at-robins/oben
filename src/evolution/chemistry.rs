@@ -45,12 +45,12 @@ pub enum State {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::State;
     ///
-    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
-    /// let b: BitBox = BitBox::from_slice(&[254usize]);
-    /// assert!(State::Greater.detect(&[&a,&b]));
+    /// let a: BitBox<Msb0, u8> = BitBox::from_slice(&[128, 12, 34]);
+    /// let b: BitBox<Msb0, u8> = BitBox::from_slice(&[127]);
+    /// assert!(State::Greater.detect(&[&a, &b]));
     /// ```
     Greater,
     /// A state operation checking if one substrate is samller than the other.
@@ -59,12 +59,12 @@ pub enum State {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::State;
     ///
-    /// let a: BitBox = BitBox::from_slice(&[255usize, 12, 34]);
-    /// let b: BitBox = BitBox::from_slice(&[254usize]);
-    /// assert!(State::Lesser.detect(&[&b,&a]));
+    /// let a: BitBox<Msb0, u8> = BitBox::from_slice(&[128, 12, 34]);
+    /// let b: BitBox<Msb0, u8> = BitBox::from_slice(&[127]);
+    /// assert!(State::Lesser.detect(&[&b, &a]));
     /// ```
     Lesser,
     /// A state operation checking if one substrate is greater or equal to the other.
@@ -153,10 +153,11 @@ pub enum State {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::State;
     ///
-    /// assert!(State::Always.detect(&[]));
+    /// let a: Vec<&BitBox<Msb0, u8>> = Vec::new();
+    /// assert!(State::Always.detect(&a));
     /// ```
     Always,
     /// A state operation always returning `false`.
@@ -165,10 +166,11 @@ pub enum State {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::State;
     ///
-    /// assert!(!State::Never.detect(&[]));
+    /// let a: Vec<&BitBox<Msb0, u8>> = Vec::new();
+    /// assert!(!State::Never.detect(&a));
     /// ```
     Never,
 }
@@ -249,6 +251,23 @@ impl Distribution<State> for Standard {
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Reaction {
     /// A binary `AND` operation.
+    ///
+    /// # Example
+    /// ```
+    /// extern crate bitvec;
+    ///
+    /// use bitvec::{boxed::BitBox, order::Msb0};
+    /// use oben::evolution::chemistry::Reaction;
+    ///
+    /// let educt1_value: BitBox<Msb0, u8> = BitBox::from_slice(&[255]);
+    /// let educt2_value: BitBox<Msb0, u8> = BitBox::from_slice(&[32]);
+    /// let educts = vec!(&educt1_value, &educt2_value);
+    ///
+    /// let product_value: BitBox<Msb0, u8> = BitBox::from_element(32);
+    /// let product = vec!(product_value);
+    ///
+    /// assert_eq!(Reaction::And.react(&educts[..]), product);
+    /// ```
     And,
     /// A binary `OR` operation.
     Or,
@@ -264,14 +283,14 @@ pub enum Reaction {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::Reaction;
     ///
-    /// let educt1_value = BitBox::from_slice(&[255usize, 32]);
-    /// let educt2_value = BitBox::from_slice(&[4usize, 35]);
+    /// let educt1_value: BitBox<Msb0, u8> = BitBox::from_slice(&[255, 32]);
+    /// let educt2_value: BitBox<Msb0, u8> = BitBox::from_slice(&[4, 35]);
     /// let educts = vec!(&educt1_value, &educt2_value);
     ///
-    /// let product_value: BitBox = BitBox::from_slice(&[255usize, 32, 4, 35]);
+    /// let product_value: BitBox<Msb0, u8> = BitBox::from_slice(&[255, 32, 4, 35]);
     /// let product = vec!(product_value);
     ///
     /// assert_eq!(Reaction::Append.react(&educts[..]), product);
@@ -287,10 +306,10 @@ pub enum Reaction {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::Reaction;
     ///
-    /// let educt_values = BitBox::from_slice(&[255usize, 32]);
+    /// let educt_values: BitBox<Msb0, u8> = BitBox::from_slice(&[255, 32]);
     /// let educts = vec!(&educt_values);
     ///
     /// assert_eq!(Reaction::Duplicate.react(&educts[..])[0], *educts[0]);
@@ -316,10 +335,10 @@ pub enum Reaction {
     /// ```
     /// extern crate bitvec;
     ///
-    /// use bitvec::boxed::BitBox;
+    /// use bitvec::{boxed::BitBox, order::Msb0};
     /// use oben::evolution::chemistry::Reaction;
     ///
-    /// let educt_values = BitBox::from_slice(&[255usize, 32]);
+    /// let educt_values: BitBox<Msb0, u8> = BitBox::from_slice(&[255, 32]);
     /// let educts = vec!(&educt_values);
     ///
     /// assert_eq!(Reaction::Random.react(&educts[..])[0].len(), educts[0].len());
