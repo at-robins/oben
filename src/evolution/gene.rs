@@ -5,7 +5,7 @@ extern crate rand;
 extern crate serde;
 extern crate rmp_serde;
 
-use super::binary::BinarySubstrate;
+use super::binary::{BinarySubstrate, do_a_or_b};
 use super::chemistry::{Reaction, State};
 use super::population::Organism;
 use super::protein::{CatalyticCentre, Receptor, Substrate};
@@ -1978,3 +1978,58 @@ impl Distribution<GenomeMutation> for Standard {
         }
     }
 }
+
+
+/// The `CrossOver` trait allows for genetic elements to be compared for similarity and be
+/// recombined.
+pub trait CrossOver {
+    /// Checks if two genetic components are similar enough for cross-over.
+    ///
+    /// # Parameters
+    ///
+    /// * `other` - a matching genetic component of the other individual
+    fn is_similar(&self, other: &Self) -> bool;
+
+    /// Creates a randomly recombined genetic component based on two initial components.
+    ///
+    /// # Parameters
+    ///
+    /// * `other` - a matching genetic component of the other individual
+    fn cross_over(&self, other: &Self) -> Self;
+
+    /// Recombines every element of the two vectors. If one vector is longer than the other,
+    /// for each element of the longer vector it is randomly chosen if the element is adopted.
+    ///
+    /// # Parameters
+    ///
+    /// * `first` - the first vector of matching genetic components
+    /// * `second` - the second vector of matching genetic components
+    fn vec_cross_over<T>(first: &Vec<T>, second: &Vec<T>) -> Vec<T> where T: CrossOver + Clone {
+        let mut recombined_vec = Vec::new();
+        // Determine shorter and longer vector.
+        let short;
+        let long;
+        if first.len() >= second.len() {
+            short = second;
+            long = first;
+        } else {
+            short = first;
+            long = second;
+        }
+        for (index, element_long) in long.iter().enumerate() {
+            if let Some(element_short) = short.get(index) {
+                // As long as there are corresponding elements in the shorter vector,
+                // perform recombination.
+                recombined_vec.push(element_long.cross_over(element_short));
+            } else {
+                // If there are corresponding elements in the shorter vector
+                // randomly add the element from the longer vector or skip it.
+                do_a_or_b(|| (), || recombined_vec.push(element_long.clone()));
+            }
+        }
+        recombined_vec
+    }
+}
+
+#[cfg(test)]
+mod tests;
