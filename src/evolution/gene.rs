@@ -5,7 +5,7 @@ extern crate rand;
 extern crate serde;
 extern crate rmp_serde;
 
-use super::binary::{BinarySubstrate, do_a_or_b};
+use super::binary::{BinarySubstrate, a_or_b, do_a_or_b};
 use super::chemistry::{Reaction, State};
 use super::population::Organism;
 use super::protein::{CatalyticCentre, Receptor, Substrate};
@@ -569,6 +569,18 @@ impl GeneSubstrate {
 
 }
 
+impl CrossOver for GeneSubstrate {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+            let gene = a_or_b(self.gene, other.gene);
+            let substrate = a_or_b(self.substrate, other.substrate);
+            GeneSubstrate{gene, substrate}
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 /// A `GeneAssociation` is a [`Substrate`] defined on [`Genome`] level that replaces [`Gene`] specific
 /// [`Substrate`]s upon translation. This process is used to interconnect different [`Gene`]s on a
@@ -645,6 +657,18 @@ impl GeneAssociation {
             }
             // Otherwise, leave the input untouched.
         }
+    }
+}
+
+impl CrossOver for GeneAssociation {
+    fn is_similar(&self, other: &Self) -> bool {
+        self.substrate.is_similar(&other.substrate) && self.associations.len() == other.associations.len()
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+            let substrate = self.substrate.cross_over(&other.substrate);
+            let associations = GeneSubstrate::vec_cross_over(&self.associations, &other.associations);
+            GeneAssociation{substrate, associations}
     }
 }
 
@@ -991,6 +1015,27 @@ impl GenomicReceptor {
 
 }
 
+impl CrossOver for GenomicReceptor {
+    fn is_similar(&self, other: &Self) -> bool {
+        self.state == other.state
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let triggers = usize::vec_cross_over(&self.triggers, &other.triggers);
+            let mut substrates = Vec::new();
+            for (index, substrate_self) in self.substrates.iter().enumerate() {
+                substrates.push(do_a_or_b(|| *substrate_self, || other.substrates[index]))
+            }
+            let state = self.state.clone();
+            let enzyme = self.enzyme.cross_over(&other.enzyme);
+            GenomicReceptor{triggers, substrates, state, enzyme}
+        } else {
+            do_a_or_b(|| self.clone(), || other.clone())
+        }
+    }
+}
+
 /// A `GenomicCatalyticCentre` represents the information of an actual [`CatalyticCentre`] that
 /// produces products from educt [`Substrate`]s
 /// by performing a [`Reaction`]. It is contained within a [`Gene`].
@@ -1118,6 +1163,29 @@ impl GenomicCatalyticCentre {
         CatalyticCentre::new(educts, products, reaction)
     }
 
+}
+
+impl CrossOver for GenomicCatalyticCentre {
+    fn is_similar(&self, other: &Self) -> bool {
+        self.reaction == other.reaction
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let mut educts = Vec::new();
+            for (index, educt_self) in self.educts.iter().enumerate() {
+                educts.push(do_a_or_b(|| *educt_self, || other.educts[index]))
+            }
+            let mut products = Vec::new();
+            for (index, product_self) in self.products.iter().enumerate() {
+                products.push(do_a_or_b(|| *product_self, || other.products[index]))
+            }
+            let reaction = self.reaction.clone();
+            GenomicCatalyticCentre{educts, products, reaction}
+        } else {
+            do_a_or_b(|| self.clone(), || other.clone())
+        }
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]

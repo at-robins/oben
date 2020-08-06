@@ -102,5 +102,16 @@ impl CrossOver for BinarySubstrate {
     }
 }
 
+// This implementation improves the usability of the `CrossOver` trait for genomic elements.
+impl CrossOver for usize {
+    fn is_similar(&self, other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        a_or_b(*self, *other)
+    }
+}
+
 #[cfg(test)]
 mod tests;
