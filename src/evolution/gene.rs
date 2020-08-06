@@ -237,6 +237,23 @@ impl Genome {
         &self.genes[gene]
     }
 
+    /// Checks if the [`Substrate`] is present in the `Genome`.
+    ///
+    /// # Parameters
+    ///
+    /// * `genes` - the [`Gene`]'s of the `Genome`
+    /// * `substrate` - the substrate to check for
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn has_substrate(genes: &Vec<Gene>, substrate: &GeneSubstrate) -> bool {
+        if let Some(gene) = genes.get(substrate.gene) {
+            gene.substrates.len() > substrate.substrate
+        } else {
+            false
+        }
+    }
+
     /// Returns all substrates of the specified [`Gene`] combined with their [`GeneSubstrate`] pointer.
     ///
     /// # Parameters
@@ -423,6 +440,51 @@ impl Genome {
         }
     }
 
+    /// Validates the [`GeneSubstrate`] references of input and output after a recombination
+    /// event and removes invalid ones.
+    ///
+    /// # Parameters
+    ///
+    /// * `genes` - the [`Gene`]s of the [`Genome`]
+    /// * `io_substrates` - the input or output [`GeneSubstrate`]s
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Genome`]: ./struct.Genome.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    fn validate_input_ouput_associations(genes: &Vec<Gene>, io_substrates: &mut Vec<Option<GeneSubstrate>>) {
+        for io_substrate in io_substrates.iter_mut() {
+            if let Some(current_substrate) = io_substrate {
+                if Genome::has_substrate(genes, current_substrate) {
+                    // Remove the io association if it points to an invalid substrate.
+                    *io_substrate = None;
+                }
+                // Otherwise, leave it untouched.
+            }
+        }
+    }
+
+    /// Validates the [`GeneAssociation`] references
+    /// after a recombination event and removes invalid ones.
+    ///
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+    fn validate_gene_substrate_associations(&mut self) {
+        let genes = &self.genes;
+        for association in  &mut self.associations {
+            association.associations.retain(|a| Genome::has_substrate(genes, a));
+        }
+    }
+
+    /// Validates the [`GeneAssociation`] references and the input-output [`GeneSubstrate`]s
+    /// after a recombination event and removes invalid ones.
+    ///
+    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    fn validate_associations(&mut self) {
+        Genome::validate_input_ouput_associations(&self.genes, &mut self.input);
+        Genome::validate_input_ouput_associations(&self.genes, &mut self.output);
+        self.validate_gene_substrate_associations();
+    }
+
     /// Load a `Genome` from a JSON file if possible.
     /// An error will be returned if parsing the file failed.
     ///
@@ -524,6 +586,29 @@ impl Default for Genome {
             output: Vec::default(),
             genes: vec!(Gene::default()),
             associations: Vec::default(),
+        }
+    }
+}
+
+impl CrossOver for Genome {
+    fn is_similar(&self, other: &Self) -> bool {
+        self.number_of_inputs() == other.number_of_inputs()
+            && self.number_of_outputs() == other.number_of_outputs()
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let input = usize::vec_cross_over(&self.input, &other.input);
+            let output = usize::vec_cross_over(&self.output, &other.output);
+            let genes = Gene::vec_cross_over(&self.genes, &other.genes);
+            let associations = GeneAssociation::vec_cross_over(&self.associations, &other.associations);
+            let mut recombined = Genome{input, output, genes, associations};
+            // Remove invalid gene-substrate-associations.
+            recombined.validate_associations();
+            recombined
+        } else {
+            // If the two genomes are not similar return a random one.
+            do_a_or_b(|| self.clone(), || other.clone())
         }
     }
 }
@@ -861,6 +946,23 @@ impl Default for Gene {
         Gene {
             substrates: vec!(BitBox::empty()),
             receptors: Vec::default(),
+        }
+    }
+}
+
+impl CrossOver for Gene {
+    fn is_similar(&self, other: &Self) -> bool {
+        other.number_of_substrates() == self.number_of_substrates()
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let substrates = BinarySubstrate::vec_cross_over(&self.substrates, &other.substrates);
+            let receptors = GenomicReceptor::vec_cross_over(&self.receptors, &other.receptors);
+            Gene{substrates, receptors}
+        } else {
+            // If the two genes are not similar return a random one.
+            do_a_or_b(|| self.clone(), || other.clone())
         }
     }
 }
