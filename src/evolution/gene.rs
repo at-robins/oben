@@ -452,9 +452,9 @@ impl Genome {
     /// [`Genome`]: ./struct.Genome.html
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     fn validate_input_ouput_associations(genes: &Vec<Gene>, io_substrates: &mut Vec<Option<GeneSubstrate>>) {
-        for io_substrate in io_substrates.iter_mut() {
+        for io_substrate in io_substrates {
             if let Some(current_substrate) = io_substrate {
-                if Genome::has_substrate(genes, current_substrate) {
+                if !Genome::has_substrate(genes, current_substrate) {
                     // Remove the io association if it points to an invalid substrate.
                     *io_substrate = None;
                 }
