@@ -11,11 +11,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use super::binary::BinarySubstrate;
 use super::protein::{Substrate, Receptor};
-use super::gene::{Gene, Genome, GenomeMutation};
+use super::gene::{CrossOver, Gene, Genome, GenomeMutation};
 use super::environment::Environment;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
-use rand_distr::{Binomial, Distribution};
+// use rand_distr::{Binomial, Distribution};
 use std::sync::{Arc, Mutex};
 use std::error::Error;
 use std::fs::File;
@@ -128,27 +128,6 @@ impl Organism {
         }
     }
 }
-
-/// Generates the specified number of randomly mutated versions of the specified [`Genome`].
-///
-/// # Parameters
-///
-/// * `number_of_mutated_genomes` - the number of mutated [`Genome`]s to produce ordered by the
-/// number of mutations per genome
-/// * `genome` - the source [`Genome`] to mutate
-///
-/// [`Genome`]: ../gene/struct.Genome.html
-fn produce_mutated_genomes(number_of_mutated_genomes: Vec<u64>, genome: &Genome) -> Vec<Genome>{
-    number_of_mutated_genomes.into_iter()
-        .enumerate()
-        .flat_map(|(number_of_mutations, number_of_genomes)| {
-            (0..number_of_genomes).map(move |_| GenomeMutation::mutate_n_times(number_of_mutations + 1, genome))
-        })
-        .filter_map(|mutation| mutation)
-        .collect()
-}
-
-
 
 #[derive(Debug, PartialEq, Clone)]
 /// Information of about an [`Organism`]s performance.
@@ -267,7 +246,6 @@ impl<I> OrganismInformation<I> {
     }
 }
 
-
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// A `ClonalPopulation` is a population of individuals with exactly the same [`Genome`].
 ///
@@ -275,7 +253,6 @@ impl<I> OrganismInformation<I> {
 pub struct ClonalPopulation {
     source: Uuid,
     genome: Genome,
-    size: f64,
     fitness: Option<f64>,
     bytes: usize,
     age: u32
@@ -288,16 +265,13 @@ impl ClonalPopulation {
     ///
     /// * `uuid` - the UUID of the `ClonalPopulation`
     /// * `genome` - the [`Genome`] of the population
-    /// * `environment` - the [`Environment`] the population is living in
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn found(uuid: Uuid, genome: Genome, environment: &Environment) -> Self {
+    pub fn found(uuid: Uuid, genome: Genome) -> Self {
         let bytes = genome.binary_size();
         ClonalPopulation{
             source: uuid,
             genome,
-            size: environment.clonal_population_founding_size(),
             fitness: None,
             bytes,
             age: 0,
@@ -324,11 +298,6 @@ impl ClonalPopulation {
         self.fitness
     }
 
-    /// Returns the relative size of this `ClonalPopulation`.
-    pub fn relative_size(&self) -> f64 {
-        self.size
-    }
-
     /// Checks whether the fitness value of this `ClonalPopulation` was already set.
     pub fn has_fitness(&self) -> bool {
         self.fitness.is_some()
@@ -344,16 +313,9 @@ impl ClonalPopulation {
         self.genome().number_of_associated_outputs()
     }
 
-    /// Adjusts the relative size of this `ClonalPopulation` to the size of the whole reference
-    /// [`Population`].
-    ///
-    /// # Parameters
-    ///
-    /// * `reference` - the reference population's size
-    ///
-    /// [`Population`]: ./struct.Population.html
-    pub fn adjust_size_to_reference(&mut self, reference: f64) {
-        self.size /= reference;
+    /// Returns the values of all outputs for this `ClonalPopulation`.
+    pub fn output_values(&self) -> Vec<Option<BinarySubstrate>> {
+        self.genome().get_output_values()
     }
 
     /// Adds the specified fitness value by setting the fitness to the mean of old and
@@ -383,46 +345,42 @@ impl ClonalPopulation {
         self.add_fitness(fitness);
     }
 
-    /// Generates mutated [`Genome`]s and updates the population size based on its fitness.
+    /// Recombine the [`Genome`] of this `Individual` and its mating partner and return the
+    /// resulting [`Genome`].
     ///
     /// # Parameters
     ///
-    /// * `environment` - the [`Environment`] the population is growing in
+    /// * `partner` - the mating partner's [`Genome`]
     ///
-    /// # Panics
+    /// [`Genome`]: ../gene/struct.Genome.html
+    pub fn mate(&self, partner: Genome) -> Genome {
+        self.genome().cross_over(&partner)
+    }
+
+    /// Recombine the [`Genome`] of this `Individual` and its mating partner and return the
+    /// resulting `Individual`.
     ///
-    /// If the fitness has not been set before.
+    /// # Parameters
+    ///
+    /// * `partner` - the mating partner's [`Genome`]
+    /// * `environment` - the [`Environment`] the `Individual` is living in
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn grow(&mut self, environment: &Environment) -> Vec<Genome> {
-        let relative_total_offspring = self.size * self.fitness
-            .expect("Fitness was not set, so updating the population is not possible");
-        let relative_total_offspring = rand_distr::Normal::new(relative_total_offspring, relative_total_offspring * environment.clonal_population_growth_sd())
-            .expect("The standard deviation for calculating the total offspring must not be negative.")
-            .sample(&mut rand::thread_rng());
-        if relative_total_offspring < 0.0 {
-            Vec::new()
+    /// [`Genome`]: ../gene/struct.Genome.html
+    pub fn mate_and_mutate(&self, partner: Genome, environment: &Environment) -> ClonalPopulation {
+        let offspring_genome = self.mate(partner);
+        let random_chance: f64 = rand::thread_rng().gen_range(0.0, 1.0);
+        // Calculate the number of mutations corresponding to the generated uniform random percentage.
+        //    P("n mutations in a single genome") = "mutation rate" ^ n
+        // => n = log(base: "mutation rate", value: P)
+        let number_of_mutations = random_chance.log(environment.mutation_rate()).floor() as usize;
+        if let Some(mutated_offspring_genome) = GenomeMutation::mutate_n_times(number_of_mutations, &offspring_genome) {
+            // If the mutation was successful, return the mutated individual.
+            ClonalPopulation::found(environment.generate_uuid(), mutated_offspring_genome)
         } else {
-            // Determine the number of genetically different offspring.
-            let absolute_total_offspring = (relative_total_offspring * (environment.population_size() as f64)).floor() as u64;
-            let mut absolute_mutated_offspring: Vec<u64> = vec!(
-                Binomial::new(absolute_total_offspring, environment.mutation_rate())
-                    .expect("The mutation rate is not set between 0 and 1.")
-                    .sample(&mut rand::thread_rng())
-            );
-            // As long as mutated individuals are produced check if another mutation happend
-            // within the mutated genomes.
-            while *absolute_mutated_offspring.last().unwrap() > 0 {
-                // At least one element is present in the vector so the unwrap must succeed.
-                absolute_mutated_offspring.push(Binomial::new(*absolute_mutated_offspring.last().unwrap(), environment.mutation_rate())
-                    .expect("The mutation rate is not set between 0 and 1.")
-                    .sample(&mut rand::thread_rng()));
-            }
-            // Grow the population by the non-mutated offspring.
-            let mutated_offspring: f64 = absolute_mutated_offspring.iter().map(|f| *f as f64).sum();
-            self.size += relative_total_offspring - (mutated_offspring / environment.population_size() as f64);
-            // Generate the mutations.
-            produce_mutated_genomes(absolute_mutated_offspring, &self.genome)
+            // If the mutation was not successful, return the recombined individual without any
+            // mutations.
+            ClonalPopulation::found(environment.generate_uuid(), offspring_genome)
         }
     }
 
@@ -449,36 +407,20 @@ struct SerialisablePopulation {
 
 impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
-    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
-        let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
-        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 12).collect();
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<ClonalPopulation>, Option<Vec<Option<BinarySubstrate>>>) {
+        let (mut uuid, mut fitness, mut cp, mut out) = (None, None, None, None);
+        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 1).collect();
         for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
                 _ => { uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
-                    size = Some(individual.relative_size());
                     cp = Some(individual.clone());
+                    out = Some(individual.output_values())
                 }
             }
         }
-        (uuid, fitness, size, cp)
-    }
-
-    /// Returns the UUID and fitness of the biggest sub-population of the population.
-    fn biggest_subpopulation(&self) -> (Option<Uuid>, Option<f64>, Option<f64>, Option<ClonalPopulation>) {
-        let (mut uuid, mut fitness, mut size, mut cp) = (None, None, None, None);
-        for individual in &self.clonal_populations {
-            match size {
-                Some(s) if s >= individual.relative_size() => {},
-                _ => { uuid = Some(*individual.uuid());
-                    fitness = individual.fitness;
-                    size = Some(individual.relative_size());
-                    cp = Some(individual.clone());
-                }
-            }
-        }
-        (uuid, fitness, size, cp)
+        (uuid, fitness, cp, out)
     }
 }
 
@@ -534,14 +476,9 @@ impl Population {
         let mut file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
-        let (id, fitness, size, cp) = serialisable_population.fittest_individual();
-        println!("\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\n\n{:#?}\n",
-            path_to_file.as_ref(), id, fitness, size, cp);
-        let (id, fitness, size, cp) = serialisable_population.biggest_subpopulation();
-        println!("Biggest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\nSize: {:?}\nTotal: {}\nF-Mean: {}\n\n{:#?}\n",
-            path_to_file.as_ref(), id, fitness, size, serialisable_population.clonal_populations.len(),
-            serialisable_population.clonal_populations.iter().filter_map(|cp| cp.fitness()).sum::<f64>() /
-            (serialisable_population.clonal_populations.len() as f64), cp);
+        let (id, fitness, cp, out) = serialisable_population.fittest_individual();
+        println!("\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\n\n{:#?}\nValues: {:?}\n\n",
+            path_to_file.as_ref(), id, fitness, cp, out);
         let ser = rmp_serde::to_vec(&serialisable_population)?;
         Ok(file.write_all(&ser)?)
     }
@@ -602,6 +539,47 @@ impl Population {
             }
             // This None is unreachable as the value must have been set before.
             None
+        }
+    }
+
+    /// Returns a random [`Genome`] of a random [`ClonalPopulation`] if there are any.
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    /// [`Genome`]: ../gene/struct.Genome.html
+    pub fn random_genome(&self) -> Option<Genome> {
+        if self.clonal_populations.len() == 0 {
+            None
+        } else {
+            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
+            self.clonal_populations.values()
+                .nth(random_population_index)
+                .and_then(|value| Some(value.lock()
+                    .expect("A thread paniced while holding the clonal population's lock.")
+                    .genome()
+                    .duplicate())
+                )
+        }
+    }
+
+    /// Returns a random [`ClonalPopulation`] if there is any.
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the clonal population's lock.
+    ///
+    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    pub fn random_individual(&self) -> Option<Arc<Mutex<ClonalPopulation>>> {
+        if self.clonal_populations.len() == 0 {
+            None
+        } else {
+            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
+            self.clonal_populations.values()
+                .nth(random_population_index)
+                .and_then(|value| Some(value.clone()))
         }
     }
 
