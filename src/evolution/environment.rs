@@ -655,12 +655,20 @@ impl<I: 'static> GlobalEnvironment<I> {
             let counter = Arc::new(Mutex::new(0u32));
             generation += 1;
             println!("Generation {}", generation);
-            // Challenge the organisms in the population and add the offspring to the population.
+            // Challenge the organisms in the population.
             self.inner.clonal_populations().par_iter().for_each(|clonal_population| {
                 Self::spawn_organism(self.inner.clone(), clonal_population.clone());
                 *counter.lock().unwrap() += 1;
                 if *counter.lock().unwrap() % 1000 == 0 {
-                    println!("     Organism {}", *counter.lock().unwrap());
+                    println!("     Spawn Organism {}", *counter.lock().unwrap());
+                }
+            });
+            // Mate the organisms of the population and add offspring to the population.
+            self.inner.clonal_populations().par_iter().for_each(|clonal_population| {
+                Self::mate_organism(self.inner.clone(), clonal_population.clone());
+                *counter.lock().unwrap() += 1;
+                if *counter.lock().unwrap() % 1000 == 0 {
+                    println!("     Mate Organism {}", *counter.lock().unwrap());
                 }
             });
             // Kill individuals on statistical basis.
@@ -669,6 +677,7 @@ impl<I: 'static> GlobalEnvironment<I> {
                 .for_each(|clonal_population| {
                     self.inner.remove_clonal_population(clonal_population.clone());
                 });
+            // Print statistics.
             println!("Size: {} : Bytes: {} ; Fitness: {}",
                 self.inner.population_size(),
                 self.inner.population_mean_genome_size(),
@@ -690,12 +699,36 @@ impl<I: 'static> GlobalEnvironment<I> {
         println!("Saved!");
     }
 
+    /// Creates and tests the [`Organism`] and updates its evaluated fitness.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - the [`Environment`] the [`Organism`] is living in
+    /// * `individual` - the [`ClonalPopulation`] describing the [`Organism`] to test
+    ///
+    /// [`Environment`]: ./struct.Environment.html
+    /// [`Organism`]: ../population/struct.Organism.html
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
     fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<ClonalPopulation>>) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
             Self::add_fitness(individual.clone(), Self::test_organism(inner.clone(), individual.clone()));
         }
+    }
+
+    /// Mates the [`Organism`] and adds its offspring to the [`Population`].
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - the [`Environment`] the [`Organism`] is living in
+    /// * `individual` - the [`ClonalPopulation`] describing the [`Organism`] to test
+    ///
+    /// [`Environment`]: ./struct.Environment.html
+    /// [`Organism`]: ../population/struct.Organism.html
+    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn mate_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<ClonalPopulation>>) {
         let offspring = Self::get_offspring(individual.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
