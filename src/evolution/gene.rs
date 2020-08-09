@@ -126,6 +126,24 @@ impl Genome {
         old_value
     }
 
+    /// Returns a copy of the output [`Substrate`]s.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn get_output_values(&self) -> Vec<Option<BinarySubstrate>> {
+        self.output.iter()
+            .map(|substrate| substrate.and_then(|a| self.get_substrate(a)))
+            .collect()
+    }
+
+    /// Returns the specified [`Substrate`] if contained within the `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn get_substrate(&self, substrate: GeneSubstrate) -> Option<BinarySubstrate> {
+        self.genes.get(substrate.gene)
+            .and_then(|gene| gene.substrates.get(substrate.substrate)
+            .and_then(|inner| Some(inner.clone())))
+    }
+
     /// Adds a [`Gene`] to the `Genome` if possible and returns the index of the
     /// new gene.
     /// This function will fail if the underlying vector would overflow due to the addition.
