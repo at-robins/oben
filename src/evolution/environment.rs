@@ -7,7 +7,7 @@ extern crate rand;
 use super::binary::BinarySubstrate;
 use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
-use super::population::{ClonalPopulation, Population, Organism, OrganismInformation};
+use super::population::{Individual, Population, Organism, OrganismInformation};
 use super::gene::Genome;
 use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
@@ -37,16 +37,16 @@ pub struct EnvironmentBuilder {
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
     mutation_rate: Option<f64>,
-    /// The maximum size a [`ClonalPopulation`] can grow to.
+    /// The maximum size a [`Individual`] can grow to.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     population_size: u32,
     /// The relative size of clonal sub-populations that can still be detected.
     /// Any population with a smaller size will go extinct.
     extinction_threshold: Option<f64>,
-    /// The amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
+    /// The amount of time an [`Organism`] of a [`Individual`] has to complete a task.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Organism`]: ../population/struct.Organism.html
     lifespan: Duration,
     /// The time intervall in which to save the current [`Population`] to a file.
@@ -55,30 +55,30 @@ pub struct EnvironmentBuilder {
     population_save_intervall: Duration,
     /// The node for UUID creation.
     uuid_node: [u8; 6],
-    /// The maximum age of a [`ClonalPopulation`] until testing and fitness determination is
+    /// The maximum age of a [`Individual`] until testing and fitness determination is
     /// always performed. After this age testing is performed by chance.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     max_testing_age: Option<u32>,
-    /// The maximum offspring a [`ClonalPopulation`] can produce per generation.
+    /// The maximum offspring a [`Individual`] can produce per generation.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     max_offspring: usize,
     /// The midpoint of the sigmoid determining the chance of death depending on the age of a
-    /// [`ClonalPopulation`].
+    /// [`Individual`].
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     death_age_sigmoid_midpoint: f64,
     /// The chance per growth event that a lateral gene transfer between two
     /// sub-populations happens.
     lateral_gene_transfer_chance: Option<f64>,
-    /// The 50 percent midpoint of test cycles of the chance determining sigmoid for testing a [`ClonalPopulation`].
+    /// The 50 percent midpoint of test cycles of the chance determining sigmoid for testing a [`Individual`].
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     testing_chance_sigmoid_midpoint: f64,
-    /// The number of times a [`ClonalPopulation`] is tested per test cycle.
+    /// The number of times a [`Individual`] is tested per test cycle.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     testing_repetitions: u32,
     /// The maximum size a single [`Organism`] can grow to during testing in bit.
     ///
@@ -324,16 +324,16 @@ pub struct Environment {
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
     mutation_rate: f64,
-    /// The maximum size a [`ClonalPopulation`] can grow to.
+    /// The maximum size a [`Individual`] can grow to.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     population_size: u32,
     /// The relative size of clonal sub-populations that can still be detected.
     /// Any population with a smaller size will go extinct.
     extinction_threshold: f64,
-    /// The amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
+    /// The amount of time an [`Organism`] of a [`Individual`] has to complete a task.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Organism`]: ../population/struct.Organism.html
     lifespan: Duration,
     /// The time intervall in which to save the current [`Population`] to a file.
@@ -342,30 +342,30 @@ pub struct Environment {
     population_save_intervall: Duration,
     /// The node for UUID creation.
     uuid_node: [u8; 6],
-    /// The maximum age of a [`ClonalPopulation`] until testing and fitness determination is
+    /// The maximum age of a [`Individual`] until testing and fitness determination is
     /// always performed. After this age testing is performed by chance.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     max_testing_age: Option<u32>,
-    /// The maximum number of offspring a [`ClonalPopulation`] can produce per generation.
+    /// The maximum number of offspring a [`Individual`] can produce per generation.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     max_offspring: usize,
     /// The midpoint of the sigmoid determining the chance of death depending on the age of a
-    /// [`ClonalPopulation`].
+    /// [`Individual`].
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     death_age_sigmoid_midpoint: f64,
     /// The chance per growth event that a lateral gene transfer between two
     /// sub-populations happens.
     lateral_gene_transfer_chance: f64,
-    /// The 50 percent midpoint of test cycles of the chance determining sigmoid for testing a [`ClonalPopulation`].
+    /// The 50 percent midpoint of test cycles of the chance determining sigmoid for testing a [`Individual`].
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     testing_chance_sigmoid_midpoint: f64,
-    /// The number of times a [`ClonalPopulation`] is tested per test cycle.
+    /// The number of times a [`Individual`] is tested per test cycle.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     testing_repetitions: u32,
     /// The maximum size a single [`Organism`] can grow to during testing in bit.
     ///
@@ -392,9 +392,9 @@ impl Environment {
     }
 
     /// Returns the threshold of relative population size which is still detectable before
-    /// a [`ClonalPopulation`] goes extinct.
+    /// a [`Individual`] goes extinct.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     pub fn extinction_threshold(&self) -> f64 {
         self.extinction_threshold
     }
@@ -537,10 +537,10 @@ impl Environment {
         path_to_genome
     }
 
-    /// Returns the amount of time an [`Organism`] of a [`ClonalPopulation`] has to complete a task.
+    /// Returns the amount of time an [`Organism`] of a [`Individual`] has to complete a task.
     ///
     /// [`Organism`]: ../population/struct.Organism.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     pub fn lifespan(&self) -> Duration {
         self.lifespan
     }
@@ -656,26 +656,26 @@ impl<I: 'static> GlobalEnvironment<I> {
             generation += 1;
             println!("Generation {}", generation);
             // Challenge the organisms in the population.
-            self.inner.clonal_populations().par_iter().for_each(|clonal_population| {
-                Self::spawn_organism(self.inner.clone(), clonal_population.clone());
+            self.inner.individuals().par_iter().for_each(|individual| {
+                Self::spawn_organism(self.inner.clone(), individual.clone());
                 *counter.lock().unwrap() += 1;
                 if *counter.lock().unwrap() % 1000 == 0 {
                     println!("     Spawn Organism {}", *counter.lock().unwrap());
                 }
             });
             // Mate the organisms of the population and add offspring to the population.
-            self.inner.clonal_populations().par_iter().for_each(|clonal_population| {
-                Self::mate_organism(self.inner.clone(), clonal_population.clone());
+            self.inner.individuals().par_iter().for_each(|individual| {
+                Self::mate_organism(self.inner.clone(), individual.clone());
                 *counter.lock().unwrap() += 1;
                 if *counter.lock().unwrap() % 1000 == 0 {
                     println!("     Mate Organism {}", *counter.lock().unwrap());
                 }
             });
             // Kill individuals on statistical basis.
-            self.inner.clonal_populations().par_iter()
-                .filter(|clonal_population| self.inner.died((*clonal_population).clone()))
-                .for_each(|clonal_population| {
-                    self.inner.remove_clonal_population(clonal_population.clone());
+            self.inner.individuals().par_iter()
+                .filter(|individual| self.inner.died((*individual).clone()))
+                .for_each(|individual| {
+                    self.inner.remove_individual(individual.clone());
                 });
             // Print statistics.
             println!("Size: {} : Bytes: {} ; Fitness: {}",
@@ -704,12 +704,12 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// # Parameters
     ///
     /// * `inner` - the [`Environment`] the [`Organism`] is living in
-    /// * `individual` - the [`ClonalPopulation`] describing the [`Organism`] to test
+    /// * `individual` - the [`Individual`] describing the [`Organism`] to test
     ///
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<ClonalPopulation>>) {
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
@@ -722,13 +722,13 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// # Parameters
     ///
     /// * `inner` - the [`Environment`] the [`Organism`] is living in
-    /// * `individual` - the [`ClonalPopulation`] describing the [`Organism`] to test
+    /// * `individual` - the [`Individual`] describing the [`Organism`] to test
     ///
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
-    fn mate_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<ClonalPopulation>>) {
+    fn mate_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) {
         let offspring = Self::get_offspring(individual.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
@@ -739,13 +739,13 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// # Parameters
     ///
     /// * `inner` - the [`Environment`] the [`Organism`] is living in
-    /// * `clonal_population` - the [`ClonalPopulation`] the [`Organism`] to test comes from
+    /// * `individual` - the [`Individual`] the [`Organism`] to test comes from
     ///
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, clonal_population: Arc<Mutex<ClonalPopulation>>) -> f64 {
-        let organism = inner.load_organism(clonal_population.clone());
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) -> f64 {
+        let organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
         // function.
@@ -758,11 +758,11 @@ impl<I: 'static> GlobalEnvironment<I> {
                 OrganismInformation::new(
                     output,
                     result_information,
-                    inner.get_bytes(clonal_population.clone()) * 8,
+                    inner.get_bytes(individual.clone()) * 8,
                     run_time,
                     *(&inner.environment.lifespan()),
-                    inner.get_associated_inputs(clonal_population.clone()),
-                    inner.get_associated_outputs(clonal_population.clone()),
+                    inner.get_associated_inputs(individual.clone()),
+                    inner.get_associated_outputs(individual.clone()),
                     organism.binary_size(),
                     *(&inner.environment.max_organism_size())
                 )
@@ -771,39 +771,39 @@ impl<I: 'static> GlobalEnvironment<I> {
         (inner.fitness_function)(organism_informations)
     }
 
-    /// Adds the specified fitness to the specified [`ClonalPopulation`].
+    /// Adds the specified fitness to the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     /// * `fitness` - the fitness to add
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn add_fitness(clonal_population: Arc<Mutex<ClonalPopulation>>, fitness: f64) {
-        let mut cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        cp.evaluate_new_fitness(fitness)
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn add_fitness(individual: Arc<Mutex<Individual>>, fitness: f64) {
+        let mut ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.evaluate_new_fitness(fitness)
     }
 
-    /// Generates offspring by sexual reproduction based on the fitness of the [`ClonalPopulation`].
+    /// Generates offspring by sexual reproduction based on the fitness of the [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     /// * `inner` - the inner environment
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_offspring(clonal_population: Arc<Mutex<ClonalPopulation>>, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<ClonalPopulation> {
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<Individual> {
         let mut offspring = Vec::new();
-        let fitness = inner.get_fitness(clonal_population.clone())
+        let fitness = inner.get_fitness(individual.clone())
             .expect("Fitness was not set, so updating the population is not possible.");
         // Statistically generate offspring based on the fitness.
         let number_of_offspring = Binomial::new(inner.environment.max_offspring() as u64, fitness)
@@ -811,9 +811,9 @@ impl<I: 'static> GlobalEnvironment<I> {
             .sample(&mut rand::thread_rng());
         for _ in 0..number_of_offspring {
             let partner = inner.get_random_genome();
-            let cp = clonal_population.lock()
-                .expect("A thread paniced while holding the clonal population's lock.");
-            offspring.push(cp.mate_and_mutate(partner, &inner.environment));
+            let ind = individual.lock()
+                .expect("A thread paniced while holding the individual's lock.");
+            offspring.push(ind.mate_and_mutate(partner, &inner.environment));
         }
         offspring
     }
@@ -828,165 +828,165 @@ struct InnerGlobalEnvironment<I> {
 }
 
 impl<I> InnerGlobalEnvironment<I> {
-    /// Checks if the specified [`ClonalPopulation`] died of age.
+    /// Checks if the specified [`Individual`] died of age.
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to check for extinction
+    /// * `individual` - the [`Individual`] to check for extinction
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn died(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        self.environment.death_chance(cp.age()) >= thread_rng().gen_range(0.0, 1.0)
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn died(&self, individual: Arc<Mutex<Individual>>) -> bool {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        self.environment.death_chance(ind.age()) >= thread_rng().gen_range(0.0, 1.0)
     }
 
-    /// Checks if the specified [`ClonalPopulation`] is juvenil and still needs testing.
+    /// Checks if the specified [`Individual`] is juvenil and still needs testing.
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    /// * `individual` - the [`Individual`] to check
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn is_juvenil(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        self.environment.max_testing_age().map_or(true, |max_age| cp.age() < max_age)
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn is_juvenil(&self, individual: Arc<Mutex<Individual>>) -> bool {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        self.environment.max_testing_age().map_or(true, |max_age| ind.age() < max_age)
     }
 
-    /// Checks if the specified [`ClonalPopulation`] should be testedby chance.
+    /// Checks if the specified [`Individual`] should be testedby chance.
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    /// * `individual` - the [`Individual`] to check
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn testing_by_chance(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(cp.age())
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn testing_by_chance(&self, individual: Arc<Mutex<Individual>>) -> bool {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(ind.age())
     }
 
-    /// Checks if the specified [`ClonalPopulation`] should be tested.
+    /// Checks if the specified [`Individual`] should be tested.
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to check
+    /// * `individual` - the [`Individual`] to check
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn testing(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> bool {
-        self.is_juvenil(clonal_population.clone()) || self.testing_by_chance(clonal_population)
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn testing(&self, individual: Arc<Mutex<Individual>>) -> bool {
+        self.is_juvenil(individual.clone()) || self.testing_by_chance(individual)
     }
 
-    /// Return the UUID of the specified [`ClonalPopulation`].
+    /// Return the UUID of the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_uuid(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Uuid {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        *cp.uuid()
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_uuid(&self, individual: Arc<Mutex<Individual>>) -> Uuid {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        *ind.uuid()
     }
 
-    /// Return the size in bytes of the specified [`ClonalPopulation`].
+    /// Return the size in bytes of the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_bytes(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        cp.bytes()
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_bytes(&self, individual: Arc<Mutex<Individual>>) -> usize {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.bytes()
     }
 
-    /// Return the fitness of the specified [`ClonalPopulation`].
+    /// Return the fitness of the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_fitness(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Option<f64> {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        cp.fitness()
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_fitness(&self, individual: Arc<Mutex<Individual>>) -> Option<f64> {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.fitness()
     }
 
-    /// Return the number of associated inputs for the specified [`ClonalPopulation`].
+    /// Return the number of associated inputs for the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_associated_inputs(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        cp.associated_inputs()
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_associated_inputs(&self, individual: Arc<Mutex<Individual>>) -> usize {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.associated_inputs()
     }
 
-    /// Return the number of associated outputs for the specified [`ClonalPopulation`].
+    /// Return the number of associated outputs for the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn get_associated_outputs(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> usize {
-        let cp = clonal_population.lock()
-            .expect("A thread paniced while holding the clonal population's lock.");
-        cp.associated_outputs()
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn get_associated_outputs(&self, individual: Arc<Mutex<Individual>>) -> usize {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.associated_outputs()
     }
 
-    /// Returns the copy of a [`Genome`] of a random [`ClonalPopulation`].
+    /// Returns the copy of a [`Genome`] of a random [`Individual`].
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock or the population is
+    /// If another thread paniced while holding the individual's lock or the population is
     /// completely extinct.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    /// [`Individual`]: ./struct.Individual.html
     fn get_random_genome(&self) -> Genome {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
@@ -1014,26 +1014,26 @@ impl<I> InnerGlobalEnvironment<I> {
             .expect(&format!("The file {:?} could not be created.", save_path.as_ref()));
     }
 
-    /// Returns all [`ClonalPopulation`]s.
+    /// Returns all [`Individual`]s.
     ///
     /// # Panics
     ///
     /// If another thread paniced while holding the population lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn clonal_populations(&self) -> Vec<Arc<Mutex<ClonalPopulation>>> {
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn individuals(&self) -> Vec<Arc<Mutex<Individual>>> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .clonal_populations()
+            .individuals()
     }
 
-    /// Returns the number of [`ClonalPopulation`]s in the [`Population`].
+    /// Returns the number of [`Individual`]s in the [`Population`].
     ///
     /// # Panics
     ///
     /// If another thread paniced while holding the population lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_size(&self) -> usize {
         self.population.lock()
@@ -1041,13 +1041,13 @@ impl<I> InnerGlobalEnvironment<I> {
             .size()
     }
 
-    /// Returns the mean fitness of all [`ClonalPopulation`]s in the [`Population`].
+    /// Returns the mean fitness of all [`Individual`]s in the [`Population`].
     ///
     /// # Panics
     ///
     /// If another thread paniced while holding the population lock.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_mean_fitness(&self) -> f64 {
         self.population.lock()
@@ -1055,14 +1055,14 @@ impl<I> InnerGlobalEnvironment<I> {
             .mean_fitness()
     }
 
-    /// Returns the mean [`Genome`] size in byte of all [`ClonalPopulation`]s in the [`Population`].
+    /// Returns the mean [`Genome`] size in byte of all [`Individual`]s in the [`Population`].
     ///
     /// # Panics
     ///
     /// If another thread paniced while holding the population lock.
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
+    /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_mean_genome_size(&self) -> f64 {
         self.population.lock()
@@ -1070,61 +1070,61 @@ impl<I> InnerGlobalEnvironment<I> {
             .mean_genome_size()
     }
 
-    /// Removes the specified [`ClonalPopulation`].
+    /// Removes the specified [`Individual`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`] to remove
+    /// * `individual` - the [`Individual`] to remove
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the population lock or if the [`ClonalPopulation`]
+    /// If another thread paniced while holding the population lock or if the [`Individual`]
     /// could not be removed.
     ///
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn remove_clonal_population(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) {
-        let uuid = self.get_uuid(clonal_population);
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn remove_individual(&self, individual: Arc<Mutex<Individual>>) {
+        let uuid = self.get_uuid(individual);
         &self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .remove(uuid)
-            .expect("Clonal population could not be removed.");
+            .expect("individual could not be removed.");
     }
 
-    /// Load the [`Organism`] corresponding to the specified [`ClonalPopulation`]
+    /// Load the [`Organism`] corresponding to the specified [`Individual`]
     ///
     /// # Parameters
     ///
-    /// * `clonal_population` - the [`ClonalPopulation`]
+    /// * `individual` - the [`Individual`]
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population lock.
+    /// If another thread paniced while holding the individual lock.
     ///
     /// [`Organism`]: ../population/struct.population.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn load_organism(&self, clonal_population: Arc<Mutex<ClonalPopulation>>) -> Organism {
-        clonal_population.lock()
-            .expect("Another thread panicked while holding the clonal population lock.")
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn load_organism(&self, individual: Arc<Mutex<Individual>>) -> Organism {
+        individual.lock()
+            .expect("Another thread panicked while holding the individual lock.")
             .genome()
             .translate()
     }
 
-    /// Add the [`ClonalPopulation`]s to the [`Population`].
+    /// Add the [`Individual`]s to the [`Population`].
     ///
     /// # Parameters
     ///
-    /// * `clonal_populations` - the [`ClonalPopulation`]s to add
+    /// * `individuals` - the [`Individual`]s to add
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population lock.
+    /// If another thread paniced while holding the individual lock.
     ///
     /// [`Population`]: ../population/struct.Population.html
-    /// [`ClonalPopulation`]: ../population/struct.ClonalPopulation.html
-    fn append_population(&self, clonal_populations: Vec<ClonalPopulation>) {
+    /// [`Individual`]: ../population/struct.Individual.html
+    fn append_population(&self, individuals: Vec<Individual>) {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .append(clonal_populations);
+            .append(individuals);
     }
 
 }

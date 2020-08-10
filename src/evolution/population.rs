@@ -247,10 +247,11 @@ impl<I> OrganismInformation<I> {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-/// A `ClonalPopulation` is a population of individuals with exactly the same [`Genome`].
+/// A `Individual` is describes an [`Organism`] with a defined [`Genome`].
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
-pub struct ClonalPopulation {
+/// [`Organism`]: ./struct.Organism.html
+pub struct Individual {
     source: Uuid,
     genome: Genome,
     fitness: Option<f64>,
@@ -258,18 +259,18 @@ pub struct ClonalPopulation {
     age: u32
 }
 
-impl ClonalPopulation {
-    /// Founds a new `ClonalPopulation` with a single individual.
+impl Individual {
+    /// Creates a new `Individual`.
     ///
     /// # Parameters
     ///
-    /// * `uuid` - the UUID of the `ClonalPopulation`
-    /// * `genome` - the [`Genome`] of the population
+    /// * `uuid` - the UUID of the `Individual`
+    /// * `genome` - the [`Genome`] of the `Individual`
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn found(uuid: Uuid, genome: Genome) -> Self {
+    pub fn new(uuid: Uuid, genome: Genome) -> Self {
         let bytes = genome.binary_size();
-        ClonalPopulation{
+        Individual{
             source: uuid,
             genome,
             fitness: None,
@@ -278,42 +279,42 @@ impl ClonalPopulation {
         }
     }
 
-    /// Returns the UUID of this `ClonalPopulation`.
+    /// Returns the UUID of this `Individual`.
     pub fn uuid(&self) -> &Uuid {
         &self.source
     }
 
-    /// Returns the number of bytes this `ClonalPopulation` contains.
+    /// Returns the number of bytes this `Individual` contains.
     pub fn bytes(&self) -> usize {
         self.bytes
     }
 
-    /// Returns the age of this `ClonalPopulation`.
+    /// Returns the age of this `Individual`.
     pub fn age(&self) -> u32 {
         self.age
     }
 
-    /// Returns the fitness of this `ClonalPopulation` if any.
+    /// Returns the fitness of this `Individual` if any.
     pub fn fitness(&self) -> Option<f64> {
         self.fitness
     }
 
-    /// Checks whether the fitness value of this `ClonalPopulation` was already set.
+    /// Checks whether the fitness value of this `Individual` was already set.
     pub fn has_fitness(&self) -> bool {
         self.fitness.is_some()
     }
 
-    /// Returns the number of associated inputs for this `ClonalPopulation` contains.
+    /// Returns the number of associated inputs for this `Individual` contains.
     pub fn associated_inputs(&self) -> usize {
         self.genome().number_of_associated_inputs()
     }
 
-    /// Returns the number of associated outputs for this `ClonalPopulation` contains.
+    /// Returns the number of associated outputs for this `Individual` contains.
     pub fn associated_outputs(&self) -> usize {
         self.genome().number_of_associated_outputs()
     }
 
-    /// Returns the values of all outputs for this `ClonalPopulation`.
+    /// Returns the values of all outputs for this `Individual`.
     pub fn output_values(&self) -> Vec<Option<BinarySubstrate>> {
         self.genome().get_output_values()
     }
@@ -367,7 +368,7 @@ impl ClonalPopulation {
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mate_and_mutate(&self, partner: Genome, environment: &Environment) -> ClonalPopulation {
+    pub fn mate_and_mutate(&self, partner: Genome, environment: &Environment) -> Individual {
         let offspring_genome = self.mate(partner);
         let random_chance: f64 = rand::thread_rng().gen_range(0.0, 1.0);
         // Calculate the number of mutations corresponding to the generated uniform random percentage.
@@ -376,15 +377,15 @@ impl ClonalPopulation {
         let number_of_mutations = random_chance.log(environment.mutation_rate()).floor() as usize;
         if let Some(mutated_offspring_genome) = GenomeMutation::mutate_n_times(number_of_mutations, &offspring_genome) {
             // If the mutation was successful, return the mutated individual.
-            ClonalPopulation::found(environment.generate_uuid(), mutated_offspring_genome)
+            Individual::new(environment.generate_uuid(), mutated_offspring_genome)
         } else {
             // If the mutation was not successful, return the recombined individual without any
             // mutations.
-            ClonalPopulation::found(environment.generate_uuid(), offspring_genome)
+            Individual::new(environment.generate_uuid(), offspring_genome)
         }
     }
 
-    /// Returns the [`Genome`] of this [`ClonalPopulation`].
+    /// Returns the [`Genome`] of this [`Individual`].
     ///
     /// # Panics
     ///
@@ -402,39 +403,39 @@ impl ClonalPopulation {
 ///
 /// [`Population`]: ./struct.Population.html
 struct SerialisablePopulation {
-    clonal_populations: Vec<ClonalPopulation>,
+    individuals: Vec<Individual>,
 }
 
 impl SerialisablePopulation {
     /// Returns the UUID and fitness of the fittest individual of the population.
-    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<ClonalPopulation>, Option<Vec<Option<BinarySubstrate>>>) {
-        let (mut uuid, mut fitness, mut cp, mut out) = (None, None, None, None);
-        let filter: Vec<&ClonalPopulation> = self.clonal_populations.iter().filter(|i| i.age() >= 1).collect();
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<Individual>, Option<Vec<Option<BinarySubstrate>>>) {
+        let (mut uuid, mut fitness, mut ind, mut out) = (None, None, None, None);
+        let filter: Vec<&Individual> = self.individuals.iter().filter(|i| i.age() >= 1).collect();
         for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
                 _ => { uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
-                    cp = Some(individual.clone());
+                    ind = Some(individual.clone());
                     out = Some(individual.output_values())
                 }
             }
         }
-        (uuid, fitness, cp, out)
+        (uuid, fitness, ind, out)
     }
 }
 
 impl From<&Population> for SerialisablePopulation {
     fn from(pop: &Population) -> Self {
-        let mut serialisable_population = SerialisablePopulation{clonal_populations: vec!()};
-        for clonal_population in pop.clonal_populations.values() {
-            match clonal_population.lock() {
-                Ok(cp) => serialisable_population.clonal_populations.push((*cp).clone()),
+        let mut serialisable_population = SerialisablePopulation{individuals: vec!()};
+        for individual in pop.individuals.values() {
+            match individual.lock() {
+                Ok(ind) => serialisable_population.individuals.push((*ind).clone()),
                 Err(err) => {
-                    // A clonal population cannot end up in an invalid state, so serialising it
+                    // A individual cannot end up in an invalid state, so serialising it
                     // does no harm.
-                    let poisoned: ClonalPopulation = err.into_inner().clone();
-                    serialisable_population.clonal_populations.push(poisoned);
+                    let poisoned: Individual = err.into_inner().clone();
+                    serialisable_population.individuals.push(poisoned);
                 },
             }
         }
@@ -443,27 +444,27 @@ impl From<&Population> for SerialisablePopulation {
 }
 
 #[derive(Debug, Clone)]
-/// A `Population` is a population of clonal sub-populations with different [`Genome`]s.
+/// A `Population` is a population of individuals with different [`Genome`]s.
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
 pub struct Population {
-    clonal_populations: HashMap<Uuid, Arc<Mutex<ClonalPopulation>>>,
+    individuals: HashMap<Uuid, Arc<Mutex<Individual>>>,
 }
 
 impl Population {
-    /// Creates a new `Population` from the specified clonal sub-populations.
+    /// Creates a new `Population` from the specified individuals.
     ///
     /// # Parameters
     ///
-    /// `sub_populations` - the [`ClonalPopulation`]s to group into a `Population`
+    /// `sub_populations` - the [`Individual`]s to group into a `Population`
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn new(sub_populations: Vec<ClonalPopulation>) -> Self {
-        let mut clonal_populations = HashMap::new();
-        for cp in sub_populations.into_iter() {
-            clonal_populations.insert(*cp.uuid(), Arc::new(Mutex::new(cp)));
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn new(sub_populations: Vec<Individual>) -> Self {
+        let mut individuals = HashMap::new();
+        for ind in sub_populations.into_iter() {
+            individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind)));
         }
-        Population{clonal_populations}
+        Population{individuals}
     }
 
     /// Write this `Population` to a JSON file if possible.
@@ -476,9 +477,9 @@ impl Population {
         let mut file = File::create(&path_to_file)?;
         let serialisable_population: SerialisablePopulation = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
-        let (id, fitness, cp, out) = serialisable_population.fittest_individual();
+        let (id, fitness, ind, out) = serialisable_population.fittest_individual();
         println!("\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\n\n{:#?}\nValues: {:?}\n\n",
-            path_to_file.as_ref(), id, fitness, cp, out);
+            path_to_file.as_ref(), id, fitness, ind, out);
         let ser = rmp_serde::to_vec(&serialisable_population)?;
         Ok(file.write_all(&ser)?)
     }
@@ -497,42 +498,42 @@ impl Population {
         Ok(serialisable_population.into())
     }
 
-    /// Returns the [`ClonalPopulation`]s that are part of this `Population`.
+    /// Returns the [`Individual`]s that are part of this `Population`.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn clonal_populations(&self) -> Vec<Arc<Mutex<ClonalPopulation>>> {
-        self.clonal_populations.values().map(|val| val.clone()).collect()
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn individuals(&self) -> Vec<Arc<Mutex<Individual>>> {
+        self.individuals.values().map(|val| val.clone()).collect()
     }
 
-    /// Inserts all the [`ClonalPopulation`]s into the `Population`.
+    /// Inserts all the [`Individual`]s into the `Population`.
     ///
     /// # Parameters
     ///
-    /// * `clonal_populations` - the [`ClonalPopulation`]s to append
+    /// * `individuals` - the [`Individual`]s to append
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn append(&mut self, clonal_populations: Vec<ClonalPopulation>) {
-        for cp in clonal_populations.into_iter() {
-            self.clonal_populations.insert(*cp.uuid(), Arc::new(Mutex::new(cp)));
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn append(&mut self, individuals: Vec<Individual>) {
+        for ind in individuals.into_iter() {
+            self.individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind)));
         }
     }
 
-    /// Returns the copy of a random gene in a random [`ClonalPopulation`] if there are any.
+    /// Returns the copy of a random gene in a random [`Individual`] if there are any.
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    /// [`Individual`]: ./struct.Individual.html
     pub fn random_gene(&self) -> Option<Gene> {
-        if self.clonal_populations.len() == 0 {
+        if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
-            for (index, value) in self.clonal_populations.values().enumerate() {
+            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            for (index, value) in self.individuals.values().enumerate() {
                 if random_population_index == index {
                     return Some(value.lock()
-                        .expect("A thread paniced while holding the clonal population's lock.")
+                        .expect("A thread paniced while holding the individual's lock.")
                         .genome()
                         .duplicate_random_gene())
                 }
@@ -542,90 +543,90 @@ impl Population {
         }
     }
 
-    /// Returns a random [`Genome`] of a random [`ClonalPopulation`] if there are any.
+    /// Returns a random [`Genome`] of a random [`Individual`] if there are any.
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    /// [`Individual`]: ./struct.Individual.html
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn random_genome(&self) -> Option<Genome> {
-        if self.clonal_populations.len() == 0 {
+        if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
-            self.clonal_populations.values()
+            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            self.individuals.values()
                 .nth(random_population_index)
                 .and_then(|value| Some(value.lock()
-                    .expect("A thread paniced while holding the clonal population's lock.")
+                    .expect("A thread paniced while holding the individual's lock.")
                     .genome()
                     .duplicate())
                 )
         }
     }
 
-    /// Returns a random [`ClonalPopulation`] if there is any.
+    /// Returns a random [`Individual`] if there is any.
     ///
     /// # Panics
     ///
-    /// If another thread paniced while holding the clonal population's lock.
+    /// If another thread paniced while holding the individual's lock.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn random_individual(&self) -> Option<Arc<Mutex<ClonalPopulation>>> {
-        if self.clonal_populations.len() == 0 {
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn random_individual(&self) -> Option<Arc<Mutex<Individual>>> {
+        if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.clonal_populations.len());
-            self.clonal_populations.values()
+            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            self.individuals.values()
                 .nth(random_population_index)
                 .and_then(|value| Some(value.clone()))
         }
     }
 
-    /// Remove the [`ClonalPopulation`] from the `Population`.
-    /// An error will be returned if there is no [`ClonalPopulation`] with the specified UUID or
+    /// Remove the [`Individual`] from the `Population`.
+    /// An error will be returned if there is no [`Individual`] with the specified UUID or
     /// if the correspondig [`Genome`] file could not be moved to the extinct sub-folder.
     ///
     /// # Parameters
     ///
-    /// * `clonal_population_uuid` - the UUID of the [`ClonalPopulation`] to remove
+    /// * `individual_uuid` - the UUID of the [`Individual`] to remove
     /// * `environment` - the [`Environment`] the population is growing in
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
-    pub fn remove(&mut self, clonal_population_uuid: Uuid) -> Result<Arc<Mutex<ClonalPopulation>>, Box<dyn Error>> {
-        let removed = self.clonal_populations.remove(&clonal_population_uuid)
-            .ok_or::<RemoveError>(RemoveError::new(&clonal_population_uuid))?;
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn remove(&mut self, individual_uuid: Uuid) -> Result<Arc<Mutex<Individual>>, Box<dyn Error>> {
+        let removed = self.individuals.remove(&individual_uuid)
+            .ok_or::<RemoveError>(RemoveError::new(&individual_uuid))?;
         Ok(removed)
     }
 
-    /// Resets the fitness and age of all [`ClonalPopulation`] as if they were never tested.
+    /// Resets the fitness and age of all [`Individual`] as if they were never tested.
     ///
-    /// [`ClonalPopulation`]: ./struct.ClonalPopulation.html
+    /// [`Individual`]: ./struct.Individual.html
     pub fn reset_fitness(&self) {
-        for clonal_population in self.clonal_populations.values() {
-            let mut cp = clonal_population.lock()
-                .expect("A thread paniced while holding the clonal population's lock.");
-            cp.fitness = None;
-            cp.age = 0;
+        for individual in self.individuals.values() {
+            let mut ind = individual.lock()
+                .expect("A thread paniced while holding the individual's lock.");
+            ind.fitness = None;
+            ind.age = 0;
         }
     }
 
-    /// Returns the number of [`ClonalPopulation`]s that are part of this `Population`.
+    /// Returns the number of [`Individual`]s that are part of this `Population`.
     pub fn size(&self) -> usize {
-        self.clonal_populations.len()
+        self.individuals.len()
     }
 
-    /// Calculates the mean fitness of the [`ClonalPopulation`]s that are part of this `Population`.
+    /// Calculates the mean fitness of the [`Individual`]s that are part of this `Population`.
     pub fn mean_fitness(&self) -> f64 {
         if self.size() > 0 {
             let mut fitness = 0.0;
-            for clonal_population in self.clonal_populations.values() {
-                let cp = clonal_population.lock()
-                    .expect("A thread paniced while holding the clonal population's lock.");
-                if let Some(f) = cp.fitness() {
+            for individual in self.individuals.values() {
+                let ind = individual.lock()
+                    .expect("A thread paniced while holding the individual's lock.");
+                if let Some(f) = ind.fitness() {
                     fitness += f;
                 }
             }
@@ -636,15 +637,15 @@ impl Population {
         }
     }
 
-    /// Calculates the mean genome size in bytes of the [`ClonalPopulation`]s
+    /// Calculates the mean genome size in bytes of the [`Individual`]s
     /// that are part of this `Population`.
     pub fn mean_genome_size(&self) -> f64 {
         if self.size() > 0 {
             let mut g_size = 0.0;
-            for clonal_population in self.clonal_populations.values() {
-                let cp = clonal_population.lock()
-                    .expect("A thread paniced while holding the clonal population's lock.");
-                g_size += cp.bytes() as f64;
+            for individual in self.individuals.values() {
+                let ind = individual.lock()
+                    .expect("A thread paniced while holding the individual's lock.");
+                g_size += ind.bytes() as f64;
             }
             g_size / (self.size() as f64)
         } else {
@@ -656,12 +657,12 @@ impl Population {
 
 impl From<SerialisablePopulation> for Population {
     fn from(serial: SerialisablePopulation) -> Self {
-        Self::new(serial.clonal_populations)
+        Self::new(serial.individuals)
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-/// A `RemoveError` is returned when a UUID with no matching [`ClonalPopulation`] is flagged for
+/// A `RemoveError` is returned when a UUID with no matching [`Individual`] is flagged for
 /// removal.
 pub struct RemoveError {
     description: String,
@@ -674,7 +675,7 @@ impl RemoveError {
     ///
     /// * `uuid` - the UUID flagged for removal
     pub fn new(uuid: &Uuid) -> Self {
-        RemoveError {description: format!("No clonal population with UUID {} is present in the population.", uuid)}
+        RemoveError {description: format!("No individual with UUID {} is present in the population.", uuid)}
     }
 }
 

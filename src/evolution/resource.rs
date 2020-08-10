@@ -3,11 +3,10 @@ extern crate serde;
 
 use serde::{Serialize, Deserialize};
 
-
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
-/// A `Resource` is needed for [`ClonalPopulation`]s to produce offspring.
+/// A `Resource` is needed for [`Individual`]s to produce offspring.
 ///
-/// [`ClonalPopulation`]: ../population/struct.Population.html
+/// [`Individual`]: ../population/struct.Population.html
 pub struct Resource {
     available: f64,
     recycling: f64,
