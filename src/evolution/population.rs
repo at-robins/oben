@@ -296,6 +296,13 @@ impl Individual {
         self.age
     }
 
+    /// Returns the [`Resource`]s this `Individual` has accumulated.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn resources(&self) -> f64 {
+        self.resources
+    }
+
     /// Returns the fitness of this `Individual` if any.
     pub fn fitness(&self) -> Option<f64> {
         self.fitness
@@ -658,6 +665,21 @@ impl Population {
             // If the population is empty, the genome size is zero.
             0.0
         }
+    }
+
+    /// Add the specified amount of [`Resource`]s.
+    ///
+    /// # Parameters
+    ///
+    /// * `amount` - the amount of [`Resource`]s to add
+    ///
+    /// # Panics
+    ///
+    /// If the specified `amount` is not a valid positive number.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn repatriate_resources(&mut self, amount: f64) {
+        self.resources.repatriate_resources(amount);
     }
 }
 

@@ -912,6 +912,27 @@ impl<I> InnerGlobalEnvironment<I> {
         *ind.uuid()
     }
 
+    /// Return the [`Resource`]s accumulated by the specified [`Individual`] including the
+    /// the ones that were needed to give birth to it.
+    ///
+    /// # Parameters
+    ///
+    /// * `individual` - the [`Individual`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the individual's lock.
+    ///
+    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Resource`]: ../resource/struct.Resource.html
+    fn get_resources_on_death(individual: Arc<Mutex<Individual>>) -> f64 {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        // An individual consumes 1.0 resources when being born, so this has to be repatriated
+        // additionally to the accumulated resources.
+        ind.resources() + 1.0
+    }
+
     /// Return the size in bytes of the specified [`Individual`].
     ///
     /// # Parameters
@@ -1071,7 +1092,7 @@ impl<I> InnerGlobalEnvironment<I> {
             .mean_genome_size()
     }
 
-    /// Removes the specified [`Individual`].
+    /// Removes the specified [`Individual`] and repatriates its accumulated resources.
     ///
     /// # Parameters
     ///
@@ -1084,11 +1105,19 @@ impl<I> InnerGlobalEnvironment<I> {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     fn remove_individual(&self, individual: Arc<Mutex<Individual>>) {
-        let uuid = self.get_uuid(individual);
-        &self.population.lock()
+        let uuid = self.get_uuid(individual.clone());
+        let resources = Self::get_resources_on_death(individual);
+        {
+            &self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .repatriate_resources(resources);
+        }
+        {
+            &self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .remove(uuid)
-            .expect("individual could not be removed.");
+            .expect("The individual could not be removed.");
+        }
     }
 
     /// Load the [`Organism`] corresponding to the specified [`Individual`]
