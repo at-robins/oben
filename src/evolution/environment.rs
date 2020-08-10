@@ -14,7 +14,7 @@ use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use rand::{thread_rng, Rng};
-use rand_distr::{Binomial, Distribution};
+use rand_distr::{Normal, Distribution};
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes/dummy";
@@ -664,6 +664,9 @@ impl<I: 'static> GlobalEnvironment<I> {
                     println!("     Spawn Organism {}", *counter.lock().unwrap());
                 }
             });
+
+            // TODO: Claim and distribute resources based on fitness.
+
             // Mate the organisms of the population and add offspring to the population.
             self.inner.individuals().par_iter().for_each(|individual| {
                 Self::mate_organism(self.inner.clone(), individual.clone());
@@ -792,7 +795,7 @@ impl<I: 'static> GlobalEnvironment<I> {
         ind.evaluate_new_fitness(fitness)
     }
 
-    /// Generates offspring by sexual reproduction based on the fitness of the [`Individual`].
+    /// Generates offspring by sexual reproduction of the [`Individual`].
     ///
     /// # Parameters
     ///
@@ -806,12 +809,8 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// [`Individual`]: ../population/struct.Individual.html
     fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<Individual> {
         let mut offspring = Vec::new();
-        let fitness = inner.get_fitness(individual.clone())
-            .expect("Fitness was not set, so updating the population is not possible.");
-        // Statistically generate offspring based on the fitness.
-        let number_of_offspring = Binomial::new(inner.environment.max_offspring() as u64, fitness)
-            .expect("The fitness is not set between 0 and 1.")
-            .sample(&mut rand::thread_rng());
+        // Use the accumulated resources to produce offspring.
+        let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
         for _ in 0..number_of_offspring {
             let partner = inner.get_random_genome();
             let ind = individual.lock()
@@ -914,8 +913,8 @@ impl<I> InnerGlobalEnvironment<I> {
         *ind.uuid()
     }
 
-    /// Return the [`Resource`]s accumulated by the specified [`Individual`] including the
-    /// the ones that were needed to give birth to it.
+    /// Returns the [`Resource`]s accumulated by the specified [`Individual`] that can be
+    /// used to generate offspring.
     ///
     /// # Parameters
     ///
@@ -927,12 +926,31 @@ impl<I> InnerGlobalEnvironment<I> {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    fn get_resources_on_death(individual: Arc<Mutex<Individual>>) -> f64 {
+    fn get_accumulated_resources(individual: Arc<Mutex<Individual>>) -> f64 {
         let ind = individual.lock()
             .expect("A thread paniced while holding the individual's lock.");
         // An individual consumes 1.0 resources when being born, so this has to be repatriated
         // additionally to the accumulated resources.
-        ind.resources() + 1.0
+        ind.resources()
+    }
+
+    /// Spends the maximum amount of [`Resource`]s possible to generate offspring and returns the
+    /// number of offspring generated this way.
+    ///
+    /// # Parameters
+    ///
+    /// * `individual` - the [`Individual`]
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the individual's lock.
+    ///
+    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Resource`]: ../resource/struct.Resource.html
+    fn spend_resources_for_mating(&self, individual: Arc<Mutex<Individual>>) -> usize {
+        let ind = individual.lock()
+            .expect("A thread paniced while holding the individual's lock.");
+        ind.spend_resources_for_mating(&self.environment)
     }
 
     /// Return the size in bytes of the specified [`Individual`].
@@ -1109,7 +1127,9 @@ impl<I> InnerGlobalEnvironment<I> {
     /// [`Resource`]: ../resource/struct.Resource.html
     fn remove_individual(&self, individual: Arc<Mutex<Individual>>) {
         let uuid = self.get_uuid(individual.clone());
-        let resources = Self::get_resources_on_death(individual);
+        // An individual consumes 1.0 resources when being born, so this has to be repatriated
+        // additionally to the accumulated resources.
+        let resources = Self::get_accumulated_resources(individual) + 1.0;
         {
             &self.population.lock()
             .expect("A thread paniced while holding the population lock.")

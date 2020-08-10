@@ -404,6 +404,25 @@ impl Individual {
     pub fn genome(&self) -> &Genome {
         &self.genome
     }
+
+    /// Spends the maximum amount of [`Resource`]s possible to generate offspring and returns the
+    /// number of offspring generated this way.
+    ///
+    /// # Parameters
+    ///
+    /// * `environment` - the [`Environment`] the `Individual` is living in
+    ///
+    /// [`Environment`]: ../environment/struct.Environment.html
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn spend_resources_for_mating(&mut self, environment: &Environment) -> usize {
+        let mut number_of_offspring = self.resources().floor() as usize;
+        // Limits the number of offspring per generation.
+        if number_of_offspring > environment.max_offspring() {
+            number_of_offspring = environment.max_offspring();
+        }
+        self.resources -= number_of_offspring as f64;
+        number_of_offspring
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
