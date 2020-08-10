@@ -1,6 +1,7 @@
+pub mod binary;
 pub mod chemistry;
-pub mod protein;
+pub mod environment;
 pub mod gene;
 pub mod population;
-pub mod environment;
-pub mod binary;
+pub mod protein;
+pub mod resource;
