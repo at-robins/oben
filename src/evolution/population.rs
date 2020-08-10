@@ -258,6 +258,7 @@ pub struct Individual {
     fitness: Option<f64>,
     bytes: usize,
     age: u32,
+    tested: u32,
     resources: f64
 }
 
@@ -278,6 +279,7 @@ impl Individual {
             fitness: None,
             bytes,
             age: 0,
+            tested: 0,
             resources: 0.0,
         }
     }
@@ -295,6 +297,11 @@ impl Individual {
     /// Returns the age of this `Individual`.
     pub fn age(&self) -> u32 {
         self.age
+    }
+
+    /// Returns how often this `Individual` was already tested.
+    pub fn times_tested(&self) -> u32 {
+        self.tested
     }
 
     /// Returns the [`Resource`]s this `Individual` has accumulated.
@@ -339,12 +346,12 @@ impl Individual {
     fn add_fitness(&mut self, fitness: f64) {
         if let Some(old_fitness) = self.fitness {
             // Calculate the mean of the current and all previous fitness values.
-            let f_old = old_fitness * (self.age as f64);
-            self.fitness = Some((fitness  + f_old) / ((self.age + 1) as f64));
+            let f_old = old_fitness * (self.tested as f64);
+            self.fitness = Some((fitness  + f_old) / ((self.tested + 1) as f64));
         } else {
             self.fitness = Some(fitness);
         }
-        self.age += 1;
+        self.tested += 1;
     }
 
     /// Updates the `Population`'s fitness.
@@ -658,6 +665,17 @@ impl Population {
         }
     }
 
+    /// Increments the age of every [`Individual`] by 1 generation.
+    ///
+    /// [`Individual`]: ./struct.Individual.html
+    pub fn increment_age(&self) {
+        for individual in self.individuals.values() {
+            individual.lock()
+                .expect("A thread paniced while holding the individual's lock.")
+                .age += 1;
+        }
+    }
+
     /// Returns the number of [`Individual`]s that are part of this `Population`.
     pub fn size(&self) -> usize {
         self.individuals.len()
@@ -732,8 +750,8 @@ impl Population {
             if let Some(fitness) = individual.lock()
                     .expect("Another thread panicked while holding the individual lock.")
                     .fitness() {
-                let mean = fitness * 100.0;
-                let mut request = Normal::new(mean, mean * 0.1)
+                let mean = fitness * 1.0;
+                let mut request = Normal::new(mean, mean * 0.01)
                     .expect("The fitness is not set between 0 and 1.")
                     .sample(&mut rand::thread_rng());
                 // Prevent negativ resource aquirement.

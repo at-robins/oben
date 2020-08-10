@@ -652,15 +652,18 @@ impl<I: 'static> GlobalEnvironment<I> {
         let mut generation: u64 = 0;
         let mut start = Instant::now();
         loop {
-            let counter = Arc::new(Mutex::new(0u32));
+            let spawn_counter = Arc::new(Mutex::new(0u32));
+            let mating_counter = Arc::new(Mutex::new(0u32));
             generation += 1;
             println!("Generation {}", generation);
+            // Age the population by a generation.
+            self.inner.increment_age();
             // Challenge the organisms in the population.
             self.inner.individuals().par_iter().for_each(|individual| {
                 Self::spawn_organism(self.inner.clone(), individual.clone());
-                *counter.lock().unwrap() += 1;
-                if *counter.lock().unwrap() % 1000 == 0 {
-                    println!("     Spawn Organism {}", *counter.lock().unwrap());
+                *spawn_counter.lock().unwrap() += 1;
+                if *spawn_counter.lock().unwrap() % 1000 == 0 {
+                    println!("     Spawn Organism {}", *spawn_counter.lock().unwrap());
                 }
             });
             // Distribute resources neccesarry for mating based on fitness.
@@ -668,9 +671,9 @@ impl<I: 'static> GlobalEnvironment<I> {
             // Mate the organisms of the population and add offspring to the population.
             self.inner.individuals().par_iter().for_each(|individual| {
                 Self::mate_organism(self.inner.clone(), individual.clone());
-                *counter.lock().unwrap() += 1;
-                if *counter.lock().unwrap() % 1000 == 0 {
-                    println!("     Mate Organism {}", *counter.lock().unwrap());
+                *mating_counter.lock().unwrap() += 1;
+                if *mating_counter.lock().unwrap() % 1000 == 0 {
+                    println!("     Mate Organism {}", *mating_counter.lock().unwrap());
                 }
             });
             // Kill individuals on statistical basis.
@@ -875,7 +878,7 @@ impl<I> InnerGlobalEnvironment<I> {
     fn testing_by_chance(&self, individual: Arc<Mutex<Individual>>) -> bool {
         let ind = individual.lock()
             .expect("A thread paniced while holding the individual's lock.");
-        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(ind.age())
+        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(ind.times_tested())
     }
 
     /// Checks if the specified [`Individual`] should be tested.
@@ -1061,6 +1064,20 @@ impl<I> InnerGlobalEnvironment<I> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .size()
+    }
+
+    /// Ages all [`Individual`]s in the [`Population`] by 1 generation.
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the population lock.
+    ///
+    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn increment_age(&self) {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .increment_age()
     }
 
     /// Distributes available [`Resource`]s among the [`Population`]
