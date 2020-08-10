@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 use super::population::{Individual, Population, Organism, OrganismInformation};
 use super::gene::Genome;
+use super::resource::Resource;
 use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -41,9 +42,9 @@ pub struct EnvironmentBuilder {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     population_size: u32,
-    /// The relative size of clonal sub-populations that can still be detected.
-    /// Any population with a smaller size will go extinct.
-    extinction_threshold: Option<f64>,
+    /// The half life time of resources that are released by the death of individuals
+    /// before becomming available again.
+    resource_half_life: f64,
     /// The amount of time an [`Organism`] of a [`Individual`] has to complete a task.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
@@ -93,7 +94,7 @@ impl EnvironmentBuilder {
             working_directory: PathBuf::from("./working_directory"),
             mutation_rate: None,
             population_size: 1_000_000,
-            extinction_threshold: None,
+            resource_half_life: 3.0,
             lifespan: Duration::from_secs(1),
             population_save_intervall: Duration::from_secs(1800),
             uuid_node: rand::random(),
@@ -115,7 +116,7 @@ impl EnvironmentBuilder {
             working_directory: self.working_directory.clone(),
             mutation_rate: self.mutation_rate_or_default(),
             population_size: self.population_size,
-            extinction_threshold: self.extinction_threshold_or_default(),
+            resource_half_life: self.resource_half_life,
             lifespan: self.lifespan,
             population_save_intervall: self.population_save_intervall,
             uuid_node: self.uuid_node,
@@ -159,14 +160,15 @@ impl EnvironmentBuilder {
         self
     }
 
-    /// Sets the extinction thresholdas as specified.
+    /// Sets the half life time of [`Resource`]s before becomming available again.
     ///
     /// # Parameters
     ///
-    /// * `extinction_threshold` - the minimum relative size of a sub-population before being
-    /// no longer detectable and thereby going extinct
-    pub fn extinction_threshold(&mut self, extinction_threshold: f64) -> &mut Self {
-        self.extinction_threshold = Some(extinction_threshold);
+    /// * `half_life` - the half life time
+    ///
+    /// ../resource/struct.Resource.html
+    pub fn resource_half_life(&mut self, half_life: f64) -> &mut Self {
+        self.resource_half_life = half_life;
         self
     }
 
@@ -290,16 +292,6 @@ impl EnvironmentBuilder {
         }
     }
 
-    /// Returns the extinction threshold if set. Otherwise defaults to a population size dependent value.
-    fn extinction_threshold_or_default(&self) -> f64 {
-        if let Some(extinction_threshold) = self.extinction_threshold {
-            extinction_threshold
-        } else {
-            // Defaults to a bit less than one individual.
-            0.3 / self.population_size as f64
-        }
-    }
-
     /// Returns the chance of lateral gene transfer if set.
     /// Otherwise defaults to a population size dependent value.
     fn lateral_gene_transfer_chance_or_default(&self) -> f64 {
@@ -328,9 +320,9 @@ pub struct Environment {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     population_size: u32,
-    /// The relative size of clonal sub-populations that can still be detected.
-    /// Any population with a smaller size will go extinct.
-    extinction_threshold: f64,
+    /// The half life time of resources that are released by the death of individuals
+    /// before becomming available again.
+    resource_half_life: f64,
     /// The amount of time an [`Organism`] of a [`Individual`] has to complete a task.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
@@ -391,12 +383,21 @@ impl Environment {
         self.population_size
     }
 
-    /// Returns the threshold of relative population size which is still detectable before
-    /// a [`Individual`] goes extinct.
+    /// Returns the half life time of [`Resource`]s before becomming available again.
+    /// [`Resource`]s are consumed by generation of offspring and released by death of
+    /// [`Individual`]s.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    pub fn extinction_threshold(&self) -> f64 {
-        self.extinction_threshold
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn resource_half_life(&self) -> f64 {
+        self.resource_half_life
+    }
+
+    /// Creates [`Resource`]s based on population size and half life time.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn generate_resources(&self) -> Resource {
+        Resource::new(self.population_size() as f64, self.resource_half_life())
     }
 
     /// Returns the node for UUID creation.

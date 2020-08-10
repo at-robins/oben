@@ -13,9 +13,9 @@ use super::binary::BinarySubstrate;
 use super::protein::{Substrate, Receptor};
 use super::gene::{CrossOver, Gene, Genome, GenomeMutation};
 use super::environment::Environment;
+use super::resource::Resource;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
-// use rand_distr::{Binomial, Distribution};
 use std::sync::{Arc, Mutex};
 use std::error::Error;
 use std::fs::File;
@@ -256,7 +256,8 @@ pub struct Individual {
     genome: Genome,
     fitness: Option<f64>,
     bytes: usize,
-    age: u32
+    age: u32,
+    resources: f64
 }
 
 impl Individual {
@@ -276,6 +277,7 @@ impl Individual {
             fitness: None,
             bytes,
             age: 0,
+            resources: 0.0,
         }
     }
 
@@ -404,6 +406,7 @@ impl Individual {
 /// [`Population`]: ./struct.Population.html
 struct SerialisablePopulation {
     individuals: Vec<Individual>,
+    resources: Resource,
 }
 
 impl SerialisablePopulation {
@@ -427,7 +430,7 @@ impl SerialisablePopulation {
 
 impl From<&Population> for SerialisablePopulation {
     fn from(pop: &Population) -> Self {
-        let mut serialisable_population = SerialisablePopulation{individuals: vec!()};
+        let mut serialisable_population = SerialisablePopulation{individuals: vec!(), resources: pop.resources};
         for individual in pop.individuals.values() {
             match individual.lock() {
                 Ok(ind) => serialisable_population.individuals.push((*ind).clone()),
@@ -449,6 +452,7 @@ impl From<&Population> for SerialisablePopulation {
 /// [`Genome`]: ../gene/struct.Genome.html
 pub struct Population {
     individuals: HashMap<Uuid, Arc<Mutex<Individual>>>,
+    resources: Resource,
 }
 
 impl Population {
@@ -456,15 +460,17 @@ impl Population {
     ///
     /// # Parameters
     ///
-    /// `sub_populations` - the [`Individual`]s to group into a `Population`
+    /// `founding_individuals` - the [`Individual`]s to group into a `Population`
+    /// `resources` - the [`Resources`]s the `Population` has access to
     ///
     /// [`Individual`]: ./struct.Individual.html
-    pub fn new(sub_populations: Vec<Individual>) -> Self {
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn new(founding_individuals: Vec<Individual>, resources: Resource) -> Self {
         let mut individuals = HashMap::new();
-        for ind in sub_populations.into_iter() {
+        for ind in founding_individuals.into_iter() {
             individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind)));
         }
-        Population{individuals}
+        Population{individuals, resources}
     }
 
     /// Write this `Population` to a JSON file if possible.
@@ -657,7 +663,7 @@ impl Population {
 
 impl From<SerialisablePopulation> for Population {
     fn from(serial: SerialisablePopulation) -> Self {
-        Self::new(serial.individuals)
+        Self::new(serial.individuals, serial.resources)
     }
 }
 
