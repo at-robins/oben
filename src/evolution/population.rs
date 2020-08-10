@@ -23,6 +23,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use rand::{thread_rng, Rng};
+use rand_distr::{Normal, Distribution};
 
 pub struct Organism {
     substrates: Vec<Rc<RefCell<Substrate>>>,
@@ -423,6 +424,17 @@ impl Individual {
         self.resources -= number_of_offspring as f64;
         number_of_offspring
     }
+
+    /// Adds the specified amount of [`Resource`]s to the `Individual`.
+    ///
+    /// # Parameters
+    ///
+    /// * `amount` - the amount of [`Resource`]s to add
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    fn aquire_resources(&mut self, amount: f64) {
+        self.resources += amount;
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -706,6 +718,42 @@ impl Population {
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn recycle(&mut self) {
         self.resources.recycle();
+    }
+
+    /// Distributes available [`Resource`]s based on the fitness of the [`Individual`]s.
+    ///
+    /// [`Individual`]: ./struct.Individual.html
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn distribute_resources(&mut self) {
+        let mut requests: Vec<(Arc<Mutex<Individual>>, f64)> = Vec::with_capacity(self.individuals.capacity());
+        let mut total_request = 0.0;
+        // Calculate the maximum resources per individual that might be aquired.
+        for individual in self.individuals() {
+            if let Some(fitness) = individual.lock()
+                    .expect("Another thread panicked while holding the individual lock.")
+                    .fitness() {
+                let mean = fitness * 100.0;
+                let mut request = Normal::new(mean, mean * 0.1)
+                    .expect("The fitness is not set between 0 and 1.")
+                    .sample(&mut rand::thread_rng());
+                // Prevent negativ resource aquirement.
+                if request < 0.0 {
+                    request = 0.0;
+                }
+                total_request += request;
+                requests.push((individual.clone(), request));
+            }
+        }
+        // Distribute resources based on available resources and claims.
+        if total_request > 0.0 {
+            let aquired_resources = self.resources.claim_resources(total_request);
+            for (individual, request) in requests {
+                let share = aquired_resources * (request / total_request);
+                individual.lock()
+                    .expect("Another thread panicked while holding the individual lock.")
+                    .aquire_resources(share);
+            }
+        }
     }
 }
 

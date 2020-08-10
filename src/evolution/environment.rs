@@ -14,7 +14,6 @@ use std::time::{Duration, Instant, SystemTime};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use rand::{thread_rng, Rng};
-use rand_distr::{Normal, Distribution};
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes/dummy";
@@ -664,9 +663,8 @@ impl<I: 'static> GlobalEnvironment<I> {
                     println!("     Spawn Organism {}", *counter.lock().unwrap());
                 }
             });
-
-            // TODO: Claim and distribute resources based on fitness.
-
+            // Distribute resources neccesarry for mating based on fitness.
+            self.inner.distribute_resources();
             // Mate the organisms of the population and add offspring to the population.
             self.inner.individuals().par_iter().for_each(|individual| {
                 Self::mate_organism(self.inner.clone(), individual.clone());
@@ -819,7 +817,6 @@ impl<I: 'static> GlobalEnvironment<I> {
         }
         offspring
     }
-
 }
 
 struct InnerGlobalEnvironment<I> {
@@ -948,9 +945,9 @@ impl<I> InnerGlobalEnvironment<I> {
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
     fn spend_resources_for_mating(&self, individual: Arc<Mutex<Individual>>) -> usize {
-        let ind = individual.lock()
-            .expect("A thread paniced while holding the individual's lock.");
-        ind.spend_resources_for_mating(&self.environment)
+        individual.lock()
+            .expect("A thread paniced while holding the individual's lock.")
+            .spend_resources_for_mating(&self.environment)
     }
 
     /// Return the size in bytes of the specified [`Individual`].
@@ -968,23 +965,6 @@ impl<I> InnerGlobalEnvironment<I> {
         let ind = individual.lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.bytes()
-    }
-
-    /// Return the fitness of the specified [`Individual`].
-    ///
-    /// # Parameters
-    ///
-    /// * `individual` - the [`Individual`]
-    ///
-    /// # Panics
-    ///
-    /// If another thread paniced while holding the individual's lock.
-    ///
-    /// [`Individual`]: ../population/struct.Individual.html
-    fn get_fitness(&self, individual: Arc<Mutex<Individual>>) -> Option<f64> {
-        let ind = individual.lock()
-            .expect("A thread paniced while holding the individual's lock.");
-        ind.fitness()
     }
 
     /// Return the number of associated inputs for the specified [`Individual`].
@@ -1081,6 +1061,18 @@ impl<I> InnerGlobalEnvironment<I> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .size()
+    }
+
+    /// Distributes available [`Resource`]s among the [`Population`]
+    /// based on the fitness of the [`Individual`]s.
+    ///
+    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Population`]: ../population/struct.Population.html
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn distribute_resources(&self) {
+        self.population.lock()
+            .expect("A thread paniced while holding the population lock.")
+            .distribute_resources()
     }
 
     /// Returns the mean fitness of all [`Individual`]s in the [`Population`].
