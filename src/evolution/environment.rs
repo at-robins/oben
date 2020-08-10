@@ -685,10 +685,11 @@ impl<I: 'static> GlobalEnvironment<I> {
             // Recycle resources.
             self.inner.recycle();
             // Print statistics.
-            println!("Size: {} : Bytes: {} ; Fitness: {}",
+            println!("Size: {} : Bytes: {} ; Fitness: {} ; Resources: {:?}",
                 self.inner.population_size(),
                 self.inner.population_mean_genome_size(),
-                self.inner.population_mean_fitness());
+                self.inner.population_mean_fitness(),
+                self.inner.resources());
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
                 self.save_population();
@@ -929,8 +930,6 @@ impl<I> InnerGlobalEnvironment<I> {
     fn get_accumulated_resources(individual: Arc<Mutex<Individual>>) -> f64 {
         let ind = individual.lock()
             .expect("A thread paniced while holding the individual's lock.");
-        // An individual consumes 1.0 resources when being born, so this has to be repatriated
-        // additionally to the accumulated resources.
         ind.resources()
     }
 
@@ -1159,6 +1158,15 @@ impl<I> InnerGlobalEnvironment<I> {
         &self.population.lock()
         .expect("A thread paniced while holding the population lock.")
         .recycle();
+    }
+
+    /// Returns the [`Resource`]s.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    fn resources(&self) -> Resource {
+        self.population.lock()
+        .expect("A thread paniced while holding the population lock.")
+        .resources()
     }
 
     /// Load the [`Organism`] corresponding to the specified [`Individual`]

@@ -683,6 +683,7 @@ impl Population {
 
     /// Calculates the mean fitness of the [`Individual`]s that are part of this `Population`.
     pub fn mean_fitness(&self) -> f64 {
+        let mut count = 0.0;
         if self.size() > 0 {
             let mut fitness = 0.0;
             for individual in self.individuals.values() {
@@ -690,9 +691,10 @@ impl Population {
                     .expect("A thread paniced while holding the individual's lock.");
                 if let Some(f) = ind.fitness() {
                     fitness += f;
+                    count += 1.0;
                 }
             }
-            fitness / (self.size() as f64)
+            fitness / count
         } else {
             // If the population is empty, the fitness is zero.
             0.0
@@ -736,6 +738,13 @@ impl Population {
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn recycle(&mut self) {
         self.resources.recycle();
+    }
+
+    /// Returns the [`Resource`]s of the `Population`.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn resources(&self) -> Resource {
+        self.resources
     }
 
     /// Distributes available [`Resource`]s based on the fitness of the [`Individual`]s.
