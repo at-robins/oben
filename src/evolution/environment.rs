@@ -678,6 +678,8 @@ impl<I: 'static> GlobalEnvironment<I> {
                 .for_each(|individual| {
                     self.inner.remove_individual(individual.clone());
                 });
+            // Recycle resources.
+            self.inner.recycle();
             // Print statistics.
             println!("Size: {} : Bytes: {} ; Fitness: {}",
                 self.inner.population_size(),
@@ -1092,7 +1094,7 @@ impl<I> InnerGlobalEnvironment<I> {
             .mean_genome_size()
     }
 
-    /// Removes the specified [`Individual`] and repatriates its accumulated resources.
+    /// Removes the specified [`Individual`] and repatriates its accumulated [`Resource`]s.
     ///
     /// # Parameters
     ///
@@ -1104,6 +1106,7 @@ impl<I> InnerGlobalEnvironment<I> {
     /// could not be removed.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Resource`]: ../resource/struct.Resource.html
     fn remove_individual(&self, individual: Arc<Mutex<Individual>>) {
         let uuid = self.get_uuid(individual.clone());
         let resources = Self::get_resources_on_death(individual);
@@ -1118,6 +1121,15 @@ impl<I> InnerGlobalEnvironment<I> {
             .remove(uuid)
             .expect("The individual could not be removed.");
         }
+    }
+
+    /// Recycles inavailable [`Resource`]s at the end of a generation.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    fn recycle(&self) {
+        &self.population.lock()
+        .expect("A thread paniced while holding the population lock.")
+        .recycle();
     }
 
     /// Load the [`Organism`] corresponding to the specified [`Individual`]

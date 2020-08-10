@@ -681,6 +681,13 @@ impl Population {
     pub fn repatriate_resources(&mut self, amount: f64) {
         self.resources.repatriate_resources(amount);
     }
+
+    /// Recycles inavailable [`Resource`]s at the end of a generation.
+    ///
+    /// [`Resource`]: ../resource/struct.Resource.html
+    pub fn recycle(&mut self) {
+        self.resources.recycle();
+    }
 }
 
 impl From<SerialisablePopulation> for Population {
