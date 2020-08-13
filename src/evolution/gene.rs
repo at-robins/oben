@@ -19,7 +19,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use core::cell::RefCell;
 use std::rc::Rc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
 ///
@@ -182,13 +182,13 @@ impl Genome {
         }
         // Remove all inputs pointing to the removed gene.
         for input_value in &mut self.input {
-            if input_value.and_then(|input| Some(input.gene == gene)).unwrap_or(false) {
+            if input_value.and_then(|input| Some(input.is_gene(gene))).unwrap_or(false) {
                 *input_value = None;
             }
         }
         // Remove all outputs pointing to the removed gene.
         for output_value in &mut self.output {
-            if output_value.and_then(|output| Some(output.gene == gene)).unwrap_or(false) {
+            if output_value.and_then(|output| Some(output.is_gene(gene))).unwrap_or(false) {
                 *output_value = None;
             }
         }
@@ -494,10 +494,12 @@ impl Genome {
     /// [`Genome`]: ./struct.Genome.html
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     fn validate_input_ouput_associations(genes: &Vec<Gene>, io_substrates: &mut Vec<Option<GeneSubstrate>>) {
+        let mut duplicate_checker = HashSet::new();
         for io_substrate in io_substrates {
             if let Some(current_substrate) = io_substrate {
-                if !Genome::has_substrate(genes, current_substrate) {
-                    // Remove the io association if it points to an invalid substrate.
+                if !duplicate_checker.insert(current_substrate.clone()) ||
+                    !Genome::has_substrate(genes, current_substrate) {
+                    // Remove the io association if it points to a duplicate or an invalid substrate.
                     *io_substrate = None;
                 }
                 // Otherwise, leave it untouched.
@@ -1782,6 +1784,7 @@ impl GenomeMutation {
            mutated_genome.adjust_input_after_gene_substrate_removal(removed_substrate);
            mutated_genome.adjust_output_after_gene_substrate_removal(removed_substrate);
            mutated_genome.adjust_associations_after_gene_substrate_removal(removed_substrate);
+           mutated_genome.validate_associations();
            Some(mutated_genome)
        } else {
            None
