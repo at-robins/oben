@@ -25,8 +25,6 @@ const SUBFOLDER_POPULATION: &str = "populations/dummy";
 const FILE_EXTENSION_GENOME: &str = "genome";
 /// The file extension of population files.
 const FILE_EXTENSION_POPULATION: &str = "population";
-/// The context for UUID creation.
-const UUID_CONTEXT: Context = Context::new(0);
 
 /// An `EnvironmentBuilder` specifing settings for an evolutionary network to develop in and
 /// returning the corresponding [`Environment`].
@@ -125,7 +123,8 @@ impl EnvironmentBuilder {
             lateral_gene_transfer_chance: self.lateral_gene_transfer_chance_or_default(),
             testing_chance_sigmoid_midpoint: self.testing_chance_sigmoid_midpoint,
             testing_repetitions: self.testing_repetitions,
-            max_organism_size: self.max_organism_size
+            max_organism_size: self.max_organism_size,
+            uuid_context: Context::new(0),
         }
     }
 
@@ -310,7 +309,7 @@ impl Default for EnvironmentBuilder {
 }
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
 pub struct Environment {
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
@@ -362,6 +361,8 @@ pub struct Environment {
     ///
     /// [`Organism`]: ../population/struct.Organism.html
     max_organism_size: usize,
+    /// The context for UUID creation.
+    uuid_context: Context,
 }
 
 impl Environment {
@@ -478,7 +479,7 @@ impl Environment {
     pub fn uuid_timestamp(&self) -> Timestamp {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
             .expect("The system clock is not set correctly, so no UUIDs can be created.");
-        Timestamp::from_unix(UUID_CONTEXT, now.as_secs(), now.subsec_nanos())
+        Timestamp::from_unix(&self.uuid_context, now.as_secs(), now.subsec_nanos())
     }
 
     /// Generates a UUID based on the `Environment`.
@@ -1156,8 +1157,8 @@ impl<I> InnerGlobalEnvironment<I> {
     /// [`Resource`]: ../resource/struct.Resource.html
     fn recycle(&self) {
         &self.population.lock()
-        .expect("A thread paniced while holding the population lock.")
-        .recycle();
+            .expect("A thread paniced while holding the population lock.")
+            .recycle();
     }
 
     /// Returns the [`Resource`]s.
@@ -1165,8 +1166,8 @@ impl<I> InnerGlobalEnvironment<I> {
     /// [`Resource`]: ../resource/struct.Resource.html
     fn resources(&self) -> Resource {
         self.population.lock()
-        .expect("A thread paniced while holding the population lock.")
-        .resources()
+            .expect("A thread paniced while holding the population lock.")
+            .resources()
     }
 
     /// Load the [`Organism`] corresponding to the specified [`Individual`]

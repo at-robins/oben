@@ -565,7 +565,14 @@ impl Population {
     /// [`Individual`]: ./struct.Individual.html
     pub fn append(&mut self, individuals: Vec<Individual>) {
         for ind in individuals.into_iter() {
-            self.individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind)));
+            if let Some(ele) = self.individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind))) {
+                // Should - for some reason - a duplicate UUID arise, repatriate the resources of
+                // the removed individual.
+                let removed_resources = ele.lock()
+                    .expect("A thread paniced while holding the individual's lock.")
+                    .resources() + 1.0;
+                self.repatriate_resources(removed_resources);
+            }
         }
     }
 
