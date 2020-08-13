@@ -416,18 +416,9 @@ impl Individual {
     /// Spends the maximum amount of [`Resource`]s possible to generate offspring and returns the
     /// number of offspring generated this way.
     ///
-    /// # Parameters
-    ///
-    /// * `environment` - the [`Environment`] the `Individual` is living in
-    ///
-    /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    pub fn spend_resources_for_mating(&mut self, environment: &Environment) -> usize {
-        let mut number_of_offspring = self.resources().floor() as usize;
-        // Limits the number of offspring per generation.
-        if number_of_offspring > environment.max_offspring() {
-            number_of_offspring = environment.max_offspring();
-        }
+    pub fn spend_resources_for_mating(&mut self) -> usize {
+        let number_of_offspring = self.resources().floor() as usize;
         self.resources -= number_of_offspring as f64;
         number_of_offspring
     }
@@ -766,9 +757,11 @@ impl Population {
             if let Some(fitness) = individual.lock()
                     .expect("Another thread panicked while holding the individual lock.")
                     .fitness() {
-                let mean = fitness * 1.0;
+                // Aquire resources. The higher the fitness, the slighter the difference needed
+                // for significant resource advantage.
+                let mean = (fitness.log(0.5) * 0.9995).recip() + 1.0;
                 let mut request = Normal::new(mean, mean * 0.01)
-                    .expect("The fitness is not set between 0 and 1.")
+                    .expect("The standard deviation may not be smaller than or equal to zero.")
                     .sample(&mut rand::thread_rng());
                 // Prevent negativ resource aquirement.
                 if request < 0.0 {

@@ -58,10 +58,6 @@ pub struct EnvironmentBuilder {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     max_testing_age: Option<u32>,
-    /// The maximum offspring a [`Individual`] can produce per generation.
-    ///
-    /// [`Individual`]: ../population/struct.Individual.html
-    max_offspring: usize,
     /// The midpoint of the sigmoid determining the chance of death depending on the age of a
     /// [`Individual`].
     ///
@@ -96,7 +92,6 @@ impl EnvironmentBuilder {
             population_save_intervall: Duration::from_secs(1800),
             uuid_node: rand::random(),
             max_testing_age: None,
-            max_offspring: 10,
             death_age_sigmoid_midpoint: 3.0,
             lateral_gene_transfer_chance: None,
             testing_chance_sigmoid_midpoint: 50.0,
@@ -118,7 +113,6 @@ impl EnvironmentBuilder {
             population_save_intervall: self.population_save_intervall,
             uuid_node: self.uuid_node,
             max_testing_age: self.max_testing_age,
-            max_offspring: self.max_offspring,
             death_age_sigmoid_midpoint: self.death_age_sigmoid_midpoint,
             lateral_gene_transfer_chance: self.lateral_gene_transfer_chance_or_default(),
             testing_chance_sigmoid_midpoint: self.testing_chance_sigmoid_midpoint,
@@ -226,16 +220,6 @@ impl EnvironmentBuilder {
         self
     }
 
-    /// Sets the maximum number of offspring an individual can produce per generation as specified.
-    ///
-    /// # Parameters
-    ///
-    /// * `offspring` - the limit of offspring per generation
-    pub fn max_offspring(&mut self, offspring: usize) -> &mut Self {
-        self.max_offspring = offspring;
-        self
-    }
-
     /// Sets the midpoint of the sigmoid determining the chance of death for an individual
     /// depending on its age.
     ///
@@ -337,10 +321,6 @@ pub struct Environment {
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     max_testing_age: Option<u32>,
-    /// The maximum number of offspring a [`Individual`] can produce per generation.
-    ///
-    /// [`Individual`]: ../population/struct.Individual.html
-    max_offspring: usize,
     /// The midpoint of the sigmoid determining the chance of death depending on the age of a
     /// [`Individual`].
     ///
@@ -446,13 +426,8 @@ impl Environment {
         // Midpoint.
         let m = self.death_age_sigmoid_midpoint();
         // Steepness.
-        let s = self.testing_chance_sigmoid_midpoint() * 0.1;
+        let s = self.testing_chance_sigmoid_midpoint() * 0.3;
         a / (1.0 + ((m - (age as f64)) / s).exp())
-    }
-
-    /// Returns the maximum offspring per individual per generation.
-    pub fn max_offspring(&self) -> usize {
-        self.max_offspring
     }
 
     /// Returns the midpoint of the sigmoid determing the chance of death depending on the age
@@ -685,11 +660,16 @@ impl<I: 'static> GlobalEnvironment<I> {
                 });
             // Recycle resources.
             self.inner.recycle();
-            // Print statistics.
-            println!("Size: {} : Bytes: {} ; Fitness: {} ; Resources: {:?}",
+            // Print statistics
+            let mut res: f64 = self.inner.individuals().par_iter()
+                .map(|a| InnerGlobalEnvironment::<I>::get_accumulated_resources(a.clone()) + 1.0)
+                .sum();
+            res += self.inner.resources().total();
+            println!("Size: {} : Bytes: {} ; Fitness: {} ; Total Resources: {} ; Resources: {:?}",
                 self.inner.population_size(),
                 self.inner.population_mean_genome_size(),
                 self.inner.population_mean_fitness(),
+                res,
                 self.inner.resources());
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
@@ -950,7 +930,7 @@ impl<I> InnerGlobalEnvironment<I> {
     fn spend_resources_for_mating(&self, individual: Arc<Mutex<Individual>>) -> usize {
         individual.lock()
             .expect("A thread paniced while holding the individual's lock.")
-            .spend_resources_for_mating(&self.environment)
+            .spend_resources_for_mating()
     }
 
     /// Return the size in bytes of the specified [`Individual`].
