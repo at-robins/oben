@@ -272,6 +272,30 @@ impl Genome {
         }
     }
 
+    /// Checks if the [`Substrate`] is an input to the `Genome`.
+    ///
+    /// # Parameters
+    /// * `substrate` - the substrate to check for
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn has_input_substrate(&self, substrate: &GeneSubstrate) -> bool {
+        self.input.iter()
+            .filter_map(|potential_input| potential_input.as_ref())
+            .any(|input|  input == substrate)
+    }
+
+    /// Checks if the [`Substrate`] is an output to the `Genome`.
+    ///
+    /// # Parameters
+    /// * `substrate` - the substrate to check for
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn has_output_substrate(&self, substrate: &GeneSubstrate) -> bool {
+        self.output.iter()
+            .filter_map(|potential_output| potential_output.as_ref())
+            .any(|output|  output == substrate)
+    }
+
     /// Returns all substrates of the specified [`Gene`] combined with their [`GeneSubstrate`] pointer.
     ///
     /// # Parameters
@@ -1436,16 +1460,23 @@ impl GenomeMutation {
     /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_input_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_inputs() > 0 {
-           let mut mutated_genome = genome.duplicate();
            // It was checked before if there are any inputs, so the unwrap must work.
-           let random_input = mutated_genome.get_random_input().unwrap();
-           let random_gene = mutated_genome.get_random_gene();
-           let random_gene_substrate = mutated_genome.get_gene(random_gene).get_random_substrate();
-           mutated_genome.set_input(random_input, Some(GeneSubstrate{
+           let random_input = genome.get_random_input().unwrap();
+           let random_gene = genome.get_random_gene();
+           let random_substrate = genome.get_gene(random_gene).get_random_substrate();
+           let random_gene_substrate = GeneSubstrate{
                gene: random_gene,
-               substrate: random_gene_substrate
-           }));
-           Some(mutated_genome)
+               substrate: random_substrate
+           };
+           if !genome.has_input_substrate(&random_gene_substrate) {
+               let mut mutated_genome = genome.duplicate();
+               mutated_genome.set_input(random_input, Some(random_gene_substrate));
+               Some(mutated_genome)
+           } else {
+               // Do not allow two input substrates to be the same. This would violate the
+               // specification of an I/O-substrate.
+               None
+           }
        } else {
            None
        }
@@ -1485,16 +1516,23 @@ impl GenomeMutation {
    /// [`Substrate`]: ../protein/struct.Substrate.html
    fn mutate_output_association(genome: &Genome) -> Option<Genome> {
        if genome.number_of_outputs() > 0 {
-           let mut mutated_genome = genome.duplicate();
            // It was checked before if there are any outputs, so the unwrap must work.
-           let random_output = mutated_genome.get_random_output().unwrap();
-           let random_gene = mutated_genome.get_random_gene();
-           let random_gene_substrate = mutated_genome.get_gene(random_gene).get_random_substrate();
-           mutated_genome.set_output(random_output, Some(GeneSubstrate{
+           let random_output = genome.get_random_output().unwrap();
+           let random_gene = genome.get_random_gene();
+           let random_substrate = genome.get_gene(random_gene).get_random_substrate();
+           let random_gene_substrate = GeneSubstrate{
                gene: random_gene,
-               substrate: random_gene_substrate
-           }));
-           Some(mutated_genome)
+               substrate: random_substrate
+           };
+           if !genome.has_output_substrate(&random_gene_substrate) {
+               let mut mutated_genome = genome.duplicate();
+               mutated_genome.set_output(random_output, Some(random_gene_substrate));
+               Some(mutated_genome)
+           } else {
+               // Do not allow two output substrates to be the same. This would violate the
+               // specification of an I/O-substrate.
+               None
+           }
        } else {
            None
        }
