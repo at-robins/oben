@@ -1,11 +1,10 @@
 //! The `binary` module contains aliases and helper functions for working with binary
 //! substrate data.
 extern crate bitvec;
-extern crate rand;
 
 use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
-use rand::{Rng, thread_rng};
 use super::gene::CrossOver;
+use super::helper::{a_or_b, do_a_or_b};
 use std::cell::RefCell;
 
 /// A type alias for the underlying binary representation of [`Substrate`]s.
@@ -47,36 +46,6 @@ pub fn as_64(substrate: &BinarySubstrate) -> [u8; 8] {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 pub fn as_f64(substrate: &BinarySubstrate) -> f64 {
     f64::from_be_bytes(as_64(substrate))
-}
-
-/// Randomly returns one of the specified values.
-///
-/// # Parameters
-///
-/// * `a` - the first value
-/// * `b` - the second value
-pub fn a_or_b<T>(a: T, b: T) -> T {
-    if thread_rng().gen() {
-        a
-    } else {
-        b
-    }
-}
-
-/// Randomly calls one of the specified functions.
-///
-/// # Parameters
-///
-/// * `a` - the first function
-/// * `b` - the second function
-pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
-    F: FnOnce() -> T,
-    G: FnOnce() -> T {
-    if thread_rng().gen() {
-        a()
-    } else {
-        b()
-    }
 }
 
 impl CrossOver for BinarySubstrate {

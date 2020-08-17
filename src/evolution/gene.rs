@@ -5,21 +5,22 @@ extern crate rand;
 extern crate serde;
 extern crate rmp_serde;
 
-use super::binary::{BinarySubstrate, do_a_or_b};
-use super::chemistry::{Reaction, State};
-use super::population::Organism;
-use super::protein::{CatalyticCentre, Receptor, Substrate};
 use bitvec::{boxed::BitBox, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
-use std::num::NonZeroUsize;
+use serde::{Deserialize, Serialize};
+use super::binary::BinarySubstrate;
+use super::chemistry::{Reaction, State};
+use super::helper::do_a_or_b;
+use super::population::Organism;
+use super::protein::{CatalyticCentre, Receptor, Substrate};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::num::NonZeroUsize;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use core::cell::RefCell;
 use std::rc::Rc;
-use std::collections::{HashMap, HashSet};
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
 ///
