@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use super::binary::BinarySubstrate;
 use super::protein::{Substrate, Receptor};
 use super::gene::{CrossOver, Gene, Genome, GenomeMutation};
-use super::environment::Environment;
+use super::environment::configuration::Environment;
 use super::resource::Resource;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
