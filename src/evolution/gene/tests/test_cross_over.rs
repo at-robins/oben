@@ -10,7 +10,7 @@ fn test_vec_cross_over() {
         let b: [u8; 16] = thread_rng().gen();
         let vec_a: Vec<BinarySubstrate> = vec!(BitBox::from_slice(&a));
         let vec_b: Vec<BinarySubstrate> = vec!(BitBox::from_slice(&b));
-        let recombined = BinarySubstrate::vec_cross_over(&vec_a, &vec_b);
+        let recombined = vec_a.cross_over(&vec_b);
         for i in 0..vec_a[0].len() {
             assert!(recombined[0].get(i) == vec_a[0].get(i)
                 || recombined[0].get(i) == vec_b[0].get(i));
@@ -23,7 +23,7 @@ fn test_vec_cross_over() {
         let c: [u8; 16] = thread_rng().gen();
         let vec_a: Vec<BinarySubstrate> = vec!(BitBox::from_slice(&a));
         let vec_b: Vec<BinarySubstrate> = vec!(BitBox::from_slice(&b), BitBox::from_slice(&c));
-        let recombined = BinarySubstrate::vec_cross_over(&vec_a, &vec_b);
+        let recombined = vec_a.cross_over(&vec_b);
         for i in 0.. vec_a[0].len() {
             assert!(recombined[0].get(i) == vec_a[0].get(i)
                 || recombined[0].get(i) == vec_b[0].get(i));

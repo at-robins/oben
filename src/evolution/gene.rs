@@ -643,10 +643,10 @@ impl CrossOver for Genome {
 
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
-            let input = usize::vec_cross_over(&self.input, &other.input);
-            let output = usize::vec_cross_over(&self.output, &other.output);
-            let genes = Gene::vec_cross_over(&self.genes, &other.genes);
-            let associations = GeneAssociation::vec_cross_over(&self.associations, &other.associations);
+            let input = self.input.cross_over(&other.input);
+            let output = self.output.cross_over(&other.output);
+            let genes = self.genes.cross_over(&other.genes);
+            let associations = self.associations.cross_over(&other.associations);
             let mut recombined = Genome{input, output, genes, associations};
             // Remove invalid gene-substrate-associations.
             recombined.validate_associations();
@@ -797,7 +797,7 @@ impl CrossOver for GeneAssociation {
 
     fn cross_over(&self, other: &Self) -> Self {
             let substrate = self.substrate.cross_over(&other.substrate);
-            let associations = GeneSubstrate::vec_cross_over(&self.associations, &other.associations);
+            let associations = self.associations.cross_over(&other.associations);
             GeneAssociation{substrate, associations}
     }
 }
@@ -1002,8 +1002,8 @@ impl CrossOver for Gene {
 
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
-            let substrates = BinarySubstrate::vec_cross_over(&self.substrates, &other.substrates);
-            let receptors = GenomicReceptor::vec_cross_over(&self.receptors, &other.receptors);
+            let substrates = self.substrates.cross_over(&other.substrates);
+            let receptors = self.receptors.cross_over(&other.receptors);
             Gene{substrates, receptors}
         } else {
             // If the two genes are not similar return a random one.
@@ -1169,8 +1169,8 @@ impl CrossOver for GenomicReceptor {
 
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
-            let triggers = usize::vec_cross_over(&self.triggers, &other.triggers);
-            let  substrates = usize::vec_cross_over(&self.substrates, &other.substrates);
+            let triggers = self.triggers.cross_over(&other.triggers);
+            let  substrates = self.substrates.cross_over(&other.substrates);
             let state = self.state.clone();
             let enzyme = self.enzyme.cross_over(&other.enzyme);
             GenomicReceptor{triggers, substrates, state, enzyme}
@@ -1316,8 +1316,8 @@ impl CrossOver for GenomicCatalyticCentre {
 
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
-            let educts = usize::vec_cross_over(&self.educts, &other.educts);
-            let products = usize::vec_cross_over(&self.products, &other.products);
+            let educts = self.educts.cross_over(&other.educts);
+            let products = self.products.cross_over(&other.products);
             let reaction = self.reaction.clone();
             GenomicCatalyticCentre{educts, products, reaction}
         } else {
@@ -2217,39 +2217,6 @@ pub trait CrossOver {
     ///
     /// * `other` - a matching genetic component of the other individual
     fn cross_over(&self, other: &Self) -> Self;
-
-    /// Recombines every element of the two vectors. If one vector is longer than the other,
-    /// for each element of the longer vector it is randomly chosen if the element is adopted.
-    ///
-    /// # Parameters
-    ///
-    /// * `first` - the first vector of matching genetic components
-    /// * `second` - the second vector of matching genetic components
-    fn vec_cross_over<T>(first: &Vec<T>, second: &Vec<T>) -> Vec<T> where T: CrossOver + Clone {
-        let mut recombined_vec = Vec::new();
-        // Determine shorter and longer vector.
-        let short;
-        let long;
-        if first.len() >= second.len() {
-            short = second;
-            long = first;
-        } else {
-            short = first;
-            long = second;
-        }
-        for (index, element_long) in long.iter().enumerate() {
-            if let Some(element_short) = short.get(index) {
-                // As long as there are corresponding elements in the shorter vector,
-                // perform recombination.
-                recombined_vec.push(element_long.cross_over(element_short));
-            } else {
-                // If there are corresponding elements in the shorter vector
-                // randomly add the element from the longer vector or skip it.
-                do_a_or_b(|| (), || recombined_vec.push(element_long.clone()));
-            }
-        }
-        recombined_vec
-    }
 }
 
 // This implementation improves the usability of the `CrossOver` trait for genomic elements.
@@ -2280,6 +2247,39 @@ impl<T> CrossOver for Option<T> where T: CrossOver + Sized + Clone {
             _ => do_a_or_b(|| self.clone(), || other.clone()),
         }
 
+    }
+}
+
+// This implementation improves the usability of the `CrossOver` trait for genomic elements.
+impl<T> CrossOver for Vec<T> where T: CrossOver + Clone {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        let mut recombined_vec = Vec::new();
+        // Determine shorter and longer vector.
+        let short;
+        let long;
+        if self.len() >= other.len() {
+            short = other;
+            long = self;
+        } else {
+            short = self;
+            long = other;
+        }
+        for (index, element_long) in long.iter().enumerate() {
+            if let Some(element_short) = short.get(index) {
+                // As long as there are corresponding elements in the shorter vector,
+                // perform recombination.
+                recombined_vec.push(element_long.cross_over(element_short));
+            } else {
+                // If there are corresponding elements in the shorter vector
+                // randomly add the element from the longer vector or skip it.
+                do_a_or_b(|| (), || recombined_vec.push(element_long.clone()));
+            }
+        }
+        recombined_vec
     }
 }
 
