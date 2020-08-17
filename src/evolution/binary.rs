@@ -4,7 +4,7 @@ extern crate bitvec;
 
 use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
 use super::gene::CrossOver;
-use super::helper::{a_or_b, do_a_or_b};
+use super::helper::do_a_or_b;
 use std::cell::RefCell;
 
 /// A type alias for the underlying binary representation of [`Substrate`]s.
@@ -68,37 +68,6 @@ impl CrossOver for BinarySubstrate {
             // If the two substrates are not similar return a random one.
             do_a_or_b(|| self.clone(), || other.clone())
         }
-    }
-}
-
-// This implementation improves the usability of the `CrossOver` trait for genomic elements.
-impl CrossOver for usize {
-    fn is_similar(&self, _other: &Self) -> bool {
-        true
-    }
-
-    fn cross_over(&self, other: &Self) -> Self {
-        a_or_b(*self, *other)
-    }
-}
-
-// This implementation improves the usability of the `CrossOver` trait for genomic elements.
-impl<T> CrossOver for Option<T> where T: CrossOver + Sized + Clone {
-    fn is_similar(&self, other: &Self) -> bool {
-        match (self, other) {
-            (None, None) => true,
-            (Some(a), Some(b)) => a.is_similar(b),
-            _ => false,
-        }
-    }
-
-    fn cross_over(&self, other: &Self) -> Self {
-        match (self, other) {
-            (None, None) => None,
-            (Some(a), Some(b)) => Some(a.cross_over(b)),
-            _ => do_a_or_b(|| self.clone(), || other.clone()),
-        }
-
     }
 }
 
