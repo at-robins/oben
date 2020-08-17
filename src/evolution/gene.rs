@@ -312,7 +312,7 @@ impl Genome {
     fn translate_get_gene_substrates(&self, gene: usize) -> Vec<(GeneSubstrate, Rc<RefCell<Substrate>>)> {
         let gene_reference = &self.genes[gene];
         (0..gene_reference.number_of_substrates().get())
-            .map(|substrate| GeneSubstrate{gene, substrate})
+            .map(|substrate| GeneSubstrate::new(gene, substrate))
             .map(|gene_substrate| (gene_substrate, Rc::new(RefCell::new(Substrate::new(gene_reference.substrates[gene_substrate.substrate].clone())))))
             .collect()
     }
@@ -372,10 +372,7 @@ impl Genome {
     fn random_gene_substrate(&self) -> GeneSubstrate {
         let random_gene = self.get_random_gene();
         let random_substrate = self.get_gene(random_gene).get_random_substrate();
-        GeneSubstrate{
-            gene: random_gene,
-            substrate: random_substrate
-        }
+        GeneSubstrate::new(random_gene, random_substrate)
     }
 
     /// Adds a [`GeneAssociation`] to the `Genome` if possible and returns the index of the
@@ -616,8 +613,8 @@ impl Genome {
             gene.add_substrate(BitBox::empty());
         }
         Genome {
-            input: (0..input).map(|i| Some(GeneSubstrate{gene: 0, substrate: i})).collect(),
-            output: (input..(output+input)).map(|o| Some(GeneSubstrate{gene: 0, substrate: o})).collect(),
+            input: (0..input).map(|i| Some(GeneSubstrate::new(0, i))).collect(),
+            output: (input..(output+input)).map(|o| Some(GeneSubstrate::new(0, o))).collect(),
             genes: vec!(gene),
             associations: vec!(),
         }
@@ -665,7 +662,7 @@ impl CrossOver for Genome {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Genome`]: ./struct.Genome.html
 /// [`Substrate`]: ../protein/struct.Substrate.html
-struct GeneSubstrate {
+pub struct GeneSubstrate {
     // index of gene inside the containing genome
     gene: usize,
     // index of substrate inside the respective gene
@@ -674,6 +671,19 @@ struct GeneSubstrate {
 
 impl GeneSubstrate {
 
+    /// Creates a new 'GeneSubstrate' reference.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the referenced [`Gene`]
+    /// * `substrate` - the index of the referenced [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn new(gene: usize, substrate: usize) -> Self {
+        GeneSubstrate{gene, substrate}
+    }
+
     /// Checks wether this `GeneSubstrate` references the [`Gene`] at the specified index.
     ///
     /// # Parameters
@@ -681,7 +691,7 @@ impl GeneSubstrate {
     /// * `gene_index` - the index of the gene to check for
     ///
     /// [`Gene`]: ./struct.Gene.html
-    fn is_gene(&self, gene_index: usize) -> bool {
+    pub fn is_gene(&self, gene_index: usize) -> bool {
         self.gene == gene_index
     }
 
@@ -693,7 +703,7 @@ impl GeneSubstrate {
     /// * `substrate_index` - the index of the substrate to check for
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn _is_substrate(&self, substrate_index: usize) -> bool {
+    pub fn is_substrate(&self, substrate_index: usize) -> bool {
         self.substrate == substrate_index
     }
 
@@ -707,7 +717,7 @@ impl CrossOver for GeneSubstrate {
     fn cross_over(&self, other: &Self) -> Self {
             let gene = self.gene.cross_over(&other.gene);
             let substrate = self.substrate.cross_over(&other.substrate);
-            GeneSubstrate{gene, substrate}
+            GeneSubstrate::new(gene, substrate)
     }
 }
 
@@ -719,7 +729,7 @@ impl CrossOver for GeneSubstrate {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Genome`]: ./struct.Genome.html
 /// [`Substrate`]: ../protein/struct.Substrate.html
-struct GeneAssociation {
+pub struct GeneAssociation {
     // substrate value defined in the genome and shared between genes
     substrate: BinarySubstrate,
     // gene specific substrates pointing to the shared substrate
@@ -727,6 +737,19 @@ struct GeneAssociation {
 }
 
 impl GeneAssociation {
+
+    /// Creates a new `GeneAssociation` from the specified [`Substrate`]
+    /// with no initial associations.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrate` - the common [`Substrate`] for this association
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn new(substrate: BinarySubstrate) -> Self {
+        GeneAssociation{substrate, associations: Vec::new()}
+    }
+
     /// Remove all associations with the specified [`Gene`].
     ///
     /// # Parameters
@@ -734,7 +757,7 @@ impl GeneAssociation {
     /// * `gene` - the index of the gene to remove associations to
     ///
     /// [`Gene`]: ./struct.Gene.html
-    fn remove_associated_gene(&mut self, gene: usize) {
+    pub fn remove_associated_gene(&mut self, gene: usize) {
         self.associations.retain(|a| a.gene != gene);
     }
 
@@ -758,7 +781,7 @@ impl GeneAssociation {
     /// * `association` - the [`GeneSubstrate`] to add to the `GeneAssociation`
     ///
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    fn add_association(&mut self, association: GeneSubstrate) -> Option<usize>{
+    pub fn add_association(&mut self, association: GeneSubstrate) -> Option<usize>{
         if let Some(new_index) = self.associations.len().checked_add(1) {
             self.associations.push(association);
             Some(new_index)
@@ -1144,7 +1167,7 @@ impl GenomicReceptor {
     /// [`Gene`]: ./struct.Gene.html
     fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate>>>) {
         let substrates = self.substrates.iter()
-            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
             ).map(|strong| Rc::downgrade(strong))
@@ -1153,7 +1176,7 @@ impl GenomicReceptor {
         let state = self.state.clone();
         let receptor = Rc::new(Receptor::new(substrates, state, enzyme));
         for trigger_index in self.triggers.iter() {
-            let gene_substrate = GeneSubstrate{gene: gene_index, substrate: *trigger_index};
+            let gene_substrate = GeneSubstrate::new(gene_index, *trigger_index);
             substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
                 .borrow_mut().add_receptor(receptor.clone());
@@ -1292,13 +1315,13 @@ impl GenomicCatalyticCentre {
     /// [`Gene`]: ./struct.Gene.html
     fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate>>>) -> CatalyticCentre {
         let educts = self.educts.iter()
-            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
             ).map(|strong| Rc::downgrade(strong))
             .collect();
         let products = self.products.iter()
-            .map(|substrate_index| GeneSubstrate{gene: gene_index, substrate: *substrate_index})
+            .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
             .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
             ).map(|strong| Rc::downgrade(strong))
@@ -1467,10 +1490,7 @@ impl GenomeMutation {
            let random_input = genome.get_random_input().unwrap();
            let random_gene = genome.get_random_gene();
            let random_substrate = genome.get_gene(random_gene).get_random_substrate();
-           let random_gene_substrate = GeneSubstrate{
-               gene: random_gene,
-               substrate: random_substrate
-           };
+           let random_gene_substrate = GeneSubstrate::new(random_gene, random_substrate);
            if !genome.has_input_substrate(&random_gene_substrate) {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.set_input(random_input, Some(random_gene_substrate));
@@ -1523,10 +1543,7 @@ impl GenomeMutation {
            let random_output = genome.get_random_output().unwrap();
            let random_gene = genome.get_random_gene();
            let random_substrate = genome.get_gene(random_gene).get_random_substrate();
-           let random_gene_substrate = GeneSubstrate{
-               gene: random_gene,
-               substrate: random_substrate
-           };
+           let random_gene_substrate = GeneSubstrate::new(random_gene, random_substrate);
            if !genome.has_output_substrate(&random_gene_substrate) {
                let mut mutated_genome = genome.duplicate();
                mutated_genome.set_output(random_output, Some(random_gene_substrate));
@@ -1777,10 +1794,10 @@ impl GenomeMutation {
        let random_gene_index = genome.get_random_gene();
        if genome.get_gene(random_gene_index).number_of_substrates().get() > 1 {
            let mut mutated_genome = genome.duplicate();
-           let removed_substrate = GeneSubstrate{
-               gene: random_gene_index,
-               substrate: mutated_genome.genes[random_gene_index].get_random_substrate(),
-           };
+           let removed_substrate = GeneSubstrate::new(
+               random_gene_index,
+               mutated_genome.genes[random_gene_index].get_random_substrate()
+           );
            mutated_genome.genes[removed_substrate.gene].remove_substrate(removed_substrate.substrate);
            mutated_genome.adjust_input_after_gene_substrate_removal(removed_substrate);
            mutated_genome.adjust_output_after_gene_substrate_removal(removed_substrate);
