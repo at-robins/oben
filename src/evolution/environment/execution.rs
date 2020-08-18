@@ -16,15 +16,15 @@ use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use rand::{thread_rng, Rng};
 
-/// A `GlobalEnvironment` containing a [`Population`] and applying selective pressure.
+/// An `EcologicalNiche` containing a [`Population`] and applying selective pressure.
 ///
 /// [`Population`]: ../population/struct.Population.html
-pub struct GlobalEnvironment<I> {
-    inner: Arc<InnerGlobalEnvironment<I>>,
+pub struct EcologicalNiche<I> {
+    inner: Arc<InnerEcologicalNiche<I>>,
 }
 
-impl<I: 'static> GlobalEnvironment<I> {
-    /// Creates a new `GlobalEnvironment` executing the evolutionary network by repeated
+impl<I: 'static> EcologicalNiche<I> {
+    /// Creates a new `EcologicalNiche` executing the evolutionary network by repeated
     /// mutagenesis, fitness evaluation and growth of a [`Population`].
     ///
     /// # Parameters
@@ -42,8 +42,8 @@ impl<I: 'static> GlobalEnvironment<I> {
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I)  + Send + Sync + 'static>,
         fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>) -> Self {
-        GlobalEnvironment {
-            inner: Arc::new(InnerGlobalEnvironment {
+        EcologicalNiche {
+            inner: Arc::new(InnerEcologicalNiche {
                 environment: Arc::new(environment),
                 population: Arc::new(Mutex::new(population)),
                 supplier_function,
@@ -107,7 +107,7 @@ impl<I: 'static> GlobalEnvironment<I> {
             self.inner.recycle();
             // Print statistics
             let mut res: f64 = self.inner.individuals().par_iter()
-                .map(|a| InnerGlobalEnvironment::<I>::get_accumulated_resources(a.clone()) + 1.0)
+                .map(|a| InnerEcologicalNiche::<I>::get_accumulated_resources(a.clone()) + 1.0)
                 .sum();
             res += self.inner.resources().total();
             println!("Size: {} : Bytes: {} ; Fitness: {} ; Total Resources: {} ; Resources: {:?}",
@@ -143,7 +143,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn spawn_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) {
+    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
@@ -162,7 +162,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
-    fn mate_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) {
+    fn mate_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) {
         let offspring = Self::get_offspring(individual.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
@@ -178,7 +178,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn test_organism(inner: Arc<InnerGlobalEnvironment<I>>, individual: Arc<Mutex<Individual>>) -> f64 {
+    fn test_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) -> f64 {
         let organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
@@ -235,7 +235,7 @@ impl<I: 'static> GlobalEnvironment<I> {
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerGlobalEnvironment<I>>) -> Vec<Individual> {
+    fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerEcologicalNiche<I>>) -> Vec<Individual> {
         let mut offspring = Vec::new();
         // Use the accumulated resources to produce offspring.
         let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
@@ -249,14 +249,14 @@ impl<I: 'static> GlobalEnvironment<I> {
     }
 }
 
-struct InnerGlobalEnvironment<I> {
+struct InnerEcologicalNiche<I> {
     environment: Arc<Environment>,
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I) + Send + Sync + 'static>,
     fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>,
 }
 
-impl<I> InnerGlobalEnvironment<I> {
+impl<I> InnerEcologicalNiche<I> {
     /// Checks if the specified [`Individual`] died of age.
     ///
     /// # Parameters
