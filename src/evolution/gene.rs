@@ -250,23 +250,6 @@ impl Genome {
         self.get_gene(self.get_random_gene()).duplicate()
     }
 
-    /// Duplicates the [`Gene`] at the specified index and adds it directly to the genome
-    /// if possible.
-    /// This function will fail if the underlying vector would overflow due to the duplication.
-    ///
-    /// # Parameters
-    ///
-    /// * `gene` - the index of the gene to duplicate
-    ///
-    /// # Panics
-    ///
-    /// If the index is out of bounds.
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    pub fn duplicate_gene_internal(&mut self, gene: usize) -> Option<usize> {
-        self.add_gene(self.genes[gene].duplicate())
-    }
-
     /// Returns the [`Gene`] at the specified index.
     ///
     /// # Parameters
@@ -1508,8 +1491,7 @@ impl GenomeMutation {
     /// [`Genome`]: ./struct.Genome.html
     fn mutate_gene_duplication(genome: &Genome) -> Option<Genome> {
         let mut mutated_genome = genome.duplicate();
-        mutated_genome.duplicate_gene_internal(mutated_genome.get_random_gene());
-        Some(mutated_genome)
+        mutated_genome.add_gene(mutated_genome.duplicate_random_gene()).and_then(|_| Some(mutated_genome))
     }
 
     /// Duplicates the [`Genome`] and then associates a random input [`GeneSubstrate`] of the [`Genome`]
