@@ -3,6 +3,7 @@
 extern crate bitvec;
 
 use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
+use super::chemistry::Information;
 use super::gene::CrossOver;
 use super::helper::do_a_or_b;
 use std::cell::RefCell;
@@ -69,6 +70,10 @@ impl CrossOver for BinarySubstrate {
             do_a_or_b(|| self.clone(), || other.clone())
         }
     }
+}
+
+impl Information for BinarySubstrate {
+
 }
 
 #[cfg(test)]

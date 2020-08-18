@@ -9,7 +9,7 @@ use bitvec::{boxed::BitBox, vec::BitVec};
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use super::binary::BinarySubstrate;
-use super::chemistry::{Reaction, State};
+use super::chemistry::{Information, Reaction, State};
 use super::helper::{a_or_b, do_a_or_b};
 use super::population::Organism;
 use super::protein::{CatalyticCentre, Receptor, Substrate};
@@ -35,12 +35,12 @@ const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 1;
 /// A `Genome` is required to consist of 1 or more genes.
 ///
 /// [`Gene`]: ./struct.Gene.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Genome {
     input: Vec<Option<GeneSubstrate>>,
     output: Vec<Option<GeneSubstrate>>,
     genes: Vec<Gene>,
-    associations: Vec<GeneAssociation>,
+    associations: Vec<GeneAssociation<BinarySubstrate>>,
 }
 
 impl Genome {
@@ -721,7 +721,7 @@ impl CrossOver for GeneSubstrate {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// A `GeneAssociation` is a [`Substrate`] defined on [`Genome`] level that replaces [`Gene`] specific
 /// [`Substrate`]s upon translation. This process is used to interconnect different [`Gene`]s on a
 /// [`Genome`] level.
@@ -729,14 +729,14 @@ impl CrossOver for GeneSubstrate {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Genome`]: ./struct.Genome.html
 /// [`Substrate`]: ../protein/struct.Substrate.html
-pub struct GeneAssociation {
+pub struct GeneAssociation<T> where T: Information {
     // substrate value defined in the genome and shared between genes
-    substrate: BinarySubstrate,
+    substrate: T,
     // gene specific substrates pointing to the shared substrate
     associations: Vec<GeneSubstrate>,
 }
 
-impl GeneAssociation {
+impl<T> GeneAssociation<T> where T: Information {
 
     /// Creates a new `GeneAssociation` from the specified [`Substrate`]
     /// with no initial associations.
@@ -746,7 +746,7 @@ impl GeneAssociation {
     /// * `substrate` - the common [`Substrate`] for this association
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn new(substrate: BinarySubstrate) -> Self {
+    pub fn new(substrate: T) -> Self {
         GeneAssociation{substrate, associations: Vec::new()}
     }
 
@@ -813,7 +813,7 @@ impl GeneAssociation {
     }
 }
 
-impl CrossOver for GeneAssociation {
+impl<T> CrossOver for GeneAssociation<T> where T: Information {
     fn is_similar(&self, other: &Self) -> bool {
         self.substrate.is_similar(&other.substrate) && self.associations.len() == other.associations.len()
     }
@@ -830,7 +830,7 @@ impl CrossOver for GeneAssociation {
 /// A `Gene` is required to encode at least 1 [`Substrate`].
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Gene {
     substrates: Vec<BinarySubstrate>,
     receptors: Vec<GenomicReceptor>,
@@ -1043,7 +1043,7 @@ impl CrossOver for Gene {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Substrate`]: ./struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GenomicReceptor {
     triggers: Vec<usize>,
     substrates: Vec<usize>,
@@ -1211,7 +1211,7 @@ impl CrossOver for GenomicReceptor {
 /// [`Gene`]: ./struct.Gene.html
 /// [`Substrate`]: ../protein/struct.Substrate.html
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GenomicCatalyticCentre {
     educts: Vec<usize>,
     products: Vec<usize>,

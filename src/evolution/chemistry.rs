@@ -5,9 +5,16 @@ extern crate rand;
 extern crate serde;
 
 use super::binary::BinarySubstrate;
+use super::gene::CrossOver;
 use bitvec::vec::BitVec;
 use rand::{distributions::{Distribution, Standard}, Rng};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+
+/// An `Information` is a generic recombinable piece of data containing any informative value.
+pub trait Information: Clone + Debug + PartialEq + CrossOver {
+
+}
 
 /// A `State` is an elementary operation for comparing binary substrates.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
