@@ -87,6 +87,26 @@ impl Genome {
         self.associations.len()
     }
 
+    /// Returns the input at the specified index if any.
+    pub fn input(&self, input_index: usize) -> Option<Option<GeneSubstrate>> {
+        self.input.get(input_index).and_then(|inner| Some(*inner))
+    }
+
+    /// Returns the output at the specified index if any.
+    pub fn output(&self, output_index: usize) -> Option<Option<GeneSubstrate>> {
+        self.output.get(output_index).and_then(|inner| Some(*inner))
+    }
+
+    /// Returns the association at the specified index if any.
+    pub fn association(&self, association_index: usize) -> Option<&GeneAssociation<BinarySubstrate>> {
+        self.associations.get(association_index)
+    }
+
+    /// Returns the association at the specified index as mutable if any.
+    pub fn association_mut(&mut self, association_index: usize) -> Option<&mut GeneAssociation<BinarySubstrate>> {
+        self.associations.get_mut(association_index)
+    }
+
     /// Sets the input association at the specified index to the specified value
     /// and returns the previous value.
     ///
@@ -132,17 +152,27 @@ impl Genome {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_output_values(&self) -> Vec<Option<BinarySubstrate>> {
         self.output.iter()
-            .map(|substrate| substrate.and_then(|a| self.get_substrate(a)))
+            .map(|substrate| substrate
+                .and_then(|a| self.get_substrate(a))
+                .and_then(|inner| Some(inner.clone()))
+            )
             .collect()
     }
 
     /// Returns the specified [`Substrate`] if contained within the `Genome`.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_substrate(&self, substrate: GeneSubstrate) -> Option<BinarySubstrate> {
+    pub fn get_substrate(&self, substrate: GeneSubstrate) -> Option<&BinarySubstrate> {
         self.genes.get(substrate.gene)
-            .and_then(|gene| gene.substrates.get(substrate.substrate)
-            .and_then(|inner| Some(inner.clone())))
+            .and_then(|gene| gene.substrates.get(substrate.substrate))
+    }
+
+    /// Returns the specified [`Substrate`] as mutable if contained within the `Genome`.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn get_substrate_mut(&mut self, substrate: GeneSubstrate) -> Option<&mut BinarySubstrate> {
+        self.genes.get_mut(substrate.gene)
+            .and_then(|gene| gene.substrates.get_mut(substrate.substrate))
     }
 
     /// Adds a [`Gene`] to the `Genome` if possible and returns the index of the
@@ -158,6 +188,24 @@ impl Genome {
         if let Some(new_index) = self.genes.len().checked_add(1) {
             self.genes.push(gene);
             Some(new_index)
+        } else {
+            None
+        }
+    }
+
+    /// Adds a substrate to a [`Gene`] if possible and returns a reference to the
+    /// new substrate.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the [`Gene`] to add to the substrate to
+    /// * `substrate` - the substrate to add
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn add_substrate_to_gene(&mut self, gene: usize, substrate: BinarySubstrate) -> Option<GeneSubstrate> {
+        if self.number_of_genes().get() > gene {
+            self.genes[gene].add_substrate(substrate)
+                .and_then(|sub_index| Some(GeneSubstrate::new(gene, sub_index)))
         } else {
             None
         }
@@ -263,6 +311,21 @@ impl Genome {
     /// [`Gene`]: ./struct.Gene.html
     pub fn get_gene(&self, gene: usize) -> &Gene {
         &self.genes[gene]
+    }
+
+    /// Returns the [`Gene`] at the specified index as mutable.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene` - the index of the gene to duplicate
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn get_gene_mut(&mut self, gene: usize) -> &mut Gene {
+        &mut self.genes[gene]
     }
 
     /// Checks if the [`Substrate`] is present in the `Genome`.
@@ -769,6 +832,21 @@ impl<T> GeneAssociation<T> where T: Information {
         GeneAssociation{substrate, associations: Vec::new()}
     }
 
+    /// Returns the substrate of this association.
+    pub fn substrate(&self) -> &T {
+        &self.substrate
+    }
+
+    /// Returns the substrate of this association.
+    pub fn substrate_mut(&mut self) -> &mut T {
+        &mut self.substrate
+    }
+
+    /// Returns the number of substrates this association references.
+    pub fn number_of_associated_substrates(&self) -> usize {
+        self.associations.len()
+    }
+
     /// Remove all associations with the specified [`Gene`].
     ///
     /// # Parameters
@@ -800,13 +878,28 @@ impl<T> GeneAssociation<T> where T: Information {
     /// * `association` - the [`GeneSubstrate`] to add to the `GeneAssociation`
     ///
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    pub fn add_association(&mut self, association: GeneSubstrate) -> Option<usize>{
+    pub fn add_association(&mut self, association: GeneSubstrate) -> Option<usize> {
         if let Some(new_index) = self.associations.len().checked_add(1) {
             self.associations.push(association);
             Some(new_index)
         } else {
             None
         }
+    }
+
+    /// Removes a [`GeneSubstrate`] from the `GeneAssociation` and returns it.
+    ///
+    /// # Parameters
+    ///
+    /// * `association_index` - the [`GeneSubstrate`]s index
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    pub fn remove_association(&mut self, association_index: usize) -> GeneSubstrate {
+        self.associations.remove(association_index)
     }
 
     /// Adjust the [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
@@ -916,7 +1009,7 @@ impl Gene {
     /// * `receptor` - the [`Substrate`] to add to the `Gene`
     ///
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-    pub fn add_receptor(&mut self, receptor: GenomicReceptor) -> Option<usize>{
+    pub fn add_receptor(&mut self, receptor: GenomicReceptor) -> Option<usize> {
         if let Some(new_index) = self.receptors.len().checked_add(1) {
             self.receptors.push(receptor);
             Some(new_index)
@@ -925,12 +1018,44 @@ impl Gene {
         }
     }
 
-    /// Removes the binary [`Substrate`]a the specified index from the `Gene` if possible and
+    /// Removes the receptor at the specified index from the `Gene` if possible and
+    /// returns the removed receptor.
+    ///
+    /// # Parameters
+    ///
+    /// * `receptor_index` - the receptor's index to remove from the `Gene`
+    ///
+    /// # Panics
+    ///
+    /// If the specified receptor's index is out of bounds.
+    pub fn remove_receptor(&mut self, receptor_index: usize) -> GenomicReceptor {
+        self.receptors.remove(receptor_index)
+    }
+
+    /// Returns the receptor at the specified index if possible.
+    ///
+    /// # Parameters
+    ///
+    /// * `receptor_index` - the receptor's index
+    pub fn receptor(&self, receptor_index: usize) -> Option<&GenomicReceptor> {
+        self.receptors.get(receptor_index)
+    }
+
+    /// Returns the receptor at the specified index if possible as mutable.
+    ///
+    /// # Parameters
+    ///
+    /// * `receptor_index` - the receptor's index
+    pub fn receptor_mut(&mut self, receptor_index: usize) -> Option<&mut GenomicReceptor> {
+        self.receptors.get_mut(receptor_index)
+    }
+
+    /// Removes the binary [`Substrate`] at the specified index from the `Gene` if possible and
     /// returns the removed [`Substrate`].
     ///
     /// # Parameters
     ///
-    /// * `substrate_index` - the [`Substrate`]'s index to remove to the `Gene`
+    /// * `substrate_index` - the [`Substrate`]'s index to remove from the `Gene`
     ///
     /// # Panics
     ///
@@ -1064,6 +1189,8 @@ impl CrossOver for Gene {
 /// [`Reaction`]: ../chemistry/struct.Reaction.html
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GenomicReceptor {
+    // TODO: Triggers should be a set, as it does not make any sense,
+    /// that a substrate can trigger a reaction twice.
     triggers: Vec<usize>,
     substrates: Vec<usize>,
     state: State,
@@ -1114,6 +1241,110 @@ impl GenomicReceptor {
         } else {
             None
         }
+    }
+
+    /// Replaces the [`State`] of this `GenomicReceptor`.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - the [`State`] to check for
+    /// * `substrates` - the [`Substrate`] indices in the respective containing [`Gene`]
+    /// the encoded [`State`] should check
+    ///
+    /// # Panics
+    ///
+    /// If the number of [`Substrate`]s is not exactly equal to the one
+    /// required by the [`State`].
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`State`]: ../chemistry/struct.State.html
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn replace_state(&mut self, state: State, substrates: Vec<usize>) {
+        assert_eq!(substrates.len(), state.get_substrate_number(),
+            "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
+            state, state.get_substrate_number(), substrates.len());
+        self.state = state;
+        self.substrates = substrates;
+    }
+
+    /// Replaces the [`Substrate`]s of this `GenomicReceptor`.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrates` - the [`Substrate`] indices in the respective containing [`Gene`]
+    /// the encoded [`State`] should check
+    ///
+    /// # Panics
+    ///
+    /// If the number of [`Substrate`]s is not exactly equal to the one
+    /// required by the [`State`].
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    /// [`State`]: ../chemistry/struct.State.html
+    /// [`Gene`]: ./struct.Gene.html
+    pub fn replace_substrates(&mut self, substrates: Vec<usize>) {
+        assert_eq!(substrates.len(), self.state.get_substrate_number(),
+            "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
+            self.state, self.state.get_substrate_number(), substrates.len());
+        self.substrates = substrates;
+    }
+
+    /// Replaces the [`Substrate`] at the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` - the index of the [`Substrate`] reference to replace
+    /// * `substrate` - the new [`Substrate`] reference value
+    ///
+    /// # Panics
+    ///
+    /// If the `index` is out of bounds.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn replace_substrate(&mut self, index:usize, substrate: usize) {
+        self.substrates[index] = substrate;
+    }
+
+    /// Replaces the [`GenomicCatalyticCentre`].
+    ///
+    /// # Parameters
+    ///
+    /// * `enzyme` - the [`GenomicCatalyticCentre`] to trigger if the [`State`] is appropriate
+    ///
+    /// [`State`]: ../chemistry/struct.State.html
+    /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
+    pub fn replace_enzyme(&mut self, enzyme: GenomicCatalyticCentre) {
+        self.enzyme = enzyme;
+    }
+
+    /// Returns the [`GenomicCatalyticCentre`].
+    ///
+    /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
+    pub fn enzyme(&self) -> &GenomicCatalyticCentre {
+        &self.enzyme
+    }
+
+    /// Returns the [`GenomicCatalyticCentre`] as mutable.
+    ///
+    /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
+    pub fn enzyme_mut(&mut self) -> &mut GenomicCatalyticCentre {
+        &mut self.enzyme
+    }
+
+    /// Removes a triggering [`Substrate`] from this `GenomicReceptor` and returns the
+    /// removed [`Substrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * `trigger` - the index of the triggering [`Substrate`] to remove from the `GenomicReceptor`
+    ///
+    /// # Panics
+    ///
+    /// If the index is out of bounds.
+    ///
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn remove_trigger(&mut self, trigger: usize) -> usize {
+        self.triggers.remove(trigger)
     }
 
     /// Returns the index of a random triggering [`Substrate`] of this `GenomicReceptor`
@@ -1297,7 +1528,7 @@ impl GenomicCatalyticCentre {
     /// if there are any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn get_random_educt(&self) -> Option<usize> {
+    pub fn get_random_educt(&self) -> Option<usize> {
         if self.educts.len() > 0 {
             Some(thread_rng().gen_range(0, self.educts.len()))
         } else {
@@ -1309,12 +1540,40 @@ impl GenomicCatalyticCentre {
     /// if there are any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn get_random_product(&self) -> Option<usize> {
+    pub fn get_random_product(&self) -> Option<usize> {
         if self.products.len() > 0 {
             Some(thread_rng().gen_range(0, self.products.len()))
         } else {
             None
         }
+    }
+
+    /// Replaces a single educt.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` - the index of the educt to replace
+    /// * `educt` - the new educt reference
+    ///
+    /// # Panics
+    ///
+    /// If the `index` is out of bounds.
+    pub fn replace_educt(&mut self, index: usize, educt: usize) {
+        self.educts[index] = educt;
+    }
+
+    /// Replaces a single product.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` - the index of the educt to replace
+    /// * `product` - the new product reference
+    ///
+    /// # Panics
+    ///
+    /// If the `index` is out of bounds.
+    pub fn replace_product(&mut self, index: usize, product: usize) {
+        self.products[index] = product;
     }
 
     /// Translates the `GenomicCatalyticCentre` into a [`CatalyticCentre`].
