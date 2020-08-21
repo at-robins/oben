@@ -76,5 +76,6 @@ impl Information for BinarySubstrate {
 
 }
 
+mod binary_mutation;
 #[cfg(test)]
 mod tests;

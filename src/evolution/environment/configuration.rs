@@ -3,8 +3,10 @@
 extern crate rand;
 
 use rand::{thread_rng, Rng};
+use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use super::super::gene::{Genome, GenomeMutation};
 use super::super::resource::Resource;
 use uuid::{Uuid, v1::Context, v1::Timestamp};
 
@@ -96,8 +98,9 @@ impl EnvironmentBuilder {
     /// Build an [`Environment`] to specify run time properties of an evolutionary network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    pub fn build(&self) -> Environment {
+    pub fn build<M>(&self) -> Environment<M> where M: GenomeMutation {
         Environment {
+            phantom: PhantomData,
             working_directory: self.working_directory.clone(),
             mutation_rate: self.mutation_rate_or_default(),
             population_size: self.population_size,
@@ -287,7 +290,8 @@ impl Default for EnvironmentBuilder {
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
 #[derive(Debug)]
-pub struct Environment {
+pub struct Environment<M> where M: GenomeMutation {
+    phantom: PhantomData<M>,
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
     mutation_rate: f64,
@@ -338,7 +342,7 @@ pub struct Environment {
     uuid_context: Context,
 }
 
-impl Environment {
+impl<M> Environment<M> where M: GenomeMutation {
     /// Returns the path to the working directory.
     pub fn working_directory(&self) -> &Path {
         Path::new(&self.working_directory)
@@ -550,16 +554,37 @@ impl Environment {
             panic!("The folder {:?} could not be created: {}", folder_path, err);
         }
     }
-}
 
-impl Default for Environment {
-    fn default() -> Self {
-        EnvironmentBuilder::new().build()
-    }
-}
-
-impl<E> From<E> for Environment where E: AsRef<EnvironmentBuilder>{
-    fn from(builder: E) -> Self {
-        builder.as_ref().build()
-    }
+    /// Mutates the specified [`Genome`] the specified amount of times. If any of the mutations
+    /// was not successful `None` is returned.
+    ///
+    /// # Parameters
+    ///
+    /// * `number_of_mutations` - the number of times the genome should be mutated
+    /// * `genome` - the [`Genome`] to mutate
+    ///
+    /// [`Genome`]: ../gene/struct.Genome.html
+     pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome) -> Option<Genome> {
+        if number_of_mutations == 0 {
+            Some(genome.duplicate())
+        } else {
+            let mut mutated_genome = None;
+            for i in 0..number_of_mutations {
+                if i == 0 {
+                    // If this is the first mutation, mutate the original genome.
+                    mutated_genome = M::random().mutate(genome);
+                } else if mutated_genome.is_some() {
+                    // If this is not the first mutation and the previous mutation was
+                    // successful, continue mutating.
+                    // Unwrapping must succeed as it was checked beforehand.
+                    mutated_genome = M::random().mutate(&mutated_genome.unwrap());
+                } else {
+                    // If this is not the first mutation and the previous mutation was not
+                    // successful, stop mutating.
+                    break;
+                }
+            }
+            mutated_genome
+        }
+     }
 }

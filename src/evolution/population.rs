@@ -59,7 +59,8 @@ impl Organism {
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Receptor`]: ../protein/struct.Receptor.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn live(&self, environment: &Environment) -> Duration {
+    pub fn live<M>(&self, environment: &Environment<M>) -> Duration
+        where M: GenomeMutation {
         let birth = Instant::now();
         let mut actions = VecDeque::<Rc<Receptor>>::new();
         // Add all receptors detecting changes to the input.
@@ -385,14 +386,15 @@ impl Individual {
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mate_and_mutate(&self, partner: Genome, environment: &Environment) -> Individual {
+    pub fn mate_and_mutate<M> (&self, partner: Genome, environment: &Environment<M>) -> Individual
+        where M: GenomeMutation {
         let offspring_genome = self.mate(partner);
         let random_chance: f64 = rand::thread_rng().gen_range(0.0, 1.0);
         // Calculate the number of mutations corresponding to the generated uniform random percentage.
         //    P("n mutations in a single genome") = "mutation rate" ^ n
         // => n = log(base: "mutation rate", value: P)
         let number_of_mutations = random_chance.log(environment.mutation_rate()).floor() as usize;
-        if let Some(mutated_offspring_genome) = GenomeMutation::mutate_n_times(number_of_mutations, &offspring_genome) {
+        if let Some(mutated_offspring_genome) = Environment::<M>::mutate_n_times(number_of_mutations, &offspring_genome) {
             // If the mutation was successful, return the mutated individual.
             Individual::new(environment.generate_uuid(), mutated_offspring_genome)
         } else {
@@ -491,7 +493,7 @@ pub struct Population {
     resources: Resource,
 }
 
-impl Population {
+impl Population{
     /// Creates a new `Population` from the specified individuals.
     ///
     /// # Parameters

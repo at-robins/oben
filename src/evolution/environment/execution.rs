@@ -1,29 +1,31 @@
 //! The `execution` module contains the executive setup of the evolutionary network.
 
 extern crate bitvec;
-extern crate rayon;
 extern crate rand;
+extern crate rayon;
 
-use super::super::binary::BinarySubstrate;
+use rand::{thread_rng, Rng};
+use rayon::prelude::*;
+use std::marker::PhantomData;
 use std::path::Path;
-use uuid::Uuid;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+use super::super::binary::BinarySubstrate;
 use super::configuration::Environment;
-use super::super::gene::Genome;
+use super::super::gene::{Genome, GenomeMutation};
 use super::super::population::{Individual, Population, Organism, OrganismInformation};
 use super::super::resource::Resource;
-use std::time::Instant;
-use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
-use rand::{thread_rng, Rng};
+use uuid::Uuid;
 
 /// An `EcologicalNiche` containing a [`Population`] and applying selective pressure.
 ///
 /// [`Population`]: ../population/struct.Population.html
-pub struct EcologicalNiche<I> {
-    inner: Arc<InnerEcologicalNiche<I>>,
+pub struct EcologicalNiche<I, M: GenomeMutation> {
+    inner: Arc<InnerEcologicalNiche<I, M>>,
+    phantom: PhantomData<M>,
 }
 
-impl<I: 'static> EcologicalNiche<I> {
+impl<I: 'static, M: GenomeMutation> EcologicalNiche<I, M> {
     /// Creates a new `EcologicalNiche` executing the evolutionary network by repeated
     /// mutagenesis, fitness evaluation and growth of a [`Population`].
     ///
@@ -38,7 +40,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// [`Environment`]: ./struct.Environment.html
     /// [`Population`]: ../population/struct.Population.html
     pub fn new(
-        environment: Environment,
+        environment: Environment<M>,
         population: Population,
         supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I)  + Send + Sync + 'static>,
         fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>) -> Self {
@@ -48,7 +50,9 @@ impl<I: 'static> EcologicalNiche<I> {
                 population: Arc::new(Mutex::new(population)),
                 supplier_function,
                 fitness_function,
-            })
+                phantom: PhantomData,
+            }),
+            phantom: PhantomData,
         }
     }
 
@@ -60,7 +64,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// Returns the [`Environment`] of the network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    fn environment(&self) -> Arc<Environment> {
+    fn environment(&self) -> Arc<Environment<M>> {
         self.inner.environment.clone()
     }
 
@@ -107,7 +111,7 @@ impl<I: 'static> EcologicalNiche<I> {
             self.inner.recycle();
             // Print statistics
             let mut res: f64 = self.inner.individuals().par_iter()
-                .map(|a| InnerEcologicalNiche::<I>::get_accumulated_resources(a.clone()) + 1.0)
+                .map(|a| InnerEcologicalNiche::<I, M>::get_accumulated_resources(a.clone()) + 1.0)
                 .sum();
             res += self.inner.resources().total();
             println!("Size: {} : Bytes: {} ; Fitness: {} ; Total Resources: {} ; Resources: {:?}",
@@ -143,7 +147,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) {
+    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I, M>>, individual: Arc<Mutex<Individual>>) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
@@ -162,7 +166,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
-    fn mate_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) {
+    fn mate_organism(inner: Arc<InnerEcologicalNiche<I, M>>, individual: Arc<Mutex<Individual>>) {
         let offspring = Self::get_offspring(individual.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
@@ -178,7 +182,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn test_organism(inner: Arc<InnerEcologicalNiche<I>>, individual: Arc<Mutex<Individual>>) -> f64 {
+    fn test_organism(inner: Arc<InnerEcologicalNiche<I, M>>, individual: Arc<Mutex<Individual>>) -> f64 {
         let organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
@@ -235,7 +239,7 @@ impl<I: 'static> EcologicalNiche<I> {
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerEcologicalNiche<I>>) -> Vec<Individual> {
+    fn get_offspring(individual: Arc<Mutex<Individual>>, inner: Arc<InnerEcologicalNiche<I, M>>) -> Vec<Individual> {
         let mut offspring = Vec::new();
         // Use the accumulated resources to produce offspring.
         let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
@@ -249,14 +253,15 @@ impl<I: 'static> EcologicalNiche<I> {
     }
 }
 
-struct InnerEcologicalNiche<I> {
-    environment: Arc<Environment>,
+struct InnerEcologicalNiche<I, M> where M: GenomeMutation {
+    environment: Arc<Environment<M>>,
     population: Arc<Mutex<Population>>,
     supplier_function: Box<dyn Fn() -> (Vec<BinarySubstrate>, I) + Send + Sync + 'static>,
     fitness_function: Box<dyn Fn(Vec<OrganismInformation<I>>) -> f64 + Send + Sync + 'static>,
+    phantom: PhantomData<M>,
 }
 
-impl<I> InnerEcologicalNiche<I> {
+impl<I, M> InnerEcologicalNiche<I, M> where M: GenomeMutation {
     /// Checks if the specified [`Individual`] died of age.
     ///
     /// # Parameters
