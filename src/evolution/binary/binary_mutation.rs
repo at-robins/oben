@@ -5,7 +5,7 @@ extern crate rand;
 
 use bitvec::vec::BitVec;
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
-use super::super::gene::{Gene, GeneAssociation, Genome};
+use super::super::gene::{Gene, GeneAssociation, Genome, GenomeMutation};
 use super::super::binary::BinarySubstrate;
 use super::super::chemistry::State;
 
@@ -19,7 +19,7 @@ const RANDOM_SUBSTRATE_MIN_LENGTH: usize = 0;
 const RANDOM_SUBSTRATE_MAX_LENGTH: usize = 1;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
-/// All mutations that can be used to randomly modify a  [`Genome`].
+/// All mutations that can be used to randomly modify a binary [`Genome`].
 ///
 /// [`Genome`]: ./struct.Genome.html
 pub enum BinaryMutation {
@@ -87,53 +87,6 @@ pub enum BinaryMutation {
 }
 
 impl BinaryMutation {
-    /// Generates a mutated version of the specified [`Genome`] based on the kind of
-    /// `BinaryMutation`.
-    ///
-    /// This will fail if the mutated [`Genome`] would be identical to the input or if the
-    /// mutation is impossible for the specified [`Genome`].
-    ///
-    /// # Parameters
-    ///
-    /// `genome` - the base [`Genome`] to generate a mutated version of
-    ///
-    /// [`Genome`]: ./struct.Genome.html
-    pub fn mutate(&self, genome: &Genome) -> Option<Genome> {
-        match self {
-            BinaryMutation::InputAssociation => BinaryMutation::mutate_input_association(genome),
-            BinaryMutation::InputDissociation => BinaryMutation::mutate_input_dissociation(genome),
-            BinaryMutation::OutputAssociation => BinaryMutation::mutate_output_association(genome),
-            BinaryMutation::OutputDissociation => BinaryMutation::mutate_output_dissociation(genome),
-            BinaryMutation::GeneFusion => BinaryMutation::mutate_gene_fusion(genome),
-            BinaryMutation::GeneDeletion => BinaryMutation::mutate_gene_deletion(genome),
-            BinaryMutation::GeneDuplication => BinaryMutation::mutate_gene_duplication(genome),
-            BinaryMutation::AssociationInsertion => BinaryMutation::mutate_association_insertion(genome),
-            BinaryMutation::AssociationDeletion => BinaryMutation::mutate_association_deletion(genome),
-            BinaryMutation::AssociationMutationSubstrate => BinaryMutation::mutate_association_substrate(genome),
-            BinaryMutation::AssociationMutationSubstrateMutationFlip => BinaryMutation::mutate_association_substrate_mutation_flip(genome),
-            BinaryMutation::AssociationMutationSubstrateMutationInsertion => BinaryMutation::mutate_association_substrate_mutation_insertion(genome),
-            BinaryMutation::AssociationMutationSubstrateMutationDeletion => BinaryMutation::mutate_association_substrate_mutation_deletion(genome),
-            BinaryMutation::AssociationMutationGeneInsertion => BinaryMutation::mutate_association_gene_insertion(genome),
-            BinaryMutation::AssociationMutationGeneDeletion => BinaryMutation::mutate_association_gene_deletion(genome),
-            BinaryMutation::GeneMutationSubstrateInsertion => BinaryMutation::mutate_gene_substrate_insertion(genome),
-            BinaryMutation::GeneMutationSubstrateDeletion => BinaryMutation::mutate_gene_substrate_deletion(genome),
-            BinaryMutation::GeneMutationSubstrateMutation => BinaryMutation::mutate_gene_substrate_mutation(genome),
-            BinaryMutation::GeneMutationSubstrateMutationFlip => BinaryMutation::mutate_gene_substrate_mutation_flip(genome),
-            BinaryMutation::GeneMutationSubstrateMutationInsertion => BinaryMutation::mutate_gene_substrate_mutation_insertion(genome),
-            BinaryMutation::GeneMutationSubstrateMutationDeletion => BinaryMutation::mutate_gene_substrate_mutation_deletion(genome),
-            BinaryMutation::GeneMutationReceptorInsertion => BinaryMutation::mutate_gene_receptor_insertion(genome),
-            BinaryMutation::GeneMutationReceptorDeletion => BinaryMutation::mutate_gene_receptor_deletion(genome),
-            BinaryMutation::GeneMutationReceptorMutationTriggerInsertion => BinaryMutation::mutate_gene_receptor_trigger_insertion(genome),
-            BinaryMutation::GeneMutationReceptorMutationTriggerDeletion => BinaryMutation::mutate_gene_receptor_trigger_deletion(genome),
-            BinaryMutation::GeneMutationReceptorMutationStateMutation => BinaryMutation::mutate_gene_receptor_state_mutation(genome),
-            BinaryMutation::GeneMutationReceptorMutationSubstratesMutation => BinaryMutation::mutate_gene_receptor_substrate_mutation(genome),
-            BinaryMutation::GeneMutationReceptorMutationEnzymeMutation => BinaryMutation::mutate_gene_receptor_enzyme_mutation(genome),
-            BinaryMutation::GeneMutationCatalyticCentreMutationEductMutation => BinaryMutation::mutate_gene_catalytic_centre_educt_mutation(genome),
-            BinaryMutation::GeneMutationCatalyticCentreMutationProductMutation => BinaryMutation::mutate_gene_catalytic_centre_product_mutation(genome),
-            // BinaryMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
-        }
-    }
-
     /// Duplicates the [`Genome`] and then duplicates a random [`Gene`] inside of the [`Genome`].
     /// Returns the altered [`Genome`].
     ///
@@ -885,5 +838,58 @@ impl Distribution<BinaryMutation> for Standard {
             29 => BinaryMutation::AssociationMutationSubstrateMutationDeletion,
             _ => panic!("A random number with no matching genomic mutation was created."),
         }
+    }
+}
+
+impl GenomeMutation for BinaryMutation {
+    /// Generates a mutated version of the specified [`Genome`] based on the kind of
+    /// `BinaryMutation`.
+    ///
+    /// This will fail if the mutated [`Genome`] would be identical to the input or if the
+    /// mutation is impossible for the specified [`Genome`].
+    ///
+    /// # Parameters
+    ///
+    /// `genome` - the base [`Genome`] to generate a mutated version of
+    ///
+    /// [`Genome`]: ./struct.Genome.html
+    fn mutate(&self, genome: &Genome) -> Option<Genome> {
+        match self {
+            BinaryMutation::InputAssociation => BinaryMutation::mutate_input_association(genome),
+            BinaryMutation::InputDissociation => BinaryMutation::mutate_input_dissociation(genome),
+            BinaryMutation::OutputAssociation => BinaryMutation::mutate_output_association(genome),
+            BinaryMutation::OutputDissociation => BinaryMutation::mutate_output_dissociation(genome),
+            BinaryMutation::GeneFusion => BinaryMutation::mutate_gene_fusion(genome),
+            BinaryMutation::GeneDeletion => BinaryMutation::mutate_gene_deletion(genome),
+            BinaryMutation::GeneDuplication => BinaryMutation::mutate_gene_duplication(genome),
+            BinaryMutation::AssociationInsertion => BinaryMutation::mutate_association_insertion(genome),
+            BinaryMutation::AssociationDeletion => BinaryMutation::mutate_association_deletion(genome),
+            BinaryMutation::AssociationMutationSubstrate => BinaryMutation::mutate_association_substrate(genome),
+            BinaryMutation::AssociationMutationSubstrateMutationFlip => BinaryMutation::mutate_association_substrate_mutation_flip(genome),
+            BinaryMutation::AssociationMutationSubstrateMutationInsertion => BinaryMutation::mutate_association_substrate_mutation_insertion(genome),
+            BinaryMutation::AssociationMutationSubstrateMutationDeletion => BinaryMutation::mutate_association_substrate_mutation_deletion(genome),
+            BinaryMutation::AssociationMutationGeneInsertion => BinaryMutation::mutate_association_gene_insertion(genome),
+            BinaryMutation::AssociationMutationGeneDeletion => BinaryMutation::mutate_association_gene_deletion(genome),
+            BinaryMutation::GeneMutationSubstrateInsertion => BinaryMutation::mutate_gene_substrate_insertion(genome),
+            BinaryMutation::GeneMutationSubstrateDeletion => BinaryMutation::mutate_gene_substrate_deletion(genome),
+            BinaryMutation::GeneMutationSubstrateMutation => BinaryMutation::mutate_gene_substrate_mutation(genome),
+            BinaryMutation::GeneMutationSubstrateMutationFlip => BinaryMutation::mutate_gene_substrate_mutation_flip(genome),
+            BinaryMutation::GeneMutationSubstrateMutationInsertion => BinaryMutation::mutate_gene_substrate_mutation_insertion(genome),
+            BinaryMutation::GeneMutationSubstrateMutationDeletion => BinaryMutation::mutate_gene_substrate_mutation_deletion(genome),
+            BinaryMutation::GeneMutationReceptorInsertion => BinaryMutation::mutate_gene_receptor_insertion(genome),
+            BinaryMutation::GeneMutationReceptorDeletion => BinaryMutation::mutate_gene_receptor_deletion(genome),
+            BinaryMutation::GeneMutationReceptorMutationTriggerInsertion => BinaryMutation::mutate_gene_receptor_trigger_insertion(genome),
+            BinaryMutation::GeneMutationReceptorMutationTriggerDeletion => BinaryMutation::mutate_gene_receptor_trigger_deletion(genome),
+            BinaryMutation::GeneMutationReceptorMutationStateMutation => BinaryMutation::mutate_gene_receptor_state_mutation(genome),
+            BinaryMutation::GeneMutationReceptorMutationSubstratesMutation => BinaryMutation::mutate_gene_receptor_substrate_mutation(genome),
+            BinaryMutation::GeneMutationReceptorMutationEnzymeMutation => BinaryMutation::mutate_gene_receptor_enzyme_mutation(genome),
+            BinaryMutation::GeneMutationCatalyticCentreMutationEductMutation => BinaryMutation::mutate_gene_catalytic_centre_educt_mutation(genome),
+            BinaryMutation::GeneMutationCatalyticCentreMutationProductMutation => BinaryMutation::mutate_gene_catalytic_centre_product_mutation(genome),
+            // BinaryMutation::LateralGeneTransfer => None, //TODO: implement a global gene pool
+        }
+    }
+
+    fn random() -> Self {
+        thread_rng().gen()
     }
 }

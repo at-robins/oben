@@ -290,7 +290,7 @@ impl Default for EnvironmentBuilder {
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
 #[derive(Debug)]
-pub struct Environment<M> where M: GenomeMutation {
+pub struct Environment<M: GenomeMutation> {
     phantom: PhantomData<M>,
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
@@ -342,7 +342,7 @@ pub struct Environment<M> where M: GenomeMutation {
     uuid_context: Context,
 }
 
-impl<M> Environment<M> where M: GenomeMutation {
+impl<M: GenomeMutation> Environment<M> {
     /// Returns the path to the working directory.
     pub fn working_directory(&self) -> &Path {
         Path::new(&self.working_directory)
