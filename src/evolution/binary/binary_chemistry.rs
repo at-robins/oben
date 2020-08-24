@@ -24,6 +24,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
@@ -39,6 +40,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
@@ -54,6 +56,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
@@ -69,6 +72,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
@@ -84,6 +88,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
@@ -99,6 +104,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
@@ -114,6 +120,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[u8::max_value(), u8::max_value()]);
@@ -128,6 +135,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
@@ -142,6 +150,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
@@ -156,6 +165,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 0, 0]);
@@ -170,6 +180,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: Vec<&BinarySubstrate> = Vec::new();
@@ -184,6 +195,7 @@ pub enum BinaryState {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
     ///
     /// let a: Vec<&BinarySubstrate> = Vec::new();
@@ -287,6 +299,7 @@ pub enum BinaryReaction {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
     ///
     /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255]);
@@ -315,6 +328,7 @@ pub enum BinaryReaction {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;;
+    /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
     ///
     /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255, 32]);
@@ -339,6 +353,7 @@ pub enum BinaryReaction {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;;
+    /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
     ///
     /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
@@ -352,6 +367,7 @@ pub enum BinaryReaction {
     /// # Example
     /// ```
     /// use oben::evolution::binary::BinarySubstrate;
+    /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
     ///
     /// let educts: Vec<&BinarySubstrate> = vec!();
@@ -367,6 +383,7 @@ pub enum BinaryReaction {
     ///
     /// use bitvec::boxed::BitBox;
     /// use oben::evolution::binary::BinarySubstrate;;
+    /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
     ///
     /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
