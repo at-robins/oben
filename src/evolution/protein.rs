@@ -5,6 +5,7 @@ use std::cell::{Ref, RefCell};
 use std::rc::{Rc, Weak};
 use super::binary::BinarySubstrate;
 use super::chemistry::{Reaction, State};
+use super::binary::{BinaryReaction, BinaryState};
 
 /// A `Substrate` represents a chemical entity of a specific value. Additionally
 /// a `Substrate` is aware of all [`Receptor`]s detecting its changes.
@@ -65,7 +66,7 @@ impl Substrate {
 #[derive(Debug, Clone)]
 pub struct Receptor {
     substrates: Vec<Weak<RefCell<Substrate>>>,
-    state: State,
+    state: BinaryState,
     enzyme: CatalyticCentre,
 }
 
@@ -86,7 +87,7 @@ impl Receptor {
     ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    pub fn new(substrates: Vec<Weak<RefCell<Substrate>>>, state: State, enzyme: CatalyticCentre) -> Self {
+    pub fn new(substrates: Vec<Weak<RefCell<Substrate>>>, state: BinaryState, enzyme: CatalyticCentre) -> Self {
         assert_eq!(substrates.len(), state.get_substrate_number(),
             "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
             state, state.get_substrate_number(), substrates.len());
@@ -140,7 +141,7 @@ impl Receptor {
 pub struct CatalyticCentre {
     educts: Vec<Weak<RefCell<Substrate>>>,
     products: Vec<Weak<RefCell<Substrate>>>,
-    reaction: Reaction,
+    reaction: BinaryReaction,
 }
 
 impl CatalyticCentre {
@@ -160,7 +161,7 @@ impl CatalyticCentre {
     ///
     /// [`Substrate`]: ./struct.Substrate.html
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    pub fn new(educts: Vec<Weak<RefCell<Substrate>>>, products: Vec<Weak<RefCell<Substrate>>>, reaction: Reaction) -> Self {
+    pub fn new(educts: Vec<Weak<RefCell<Substrate>>>, products: Vec<Weak<RefCell<Substrate>>>, reaction: BinaryReaction) -> Self {
         assert_eq!(educts.len(), reaction.get_educt_number(),
             "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
             reaction, reaction.get_educt_number(), educts.len());

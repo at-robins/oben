@@ -6,7 +6,7 @@ extern crate rand;
 use bitvec::vec::BitVec;
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
 use super::super::gene::{Gene, GeneAssociation, Genome, GenomeMutation};
-use super::super::binary::BinarySubstrate;
+use super::super::binary::{BinarySubstrate, BinaryState};
 use super::super::chemistry::State;
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
@@ -558,7 +558,7 @@ impl BinaryMutation {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             let mut mutated_genome = genome.duplicate();
-            let state: State = rand::random();
+            let state: BinaryState = BinaryState::random();
             let substrates = (0..state.get_substrate_number()).map(|_| mutated_genome.get_gene(random_gene_index).get_random_substrate()).collect();
             mutated_genome.get_gene_mut(random_gene_index)
                 .receptor_mut(random_receptor)

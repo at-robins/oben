@@ -16,7 +16,7 @@ use std::io::{Read, Write};
 use std::num::NonZeroUsize;
 use std::path::Path;
 use std::rc::Rc;
-use super::binary::BinarySubstrate;
+use super::binary::{BinarySubstrate, BinaryReaction, BinaryState};
 use super::chemistry::{Information, Reaction, State};
 use super::helper::{a_or_b, do_a_or_b};
 use super::population::Organism;
@@ -1128,7 +1128,7 @@ impl Gene {
 
     /// Creates a random [`GenomicCatalyticCentre`] specific to this `Gene`.
     pub fn random_catalytic_centre(&self) -> GenomicCatalyticCentre {
-        let reaction: Reaction = rand::random();
+        let reaction: BinaryReaction = rand::random();
         let educts = (0..reaction.get_educt_number()).map(|_| self.get_random_substrate()).collect();
         let products = (0..reaction.get_product_number()).map(|_| self.get_random_substrate()).collect();
         GenomicCatalyticCentre{educts, products, reaction}
@@ -1136,7 +1136,7 @@ impl Gene {
 
     /// Creates a random [`GenomicReceptor`] specific to this `Gene`.
     pub fn random_receptor(&self) -> GenomicReceptor {
-        let state: State = rand::random();
+        let state: BinaryState = rand::random();
         let enzyme = self.random_catalytic_centre();
         let substrates = (0..state.get_substrate_number()).map(|_| self.get_random_substrate()).collect();
         let triggers = vec!(self.get_random_substrate());
@@ -1184,7 +1184,7 @@ pub struct GenomicReceptor {
     /// that a substrate can trigger a reaction twice.
     triggers: Vec<usize>,
     substrates: Vec<usize>,
-    state: State,
+    state: BinaryState,
     enzyme: GenomicCatalyticCentre,
 }
 
@@ -1209,7 +1209,7 @@ impl GenomicReceptor {
     /// [`State`]: ../chemistry/struct.State.html
     /// [`Gene`]: ./struct.Gene.html
     /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
-    pub fn new(triggers: Vec<usize>, substrates: Vec<usize>, state: State, enzyme: GenomicCatalyticCentre) -> Self {
+    pub fn new(triggers: Vec<usize>, substrates: Vec<usize>, state: BinaryState, enzyme: GenomicCatalyticCentre) -> Self {
         assert_eq!(substrates.len(), state.get_substrate_number(),
             "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
             state, state.get_substrate_number(), substrates.len());
@@ -1250,7 +1250,7 @@ impl GenomicReceptor {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     /// [`State`]: ../chemistry/struct.State.html
     /// [`Gene`]: ./struct.Gene.html
-    pub fn replace_state(&mut self, state: State, substrates: Vec<usize>) {
+    pub fn replace_state(&mut self, state: BinaryState, substrates: Vec<usize>) {
         assert_eq!(substrates.len(), state.get_substrate_number(),
             "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
             state, state.get_substrate_number(), substrates.len());
@@ -1456,7 +1456,7 @@ impl CrossOver for GenomicReceptor {
 pub struct GenomicCatalyticCentre {
     educts: Vec<usize>,
     products: Vec<usize>,
-    reaction: Reaction,
+    reaction: BinaryReaction,
 }
 
 impl GenomicCatalyticCentre {
@@ -1478,7 +1478,7 @@ impl GenomicCatalyticCentre {
     /// [`Gene`]: ./struct.Gene.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    pub fn new(educts: Vec<usize>, products: Vec<usize>, reaction: Reaction) -> Self {
+    pub fn new(educts: Vec<usize>, products: Vec<usize>, reaction: BinaryReaction) -> Self {
         assert_eq!(educts.len(), reaction.get_educt_number(),
             "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
             reaction, reaction.get_educt_number(), educts.len());

@@ -2,6 +2,9 @@
 //! substrate data.
 extern crate bitvec;
 
+pub use binary_chemistry::{BinaryReaction, BinaryState};
+pub use binary_mutation::BinaryMutation;
+
 use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
 use super::chemistry::Information;
 use super::gene::CrossOver;
@@ -76,6 +79,7 @@ impl Information for BinarySubstrate {
 
 }
 
+mod binary_chemistry;
 mod binary_mutation;
 #[cfg(test)]
 mod tests;

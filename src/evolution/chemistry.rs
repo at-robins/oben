@@ -1,14 +1,9 @@
-//! The `chemistry` module contains elementary bit actions
+//! The `chemistry` module contains elementary actions
 //! for the evolutionary network.
-extern crate bitvec;
-extern crate rand;
-extern crate serde;
+// extern crate serde;
 
-use super::binary::BinarySubstrate;
 use super::gene::CrossOver;
-use bitvec::vec::BitVec;
-use rand::{distributions::{Distribution, Standard}, Rng};
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 /// An `Information` is a generic recombinable piece of data containing any informative value.
@@ -17,185 +12,7 @@ pub trait Information: Clone + Debug + PartialEq + CrossOver {
 }
 
 /// A `State` is an elementary operation for comparing binary substrates.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum State {
-    /// A state operation comparing two substrates for equality.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
-    /// let b: BinarySubstrate = a.clone();
-    /// assert!(State::Equals.detect(&[&a,&b]));
-    /// ```
-    Equals,
-    /// A state operation comparing two substrates for inequality.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
-    /// let b: BinarySubstrate = a.clone();
-    /// assert!(!State::Not.detect(&[&a,&b]));
-    /// ```
-    Not,
-    /// A state operation checking if one substrate is greater than the other.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
-    /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
-    /// assert!(State::Greater.detect(&[&a, &b]));
-    /// ```
-    Greater,
-    /// A state operation checking if one substrate is samller than the other.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
-    /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
-    /// assert!(State::Lesser.detect(&[&b, &a]));
-    /// ```
-    Lesser,
-    /// A state operation checking if one substrate is greater or equal to the other.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
-    /// let b: BinarySubstrate = a.clone();
-    /// assert!(State::GreaterOrEqual.detect(&[&a,&b]));
-    /// ```
-    GreaterOrEqual,
-    /// A state operation checking if one substrate is smaller or equal to the other.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
-    /// let b: BinarySubstrate = a.clone();
-    /// assert!(State::LesserOrEqual.detect(&[&a,&b]));
-    /// ```
-    LesserOrEqual,
-    /// A state operation checking if a substrate is completely set.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[u8::max_value(), u8::max_value()]);
-    /// assert!(State::All.detect(&[&a]));
-    /// ```
-    All,
-    /// A state operation checking if a substrate is not completely unset.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
-    /// assert!(State::Some.detect(&[&a]));
-    /// ```
-    Some,
-    /// A state operation checking if a substrate is not completely set.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
-    /// assert!(State::NotAll.detect(&[&a]));
-    /// ```
-    NotAll,
-    /// A state operation checking if a substrate is completely unset.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 0, 0]);
-    /// assert!(State::None.detect(&[&a]));
-    /// ```
-    None,
-    /// A state operation always returning `true`.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: Vec<&BinarySubstrate> = Vec::new();
-    /// assert!(State::Always.detect(&a));
-    /// ```
-    Always,
-    /// A state operation always returning `false`.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::State;
-    ///
-    /// let a: Vec<&BinarySubstrate> = Vec::new();
-    /// assert!(!State::Never.detect(&a));
-    /// ```
-    Never,
-}
-
-impl State {
+pub trait State<T: Information>: Clone + Debug + PartialEq + CrossOver {
     /// Compares a number of substrates for a logical property.
     ///
     /// # Parameters
@@ -205,169 +22,17 @@ impl State {
     /// # Panics
     ///
     /// If the number of substrates is not exactly equal to the required one.
-    pub fn detect(&self, substrates: &[&BinarySubstrate]) -> bool {
-        assert_eq!(substrates.len(), self.get_substrate_number(),
-            "The number of required substrates is {}, but {} substrates were supplied.",
-            self.get_substrate_number(), substrates.len());
-
-        match self {
-            State::Equals => substrates[0] == substrates[1],
-            State::Not => substrates[0] != substrates[1],
-            State::Greater => substrates[0] > substrates[1],
-            State::Lesser => substrates[0] < substrates[1],
-            State::GreaterOrEqual => substrates[0] >= substrates[1],
-            State::LesserOrEqual => substrates[0] <= substrates[1],
-            State::All => substrates[0].all(),
-            State::Some => substrates[0].some(),
-            State::None => substrates[0].not_any(),
-            State::NotAll => substrates[0].not_all(),
-            State::Always => true,
-            State::Never => false,
-        }
-    }
+    fn detect(&self, substrates: &[&T]) -> bool;
 
     /// Returns the number of substrates required to perform the logical comparison.
-    pub fn get_substrate_number(&self) -> usize {
-        match self {
-            State::Equals => 2,
-            State::Not => 2,
-            State::Greater => 2,
-            State::Lesser => 2,
-            State::GreaterOrEqual => 2,
-            State::LesserOrEqual => 2,
-            State::All => 1,
-            State::Some => 1,
-            State::NotAll => 1,
-            State::None => 1,
-            State::Always => 0,
-            State::Never => 0,
-        }
-    }
+    fn get_substrate_number(&self) -> usize;
 
-}
-
-impl Distribution<State> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> State {
-        match rng.gen_range(0u8, 12) {
-            0 => State::Equals,
-            1 => State::Not,
-            2 => State::Greater,
-            3 => State::Lesser,
-            4 => State::GreaterOrEqual,
-            5 => State::LesserOrEqual,
-            6 => State::All,
-            7 => State::Some,
-            8 => State::NotAll,
-            9 => State::None,
-            10 => State::Always,
-            11 => State::Never,
-            _ => panic!("A random number with no matching state was created.")
-        }
-    }
+    /// Creates a random `Reaction`.
+    fn random() -> Self;
 }
 
 /// A `Reaction` represents an elementary operation for modification of binary substrates.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum Reaction {
-    /// A binary `AND` operation.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::Reaction;
-    ///
-    /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255]);
-    /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[32]);
-    /// let educts = vec!(&educt1_value, &educt2_value);
-    ///
-    /// let product_value: BinarySubstrate = BitBox::from_element(32);
-    /// let product = vec!(product_value);
-    ///
-    /// assert_eq!(Reaction::And.react(&educts[..]), product);
-    /// ```
-    And,
-    /// A binary `OR` operation.
-    Or,
-    /// A binary `XOR` operation.
-    XOr,
-    /// A binary right shift operation.
-    ShiftRight,
-    /// A binary left shift operation.
-    ShiftLeft,
-    /// An operation, appending a binary value to another one.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;;
-    /// use oben::evolution::chemistry::Reaction;
-    ///
-    /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255, 32]);
-    /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[4, 35]);
-    /// let educts = vec!(&educt1_value, &educt2_value);
-    ///
-    /// let product_value: BinarySubstrate = BitBox::from_slice(&[255, 32, 4, 35]);
-    /// let product = vec!(product_value);
-    ///
-    /// assert_eq!(Reaction::Append.react(&educts[..]), product);
-    /// ```
-    Append,
-    /// A binary inversion.
-    Inverse,
-    /// A binary reverse.
-    Reverse,
-    /// A duplication of a binary value.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;;
-    /// use oben::evolution::chemistry::Reaction;
-    ///
-    /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
-    /// let educts = vec!(&educt_values);
-    ///
-    /// assert_eq!(Reaction::Duplicate.react(&educts[..])[0], *educts[0]);
-    /// ```
-    Duplicate,
-    /// No function.
-    ///
-    /// # Example
-    /// ```
-    /// use oben::evolution::binary::BinarySubstrate;
-    /// use oben::evolution::chemistry::Reaction;
-    ///
-    /// let educts: Vec<&BinarySubstrate> = vec!();
-    ///
-    /// assert!(Reaction::Misfunction.react(&educts[..]).is_empty());
-    /// ```
-    Misfunction,
-    /// A random binary number.
-    ///
-    /// # Example
-    /// ```
-    /// extern crate bitvec;
-    ///
-    /// use bitvec::boxed::BitBox;
-    /// use oben::evolution::binary::BinarySubstrate;;
-    /// use oben::evolution::chemistry::Reaction;
-    ///
-    /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
-    /// let educts = vec!(&educt_values);
-    ///
-    /// assert_eq!(Reaction::Random.react(&educts[..])[0].len(), educts[0].len());
-    /// ```
-    Random,
-}
-
-impl Reaction {
+pub trait Reaction<T: Information>: Clone + Debug + PartialEq + CrossOver {
     /// Performs the specified reaction and returns the products.
     ///
     /// # Parameters
@@ -378,100 +43,14 @@ impl Reaction {
     ///
     /// If the number of supplied educts and created products is not
     /// exactly equal to the required one.
-    pub fn react(&self, educts: &[&BinarySubstrate]) -> Vec<BinarySubstrate> {
-        assert_eq!(educts.len(), self.get_educt_number(),
-            "The number of required educts is {}, but {} educts were supplied.",
-            self.get_educt_number(), educts.len());
-
-        let products = match self {
-            Reaction::And => vec!(educts[0].clone() & educts[1].clone()),
-            Reaction::Or => vec!(educts[0].clone() | educts[1].clone()),
-            Reaction::XOr => vec!(educts[0].clone() ^ educts[1].clone()),
-            // TODO: Re-implement the bit shift operations as soon as native BitBox shift gets fixed.
-            // Currently casting to a BitVec is needed otherwise BitBoxes of length n * container
-            // type (here u8 => n * 8) will panic upon shifting.
-            Reaction::ShiftRight => vec!((educts[0].to_vec() >> educts[1].len()).into()),
-            Reaction::ShiftLeft => vec!((educts[0].to_vec() << educts[1].len()).into()),
-            Reaction::Append => {
-                let mut a = BitVec::from(educts[0].clone());
-                let mut b = BitVec::from(educts[1].clone());
-                a.append(&mut b);
-                vec!(a.into())
-            },
-            Reaction::Inverse => vec!(!educts[0].clone()),
-            Reaction::Reverse => {
-                let mut a = educts[0].clone();
-                a.reverse();
-                vec!(a)
-            },
-            Reaction::Duplicate => vec!(educts[0].clone()),
-            Reaction::Misfunction => vec!(),
-            Reaction::Random => {
-                let mut random_bits = BitVec::with_capacity(educts[0].len());
-                for _i in 0..educts[0].len() {
-                    random_bits.push(rand::random())
-                }
-                vec!(random_bits.into())
-            },
-        };
-
-        assert_eq!(products.len(), self.get_product_number(),
-            "The number of required products is {}, but {} products were created.",
-            self.get_product_number(), products.len());
-
-        products
-    }
+    fn react(&self, educts: &[&T]) -> Vec<T>;
 
     /// Returns the number of educts required to perform the reaction.
-    pub fn get_educt_number(&self) -> usize {
-        match self {
-            Reaction::And => 2,
-            Reaction::Or => 2,
-            Reaction::XOr => 2,
-            Reaction::ShiftRight => 2,
-            Reaction::ShiftLeft => 2,
-            Reaction::Append => 2,
-            Reaction::Inverse => 1,
-            Reaction::Reverse => 1,
-            Reaction::Duplicate => 1,
-            Reaction::Misfunction => 0,
-            Reaction::Random => 1,
-        }
-    }
+    fn get_educt_number(&self) -> usize;
 
     /// Returns the number of products required to perform the reaction.
-    pub fn get_product_number(&self) -> usize {
-        match self {
-            Reaction::And => 1,
-            Reaction::Or => 1,
-            Reaction::XOr => 1,
-            Reaction::ShiftRight => 1,
-            Reaction::ShiftLeft => 1,
-            Reaction::Append => 1,
-            Reaction::Inverse => 1,
-            Reaction::Reverse => 1,
-            Reaction::Duplicate => 1,
-            Reaction::Misfunction => 0,
-            Reaction::Random => 1,
-        }
-    }
-}
+    fn get_product_number(&self) -> usize;
 
-impl Distribution<Reaction> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Reaction {
-        match rng.gen_range(0u8, 11) {
-            0 => Reaction::And,
-            1 => Reaction::Or,
-            2 => Reaction::XOr,
-            3 => Reaction::ShiftRight,
-            4 => Reaction::ShiftLeft,
-            5 => Reaction::Append,
-            6 => Reaction::Inverse,
-            7 => Reaction::Reverse,
-            8 => Reaction::Duplicate,
-            9 => Reaction::Misfunction,
-            10 => Reaction::Random,
-            _ => panic!("A random number with no matching reaction was created.")
-        }
-    }
+    /// Creates a random `Reaction`.
+    fn random() -> Self;
 }
