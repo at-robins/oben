@@ -3,16 +3,16 @@
 // extern crate serde;
 
 use super::gene::CrossOver;
-// use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 /// An `Information` is a generic recombinable piece of data containing any informative value.
-pub trait Information: Clone + Debug + PartialEq + CrossOver {
+pub trait Information: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
 
 }
 
 /// A `State` is an elementary operation for comparing binary substrates.
-pub trait State<T: Information>: Clone + Debug + PartialEq + CrossOver {
+pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
     /// Compares a number of substrates for a logical property.
     ///
     /// # Parameters
@@ -32,7 +32,7 @@ pub trait State<T: Information>: Clone + Debug + PartialEq + CrossOver {
 }
 
 /// A `Reaction` represents an elementary operation for modification of binary substrates.
-pub trait Reaction<T: Information>: Clone + Debug + PartialEq + CrossOver {
+pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
     /// Performs the specified reaction and returns the products.
     ///
     /// # Parameters

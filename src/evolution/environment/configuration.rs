@@ -6,6 +6,7 @@ use rand::{thread_rng, Rng};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{Genome, GenomeMutation};
 use super::super::resource::Resource;
 use uuid::{Uuid, v1::Context, v1::Timestamp};
@@ -98,9 +99,12 @@ impl EnvironmentBuilder {
     /// Build an [`Environment`] to specify run time properties of an evolutionary network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    pub fn build<M>(&self) -> Environment<M> where M: GenomeMutation {
+    pub fn build<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>(&self) -> Environment<M, R, S, T> {
         Environment {
-            phantom: PhantomData,
+            phantom_m: PhantomData,
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
             working_directory: self.working_directory.clone(),
             mutation_rate: self.mutation_rate_or_default(),
             population_size: self.population_size,
@@ -290,8 +294,11 @@ impl Default for EnvironmentBuilder {
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
 #[derive(Debug)]
-pub struct Environment<M: GenomeMutation> {
-    phantom: PhantomData<M>,
+pub struct Environment<M, R, S, T> {
+    phantom_m: PhantomData<M>,
+    phantom_r: PhantomData<R>,
+    phantom_s: PhantomData<S>,
+    phantom_t: PhantomData<T>,
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
     mutation_rate: f64,
@@ -342,7 +349,7 @@ pub struct Environment<M: GenomeMutation> {
     uuid_context: Context,
 }
 
-impl<M: GenomeMutation> Environment<M> {
+impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> Environment<M, R, S, T> {
     /// Returns the path to the working directory.
     pub fn working_directory(&self) -> &Path {
         Path::new(&self.working_directory)
@@ -564,7 +571,7 @@ impl<M: GenomeMutation> Environment<M> {
     /// * `genome` - the [`Genome`] to mutate
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-     pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome) -> Option<Genome> {
+     pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome<R, S, T>) -> Option<Genome<R, S, T>> {
         if number_of_mutations == 0 {
             Some(genome.duplicate())
         } else {

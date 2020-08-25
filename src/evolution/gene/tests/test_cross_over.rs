@@ -1,4 +1,8 @@
+extern crate bitvec;
+
+use bitvec::boxed::BitBox;
 use super::*;
+use super::super::super::binary::BinarySubstrate;
 
 #[test]
 /// Tests if the function `cross_over` of the `CrossOver` trait can correctly recombine

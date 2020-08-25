@@ -1,18 +1,31 @@
+extern crate bitvec;
+
+use bitvec::boxed::BitBox;
 use super::*;
+use super::super::super::binary::{BinaryReaction, BinaryState, BinarySubstrate};
 
 #[test]
 /// Tests if the function `validate_associations` of the `Genome` struct.
 fn test_validate_associations() {
     // Test invalid substrates.
     {
-        let mut gene = Gene{substrates: Vec::new(), receptors: Vec::new()};
-            gene.add_substrate(BitBox::empty());
+        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
+            substrates: Vec::new(),
+            receptors: Vec::new()
+        };
+        gene.add_substrate(BitBox::empty());
         let invalid_gene_substrate = GeneSubstrate{gene: 1, substrate: 1};
         let invalid_association = GeneAssociation{
             substrate: BitBox::empty(),
             associations: vec!(invalid_gene_substrate.clone())
         };
         let mut genome = Genome {
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
             input: vec!(Some(invalid_gene_substrate.clone())),
             output: vec!(Some(invalid_gene_substrate.clone())),
             genes: vec!(gene),
@@ -25,10 +38,19 @@ fn test_validate_associations() {
     }
     // Test duplicate I/O-substrates.
     {
-        let mut gene = Gene{substrates: Vec::new(), receptors: Vec::new()};
-            gene.add_substrate(BitBox::empty());
+        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
+            substrates: Vec::new(),
+            receptors: Vec::new()
+        };
+        gene.add_substrate(BitBox::empty());
         let gene_substrate = GeneSubstrate{gene: 0, substrate: 0};
         let mut genome = Genome {
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
             input: vec!(Some(gene_substrate.clone()), Some(gene_substrate.clone())),
             output: vec!(Some(gene_substrate.clone()), Some(gene_substrate.clone())),
             genes: vec!(gene),
@@ -44,9 +66,18 @@ fn test_validate_associations() {
 /// Tests if the function `has_substrate` of the `Genome` struct.
 fn test_has_substrate() {
     {
-        let mut gene = Gene{substrates: Vec::new(), receptors: Vec::new()};
-            gene.add_substrate(BitBox::empty());
+        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
+            substrates: Vec::new(),
+            receptors: Vec::new()
+        };
+        gene.add_substrate(BitBox::empty());
         let genome = Genome {
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
             input: Vec::new(),
             output: Vec::new(),
             genes: vec!(gene),

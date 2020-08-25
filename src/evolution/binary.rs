@@ -7,7 +7,7 @@ pub use binary_mutation::BinaryMutation;
 
 use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
 use super::chemistry::Information;
-use super::gene::CrossOver;
+use super::gene::{CrossOver, Genome};
 use super::helper::do_a_or_b;
 use std::cell::RefCell;
 
@@ -15,6 +15,10 @@ use std::cell::RefCell;
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
 pub type BinarySubstrate = BitBox<Msb0, u8>;
+/// A type alias for the representation of a binary [`Genome`].
+///
+/// [`Genome`]: ../gene/struct.Genome.html
+pub type BinaryGenome = Genome<BinaryReaction, BinaryState, BinarySubstrate>;
 
 /// Converts the [`Substrate`] into a 64 bit array.
 ///

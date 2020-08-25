@@ -5,8 +5,8 @@ extern crate rand;
 
 use bitvec::vec::BitVec;
 use rand::{distributions::{Distribution, Standard}, thread_rng, Rng};
-use super::super::gene::{Gene, GeneAssociation, Genome, GenomeMutation};
-use super::super::binary::{BinarySubstrate, BinaryState};
+use super::{BinaryGenome, BinaryReaction, BinarySubstrate, BinaryState};
+use super::super::gene::{Gene, GeneAssociation, GenomeMutation};
 use super::super::chemistry::State;
 
 /// The minimal length in byte of a randomly created binary [`Substrate`].
@@ -92,7 +92,7 @@ impl BinaryMutation {
     ///
     /// [`Gene`]: ./struct.Gene.html
     /// [`Genome`]: ./struct.Genome.html
-    fn mutate_gene_duplication(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_duplication(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let mut mutated_genome = genome.duplicate();
         mutated_genome.add_gene(mutated_genome.duplicate_random_gene()).and_then(|_| Some(mutated_genome))
     }
@@ -105,7 +105,7 @@ impl BinaryMutation {
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     /// [`Genome`]: ./struct.Genome.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_input_association(genome: &Genome) -> Option<Genome> {
+   fn mutate_input_association(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if genome.number_of_inputs() > 0 {
            // It was checked before if there are any inputs, so the unwrap must work.
            let random_input = genome.get_random_input().unwrap();
@@ -130,7 +130,7 @@ impl BinaryMutation {
    ///
    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_input_dissociation(genome: &Genome) -> Option<Genome> {
+   fn mutate_input_dissociation(genome: &BinaryGenome) -> Option<BinaryGenome> {
        genome.get_random_input()
             .and_then(|random_in| genome.input(random_in)
                 .and_then(|inner| inner)
@@ -151,7 +151,7 @@ impl BinaryMutation {
    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_output_association(genome: &Genome) -> Option<Genome> {
+   fn mutate_output_association(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if genome.number_of_outputs() > 0 {
            // It was checked before if there are any outputs, so the unwrap must work.
            let random_output = genome.get_random_output().unwrap();
@@ -176,7 +176,7 @@ impl BinaryMutation {
    ///
    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_output_dissociation(genome: &Genome) -> Option<Genome> {
+   fn mutate_output_dissociation(genome: &BinaryGenome) -> Option<BinaryGenome> {
        genome.get_random_output()
             .and_then(|random_out| genome.input(random_out)
                 .and_then(|inner| inner)
@@ -196,7 +196,7 @@ impl BinaryMutation {
    ///
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_gene_fusion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_fusion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        // Only allow this mutation if there is more than one gene in the genome, since
        // 2 different genes are needed for fusion.
        if genome.number_of_genes().get() > 1 {
@@ -220,7 +220,7 @@ impl BinaryMutation {
    ///
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_gene_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        // Only allow this mutation if there is more than one gene in the genome,
        // otherwise the genome would end up in an invalid state.
        if genome.number_of_genes().get() > 1 {
@@ -238,7 +238,7 @@ impl BinaryMutation {
    ///
    /// [`Gene`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_association_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let mut mutated_genome = genome.duplicate();
        let mut random_association = GeneAssociation::new(random_substrate());
        random_association.add_association(mutated_genome.random_gene_substrate());
@@ -250,7 +250,7 @@ impl BinaryMutation {
    ///
    /// [`Gene`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
-   fn mutate_association_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if let Some(random_association_index) = genome.get_random_association() {
            let mut mutated_genome = genome.duplicate();
            mutated_genome.remove_association(random_association_index);
@@ -266,7 +266,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_association_substrate(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_substrate(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if let Some(random_association_index) = genome.get_random_association() {
            let mut mutated_genome = genome.duplicate();
            let random_substrate = mutate_substrate_based_on(
@@ -293,7 +293,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_association_substrate_mutation_flip(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_substrate_mutation_flip(genome: &BinaryGenome) -> Option<BinaryGenome> {
        genome.get_random_association().and_then(|random_association_index|{
            if genome.association(random_association_index).unwrap().substrate().len() > 0 {
                let mut mutated_genome = genome.duplicate();
@@ -311,7 +311,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_association_substrate_mutation_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_substrate_mutation_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        genome.get_random_association().and_then(|random_association_index|{
                let mut mutated_genome = genome.duplicate();
                let mut mutated_substrate = mutated_genome.association(random_association_index).unwrap().substrate().clone();
@@ -327,7 +327,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_association_substrate_mutation_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_substrate_mutation_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        genome.get_random_association().and_then(|random_association_index|{
            if genome.association(random_association_index).unwrap().substrate().len() > 0 {
                let mut mutated_genome = genome.duplicate();
@@ -347,7 +347,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`GeneAssociation`]: ./struct.GeneSubstrate.html
-   fn mutate_association_gene_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_gene_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if let Some(random_association_index) = genome.get_random_association() {
            let mut mutated_genome = genome.duplicate();
            let random_gene_substrate = mutated_genome.random_gene_substrate();
@@ -364,7 +364,7 @@ impl BinaryMutation {
    /// [`GeneAssociation`]: ./struct.GeneAssociation.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`GeneAssociation`]: ./struct.GeneSubstrate.html
-   fn mutate_association_gene_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_association_gene_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        if let Some(random_association_index) = genome.get_random_association() {
            let mut mutated_genome = genome.duplicate();
            if mutated_genome.association(random_association_index).unwrap().number_of_associated_substrates() > 0 {
@@ -388,7 +388,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let mut mutated_genome = genome.duplicate();
        let random_gene_index = mutated_genome.get_random_gene();
        mutated_genome.add_substrate_to_gene(random_gene_index, random_substrate()).and(Some(mutated_genome))
@@ -400,7 +400,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let random_substrate = genome.random_gene_substrate();
        if genome.get_gene(random_substrate.gene()).number_of_substrates().get() > 1 {
            let mut mutated_genome = genome.duplicate();
@@ -417,7 +417,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_mutation(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let mut mutated_genome = genome.duplicate();
        let random_substrate = mutated_genome.random_gene_substrate();
        let random_substrate_value = mutate_substrate_based_on(mutated_genome.get_substrate(random_substrate).unwrap().len() / 8);
@@ -435,7 +435,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_mutation_flip(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_mutation_flip(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let random_substrate = genome.random_gene_substrate();
        if genome.get_substrate(random_substrate).unwrap().len() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -452,7 +452,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_mutation_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_mutation_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
            let mut mutated_genome = genome.duplicate();
            let random_substrate = mutated_genome.random_gene_substrate();
            let mut mutated_substrate = mutated_genome.get_substrate(random_substrate).unwrap().clone();
@@ -467,7 +467,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`Substrate`]: ../protein/struct.Substrate.html
-   fn mutate_gene_substrate_mutation_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_substrate_mutation_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let random_substrate = genome.random_gene_substrate();
        if genome.get_substrate(random_substrate).unwrap().len() > 0 {
            let mut mutated_genome = genome.duplicate();
@@ -486,7 +486,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-   fn mutate_gene_receptor_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_receptor_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let mut mutated_genome = genome.duplicate();
        let random_gene_index = mutated_genome.get_random_gene();
        let random_receptor = mutated_genome.get_gene(random_gene_index).random_receptor();
@@ -499,7 +499,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-   fn mutate_gene_receptor_deletion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_receptor_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let random_gene_index = genome.get_random_gene();
        let mut mutated_genome = genome.duplicate();
         mutated_genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
@@ -514,7 +514,7 @@ impl BinaryMutation {
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
    /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-   fn mutate_gene_receptor_trigger_insertion(genome: &Genome) -> Option<Genome> {
+   fn mutate_gene_receptor_trigger_insertion(genome: &BinaryGenome) -> Option<BinaryGenome> {
        let mut mutated_genome = genome.duplicate();
        let random_gene_index = mutated_genome.get_random_gene();
        mutated_genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
@@ -533,7 +533,7 @@ impl BinaryMutation {
     /// [`Gene`]: ./struct.Gene.html
     /// [`Genome`]: ./struct.Genome.html
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
-    fn mutate_gene_receptor_trigger_deletion(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_receptor_trigger_deletion(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             genome.get_gene(random_gene_index).receptor(random_receptor).unwrap().get_random_trigger().and_then(|random_trigger| {
@@ -554,7 +554,7 @@ impl BinaryMutation {
     /// [`Genome`]: ./struct.Genome.html
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     /// [`State`]: ../chemistry/struct.State.html
-    fn mutate_gene_receptor_state_mutation(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_receptor_state_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             let mut mutated_genome = genome.duplicate();
@@ -575,7 +575,7 @@ impl BinaryMutation {
     /// [`Genome`]: ./struct.Genome.html
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn mutate_gene_receptor_substrate_mutation(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_receptor_substrate_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             genome.get_gene(random_gene_index).receptor(random_receptor).unwrap().get_random_substrate().and_then(|random_substrate| {
@@ -597,7 +597,7 @@ impl BinaryMutation {
     /// [`Genome`]: ./struct.Genome.html
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    fn mutate_gene_receptor_enzyme_mutation(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_receptor_enzyme_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             let mut mutated_genome = genome.duplicate();
@@ -618,7 +618,7 @@ impl BinaryMutation {
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn mutate_gene_catalytic_centre_educt_mutation(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_catalytic_centre_educt_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             genome.get_gene(random_gene_index).receptor(random_receptor).unwrap().enzyme().get_random_educt().and_then(|random_educt| {
@@ -642,7 +642,7 @@ impl BinaryMutation {
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn mutate_gene_catalytic_centre_product_mutation(genome: &Genome) -> Option<Genome> {
+    fn mutate_gene_catalytic_centre_product_mutation(genome: &BinaryGenome) -> Option<BinaryGenome> {
         let random_gene_index = genome.get_random_gene();
         genome.get_gene(random_gene_index).get_random_receptor().and_then(|random_receptor| {
             genome.get_gene(random_gene_index).receptor(random_receptor).unwrap().enzyme().get_random_product().and_then(|random_product| {
@@ -668,7 +668,7 @@ impl BinaryMutation {
    ///
    /// [`Gene`]: ./struct.Gene.html
    /// [`Genome`]: ./struct.Genome.html
-   pub fn lateral_gene_transfer(acceptor: &Genome, donor_gene: Gene) -> Option<Genome> {
+   pub fn lateral_gene_transfer(acceptor: &BinaryGenome, donor_gene: Gene<BinaryReaction, BinaryState, BinarySubstrate>) -> Option<BinaryGenome> {
        let mut mutated_genome = acceptor.duplicate();
        mutated_genome.add_gene(donor_gene).and(Some(mutated_genome))
    }
@@ -682,7 +682,7 @@ impl BinaryMutation {
    /// * `genome` - the [`Genome`] to mutate
    ///
    /// [`Genome`]: ./struct.Genome.html
-    pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome) -> Option<Genome> {
+    pub fn mutate_n_times(number_of_mutations: usize, genome: &BinaryGenome) -> Option<BinaryGenome> {
        if number_of_mutations == 0 {
            Some(genome.duplicate())
        } else {
@@ -841,7 +841,7 @@ impl Distribution<BinaryMutation> for Standard {
     }
 }
 
-impl GenomeMutation for BinaryMutation {
+impl GenomeMutation<BinaryReaction, BinaryState, BinarySubstrate> for BinaryMutation {
     /// Generates a mutated version of the specified [`Genome`] based on the kind of
     /// `BinaryMutation`.
     ///
@@ -853,7 +853,7 @@ impl GenomeMutation for BinaryMutation {
     /// `genome` - the base [`Genome`] to generate a mutated version of
     ///
     /// [`Genome`]: ./struct.Genome.html
-    fn mutate(&self, genome: &Genome) -> Option<Genome> {
+    fn mutate(&self, genome: &BinaryGenome) -> Option<BinaryGenome> {
         match self {
             BinaryMutation::InputAssociation => BinaryMutation::mutate_input_association(genome),
             BinaryMutation::InputDissociation => BinaryMutation::mutate_input_dissociation(genome),
