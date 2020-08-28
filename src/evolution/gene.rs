@@ -36,6 +36,33 @@ pub struct Genome<R, S, T> {
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
+    /// Creates a new `Genome` containing the specified inputs, outputs and [`Gene`]s.
+    /// A `Genome` needs at least 1 [`Gene`].
+    ///
+    /// # Parameters
+    ///
+    /// * `input` - the input substrates
+    /// * `output` - the output substrates
+    /// * `genes` - the initial [`Gene`]s
+    ///
+    /// # Panics
+    ///
+    /// If the vector of `genes` is empty.
+    pub fn new(input: Vec<Option<GeneSubstrate>>, output: Vec<Option<GeneSubstrate>>, genes: Vec<Gene<R, S, T>>) -> Self {
+        if genes.is_empty() {
+            panic!("A genome needs at least one gene.");
+        }
+        Genome{
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
+            input,
+            output,
+            genes,
+            associations: Vec::new(),
+        }
+    }
+
     /// Get the number of [`Gene`]s in this `Genome`.
     /// A `Genome` must encode 1 or more [`Gene`]s.
     ///
@@ -657,35 +684,6 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
             .collect();
         Organism::new(substrates, input, output)
     }
-
-    // /// Creates an empty `Genome` with the specified number of non-associated inputs and outputs.
-    // ///
-    // /// # Parameters
-    // ///
-    // /// * `input` - number of inputs
-    // /// * `output` - number of outputs
-    // pub fn empty_genome(input: usize, output: usize) -> Self {
-    //     let mut gene = Gene{substrates: Vec::new(), receptors: Vec::new()};
-    //     for _ in 0..input {
-    //         gene.add_substrate(BitBox::empty());
-    //     }
-    //     for _ in 0..output {
-    //         gene.add_substrate(BitBox::empty());
-    //     }
-    //     // Make sure that a gene always has at least one substrate.
-    //     if input+output == 0 {
-    //         gene.add_substrate(BitBox::empty());
-    //     }
-    //     Genome {
-    //         phantom_r: PhantomData,
-    //         phantom_s: PhantomData,
-    //         phantom_t: PhantomData,
-    //         input: (0..input).map(|i| Some(GeneSubstrate::new(0, i))).collect(),
-    //         output: (input..(output+input)).map(|o| Some(GeneSubstrate::new(0, o))).collect(),
-    //         genes: vec!(gene),
-    //         associations: vec!(),
-    //     }
-    // }
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information + Default> Default for Genome<R, S, T> {
@@ -954,6 +952,29 @@ pub struct Gene<R, S, T> {
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
+    /// Creates a new `Gene` containing the specified substrates.
+    /// A `Gene` needs at least 1 substrate.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrates` - the initial substrates the gene contains
+    ///
+    /// # Panics
+    ///
+    /// If the vector of `substrates` is empty.
+    pub fn new(substrates: Vec<T>) -> Self {
+        if substrates.is_empty() {
+            panic!("A gene needs at least one substrate.");
+        }
+        Gene{
+            phantom_r: PhantomData,
+            phantom_s: PhantomData,
+            phantom_t: PhantomData,
+            substrates,
+            receptors: Vec::new()
+        }
+    }
+
     /// Gets the number of [`Substrate`]s encoded by this `Gene`.
     /// A `Gene` must encode for 1 or more [`Substrate`]s.
     ///
