@@ -1481,7 +1481,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicReceptor<
         if self.is_similar(other) {
             let triggers = self.triggers.cross_over(&other.triggers);
             let  substrates = self.substrates.cross_over(&other.substrates);
-            let state = self.state.clone();
+            let state = self.state.cross_over(&other.state);
             let enzyme = self.enzyme.cross_over(&other.enzyme);
             GenomicReceptor{
                 phantom_r: PhantomData,
@@ -1671,7 +1671,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalytic
         if self.is_similar(other) {
             let educts = self.educts.cross_over(&other.educts);
             let products = self.products.cross_over(&other.products);
-            let reaction = self.reaction.clone();
+            let reaction = self.reaction.cross_over(&other.reaction);
             GenomicCatalyticCentre{
                 phantom_s: PhantomData,
                 phantom_t: PhantomData,
