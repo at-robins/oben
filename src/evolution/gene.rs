@@ -1382,6 +1382,18 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
         &self.enzyme
     }
 
+    /// Returns the [`State`] that triggers this receptor.
+    ///
+    /// [`State`]: ../chemistry/trait.State.htm
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
+    /// Returns the substrates of this receptor.
+    pub fn substrates(&self) -> &Vec<usize> {
+        &self.substrates
+    }
+
     /// Returns the [`GenomicCatalyticCentre`] as mutable.
     ///
     /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
@@ -1553,7 +1565,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Gene`]: ./struct.Gene.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    /// [`Reaction`]: ../chemistry/struct.Reaction.html
+    /// [`Reaction`]: ../chemistry/trait.Reaction.html
     pub fn new(educts: Vec<usize>, products: Vec<usize>, reaction: R) -> Self {
         assert_eq!(educts.len(), reaction.get_educt_number(),
             "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
@@ -1568,6 +1580,23 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
             products,
             reaction
         }
+    }
+
+    /// Returns the [`Reaction`] catalysed by this `GenomicCatalyticCentre`.
+    ///
+    /// [`Reaction`]: ../chemistry/trait.Reaction.html
+    pub fn reaction(&self) -> &R {
+        &self.reaction
+    }
+
+    /// Returns the reaction educts.
+    pub fn educts(&self) -> &Vec<usize> {
+        &self.educts
+    }
+
+    /// Returns the reaction educts.
+    pub fn products(&self) -> &Vec<usize> {
+        &self.products
     }
 
     /// Checks wether this `GenomicCatalyticCentre` contains any reference to the specified [`Substrate`].
