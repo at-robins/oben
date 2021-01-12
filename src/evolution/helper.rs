@@ -3,8 +3,7 @@ extern crate bitvec;
 extern crate rand;
 
 use rand::{Rng, thread_rng};
-use bitvec::{boxed::BitBox, order::Msb0, vec::BitVec};
-use std::cmp::Ordering;
+use std::convert::TryFrom;
 
 /// Randomly returns one of the specified values.
 ///
@@ -36,108 +35,58 @@ pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
     }
 }
 
-/// A type alias for the underlying binary representation of
-/// [`Iteration`](oben::evolution::helper::Iteration)s.
-pub type BinaryIteration = BitBox<Msb0, usize>;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// An `Iteration` is a sequential datatype for determining the absolute difference between
+/// to objects of an iterative process, where the maximum distance is capped.
 pub struct Iteration {
-    current_iteration: BinaryIteration,
+    current_iteration: i128,
 }
 
 impl Iteration {
+    /// Creates a new `Iteration`.
     pub fn new() -> Self {
-        Self{current_iteration: BitBox::from_element(0)}
+        Self{current_iteration: 0}
     }
 
+    /// Increments the `Iteration` to its sequentially next step.
     pub fn increment(&self) -> Self {
-        let mut next_value = BitVec::from_boxed_bitslice(self.current_iteration.clone());
-        let mut carry = true;
-        let mut index = 0;
-        while carry {
-            match next_value.get(index) {
-                None => {
-                    next_value.insert(index, carry);
-                    carry = false;
-                },
-                Some(val) => {
-                    carry = *val && carry;
-                    if carry {
-                        next_value.set(index, false);
-                    } else {
-                        next_value.set(index, true);
-                    }
-                },
+        Self{current_iteration: self.current_iteration + 1}
+    }
+
+    /// Returns the difference in steps between both `Iteration`s. If the difference is out
+    /// of range of the returned datatype, the corresponding datatype's maximum or minimum
+    /// value is returned.
+    ///
+    /// # Parameters
+    ///
+    /// * `other` - the `Iteration` to calculate the difference from
+    pub fn difference<T: std::borrow::Borrow<Iteration>> (&self, other: T) -> i32 {
+        let real_difference = self.current_iteration - other.borrow().current_iteration;
+        i32::try_from(real_difference).unwrap_or_else(|_| -> i32 {
+            if real_difference > i32::MAX as i128 {
+                i32::MAX
+            } else {
+                i32::MIN
             }
-            index += 1;
-        }
-        Self{current_iteration: next_value.into()}
-    }
-
-    // pub fn difference<T: std::borrow::Borrow<Iteration>> (&self, other: T) -> i32 {
-    //
-    // }
-}
-
-impl PartialOrd for Iteration {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        })
     }
 }
 
-impl Ord for Iteration {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.current_iteration.len() > other.current_iteration.len() {
-            Ordering::Greater
-        } else if self.current_iteration.len() < other.current_iteration.len() {
-            Ordering::Less
-        } else {
-            for (index, value) in self.current_iteration.iter().enumerate().rev() {
-                if *value && !other.current_iteration[index] {
-                    return Ordering::Greater;
-                } else if !value && other.current_iteration[index] {
-                    return Ordering::Less;
-                }
-            }
-            Ordering::Equal
-        }
+impl std::ops::Sub for Iteration {
+    type Output = i32;
+
+    fn sub(self, other: Self) -> Self::Output {
+        self.difference(other)
     }
 }
 
-// impl std::ops::Add for Iteration {
-//     type Output = Self;
-//
-//     fn add(self, other: Self) -> Self::Output {
-//         Self {
-//             current_iteration: self.current_iteration.overflowing_add(other.current_iteration).0
-//         }
-//     }
-// }
+impl std::ops::Sub for &Iteration {
+    type Output = i32;
 
-// impl std::ops::Add for &Iteration {
-//     type Output = Iteration;
-//
-//     fn add(self, other: Self) -> Self::Output {
-//         Iteration {
-//             current_iteration: self.current_iteration.overflowing_add(other.current_iteration).0
-//         }
-//     }
-// }
-
-// impl std::ops::Sub for Iteration {
-//     type Output = Self;
-//
-//     fn sub(self, other: Self) -> Self::Output {
-//         let cycle = self.current_iteration.overflowing_div(other.current_iteration);
-//         let difference = cycle.0;
-//         if cycle.1 {
-//
-//         }
-//         Self {
-//             current_iteration: cycle
-//         }
-//     }
-// }
+    fn sub(self, other: Self) -> Self::Output {
+        self.difference(other)
+    }
+}
 
 impl Iterator for Iteration {
     type Item = Iteration;
