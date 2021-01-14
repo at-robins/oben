@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use rand_distr::{Normal, Distribution};
 use serde::{Serialize, Deserialize};
 use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -19,6 +19,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use super::chemistry::{Information, Reaction, State};
+use super::helper::{ActionChain, Iteration};
 use super::protein::{Substrate, Receptor};
 use super::gene::{CrossOver, Gene, Genome, GenomeMutation};
 use super::environment::Environment;
@@ -62,21 +63,30 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     pub fn live<M>(&self, environment: &Environment<M, R, S, T>) -> Duration
         where M: GenomeMutation<R, S, T> {
         let birth = Instant::now();
-        let mut actions = VecDeque::<Rc<Receptor<R, S, T>>>::new();
+        // Set the current time to the last update, so the organsim can be reused (set_input()).
+        let mut actions: ActionChain<Rc<Receptor<R, S, T>>> = self.last_substrate_change_time().into();
         // Add all receptors detecting changes to the input.
         for input_substrate in self.input.iter().filter_map(|val| val.as_ref()) {
             for receptor in input_substrate.borrow().receptors() {
-                actions.push_back(receptor);
+                actions.push_action(receptor);
             }
         }
         // Run all receptors and subsequently add receptors detecting substrates,
         // which were modified during the run.
         // If the task takes longer than the specified threshold,
         // the run will be aborted.
-        while !actions.is_empty() && birth.elapsed() < environment.lifespan() && self.binary_size() < environment.max_organism_size() {
-            for cascading_receptor in actions.pop_front().unwrap().detect() {
-                actions.push_back(cascading_receptor);
-            }
+        while !actions.is_empty()
+            && birth.elapsed() < environment.lifespan()
+            && self.binary_size() < environment.max_organism_size()
+        {
+            let time = actions.current_iteration();
+            actions
+                .pop_actions()
+                .iter()
+                .filter(|receptor| receptor.detect())
+                .flat_map(|receptor| receptor.catalyse(time))
+                .for_each(|cascading_receptor| {actions.push_action(cascading_receptor);});
+
         }
         // Return the time it took to perform the task, but never more than the lifespan.
         let run_time = birth.elapsed();
@@ -110,6 +120,14 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
         self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
     }
 
+    /// Returns the time the last substrate change was performed.
+    pub fn last_substrate_change_time(&self) -> Iteration {
+        self.substrates.iter()
+            .map(|s| s.borrow().last_change())
+            .max()
+            .unwrap_or(Iteration::new())
+    }
+
     /// Sets the input of the `Organism` to the specified values.
     ///
     /// # Prameters
@@ -125,7 +143,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
         }
         for ip in input.into_iter().enumerate() {
             if let Some(substrate) = self.input[ip.0].as_ref() {
-                substrate.borrow_mut().set_value(ip.1);
+                substrate.borrow_mut().set_value(ip.1, self.last_substrate_change_time());
             }
         }
     }

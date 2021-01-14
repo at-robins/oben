@@ -5,6 +5,7 @@ extern crate rmp_serde;
 use std::cell::{Ref, RefCell};
 use std::rc::{Rc, Weak};
 use super::chemistry::{Information, Reaction, State};
+use super::helper::Iteration;
 
 /// A `Substrate` represents a chemical entity of a specific value. Additionally
 /// a `Substrate` is aware of all [`Receptor`]s detecting its changes.
@@ -14,12 +15,13 @@ use super::chemistry::{Information, Reaction, State};
 pub struct Substrate<R, S, T> {
     value: T,
     receptors: Vec<Rc<Receptor<R, S, T>>>,
+    last_change: Iteration,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// Creates a new `Substrate` with the specified binary value.
     pub fn new(value: T) -> Self {
-            Substrate{value, receptors: vec!()}
+            Substrate{value, receptors: vec!(), last_change: Iteration::new()}
     }
 
     /// Set the value of this substrate.
@@ -28,10 +30,19 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// # Parameters
     ///
     /// * `value` - the new value of the substrate
+    /// * `time_of_change` - the timepoint at which the change in value happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
     ///
     /// [`Receptor`]: ./struct.Receptor.html
-    pub fn set_value(&mut self, value: T) {
+    pub fn set_value(&mut self, value: T, time_of_change: Iteration) {
         self.value = value;
+        self.last_change = time_of_change;
+    }
+
+    /// Returns the [`Iteration`](oben::evolution::helper::Iteration) when the `Substrate`
+    /// was last changed.
+    pub fn last_change(&self) -> Iteration {
+        self.last_change
     }
 
     /// Returns the binary value of this substrate.
@@ -98,7 +109,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Receptor<R, S, T> {
     ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    fn should_trigger(&self) -> bool {
+    pub fn detect(&self) ->  bool {
         // TODO: refactor this ugly code
         let strong: Vec<Rc<RefCell<Substrate<R, S, T>>>> = self.substrates.iter()
             // This unwrap must succeed as the containing structure will always be dropped first
@@ -108,26 +119,41 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Receptor<R, S, T> {
         let substrates: Vec<Ref<Substrate<R, S, T>>> = strong.iter()
             .map(|sub| sub.borrow())
             .collect();
-        let substrates: Vec<&T> = substrates.iter()
+        let substrate_values: Vec<&T> = substrates.iter()
             .map(|sub| sub.value())
             .collect();
-        self.state.detect(&substrates)
+        self.state.detect(&substrate_values)
     }
 
-    /// Detects the [`State`] of its substrates and triggers a
-    /// [`CatalyticCentre`]'s reaction if appropriate. Subsequent ("cascading")
+    /// Triggers a [`CatalyticCentre`]'s reaction. Subsequent ("cascading")
     /// receptors, which are supposed to be checked after the reaction was triggered,
     /// are returned.
     ///
-    /// [`State`]: ../chemistry/struct.State.html
+    /// # Parameters
+    ///
+    /// * `time_of_catalysis` - the timepoint at which the catalysis happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    ///
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    pub fn detect(&self) -> Vec<Rc<Receptor<R, S, T>>> {
-        if self.should_trigger() {
-            self.enzyme.catalyse();
-            self.enzyme.cascading_receptors()
-        } else {
-            vec!()
+    pub fn catalyse(&self, time_of_catalysis: Iteration) -> Vec<Rc<Receptor<R, S, T>>> {
+        self.enzyme.catalyse(time_of_catalysis);
+        self.enzyme.cascading_receptors()
+    }
+}
+
+impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for Receptor<R, S, T>  {
+    fn eq(&self, other: &Self) -> bool {
+        if self.state != other.state { return false; }
+        if self.enzyme != other.enzyme { return false; }
+        if self.substrates.len() != other.substrates.len() { return false; }
+        // Compare the raw pointers.
+        let educt_pairs = self.substrates.iter()
+            .map(|w| w.as_ptr())
+            .zip(other.substrates.iter().map(|w| w.as_ptr()));
+        for (a, b) in educt_pairs {
+            if a != b { return false; }
         }
+        true
     }
 }
 
@@ -192,14 +218,22 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
 
     /// Catalyses the [`Reaction`] specific for this catalytic centre.
     ///
+    /// # Parameters
+    ///
+    /// * `time_of_catalysis` - the timepoint at which the catalysis happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    pub fn catalyse(&self) {
+    pub fn catalyse(&self, time_of_catalysis: Iteration) {
         let mut product_values = self.calculate_product_values();
         for product in &self.products {
             // TODO: maybe switch to VecDeque and use pop_first()
             // This unwrap must succeed as the containing structure will always be dropped first
             // and no substrate references are leaked.
-            product.upgrade().unwrap().borrow_mut().set_value(product_values.remove(0));
+            product.upgrade()
+                .unwrap()
+                .borrow_mut()
+                .set_value(product_values.remove(0), time_of_catalysis);
         }
     }
 
@@ -211,5 +245,27 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
         // This unwrap must succeed as the containing structure will always be dropped first
         // and no substrate references are leaked.
         self.products.iter().flat_map(|product| product.upgrade().unwrap().borrow().receptors()).collect()
+    }
+}
+
+impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for CatalyticCentre<R, S, T>  {
+    fn eq(&self, other: &Self) -> bool {
+        if self.reaction != other.reaction { return false; }
+        if self.educts.len() != other.educts.len() { return false; }
+        if self.products.len() != other.products.len() { return false; }
+        // Compare the raw pointers.
+        let educt_pairs = self.educts.iter()
+            .map(|w| w.as_ptr())
+            .zip(other.educts.iter().map(|w| w.as_ptr()));
+        for (a, b) in educt_pairs {
+            if a != b { return false; }
+        }
+        let product_pairs = self.products.iter()
+            .map(|w| w.as_ptr())
+            .zip(other.products.iter().map(|w| w.as_ptr()));
+        for (a, b) in product_pairs {
+            if a != b { return false; }
+        }
+        true
     }
 }

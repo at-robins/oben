@@ -137,6 +137,10 @@ impl<T: PartialEq> ActionChain<T> {
 
     /// Adds an action to the `ActionChain` if the action is not already present and returns
     /// `true` if the action was successfully added.
+    ///
+    /// # Parameters
+    ///
+    /// * `action` - the action to add
     pub fn push_action(&mut self, action: T) -> bool {
         if self.actions.contains(&action) {
             false
@@ -144,6 +148,11 @@ impl<T: PartialEq> ActionChain<T> {
             self.actions.push(action);
             true
         }
+    }
+
+    /// Returns `true` if no actions are in the `ActionChain`.
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
     }
 
 }
