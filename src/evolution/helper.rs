@@ -98,5 +98,61 @@ impl Iterator for Iteration {
     }
 }
 
+impl Default for Iteration {
+    fn default() -> Self {
+        Iteration::new()
+    }
+}
+
+/// An `ActionChain` contains actions that are executed at the same
+/// [`Iteration`](oben::evolution::helper::Iteration).
+pub struct ActionChain<T> {
+    mean_size: usize,
+    iteration: Iteration,
+    actions: Vec<T>,
+}
+
+impl<T: PartialEq> ActionChain<T> {
+    /// Creates a new `ActionChain` starting a new
+    /// [`Iteration`](oben::evolution::helper::Iteration) cycle.
+    pub fn new() -> Self {
+        Self{mean_size: 0, iteration: Iteration::new(), actions: Vec::new()}
+    }
+
+    /// Returns the current [`Iteration`](oben::evolution::helper::Iteration) the actions
+    /// are performed at.
+    pub fn current_iteration(&self) -> Iteration {
+        self.iteration
+    }
+
+    /// Returns all actions and starts a new [`Iteration`](oben::evolution::helper::Iteration)
+    /// cycle.
+    pub fn pop_actions(&mut self) -> Vec<T> {
+        self.mean_size = (self.mean_size + self.actions.len()) / 2;
+        self.iteration = self.iteration.increment();
+        let mut new_actions = Vec::with_capacity(self.mean_size);
+        std::mem::swap(&mut self.actions, &mut new_actions);
+        new_actions
+    }
+
+    /// Adds an action to the `ActionChain` if the action is not already present and returns
+    /// `true` if the action was successfully added.
+    pub fn push_action(&mut self, action: T) -> bool {
+        if self.actions.contains(&action) {
+            false
+        } else {
+            self.actions.push(action);
+            true
+        }
+    }
+
+}
+
+impl<T, I: std::borrow::Borrow<Iteration>> From<I> for ActionChain<T> {
+    fn from(starting_iteration: I) -> Self {
+        Self{mean_size: 0, iteration: *starting_iteration.borrow(), actions: Vec::new()}
+    }
+}
+
 #[cfg(test)]
 mod tests;

@@ -125,3 +125,31 @@ fn test_iteration_ordering() {
         b = b.increment();
     }
 }
+
+#[test]
+/// Tests the basic functionality of `ActionChain`.
+fn test_action_chain() {
+    let mut action_chain = ActionChain::new();
+    let start_iter = action_chain.current_iteration();
+    assert!(action_chain.push_action(1));
+    assert!(action_chain.push_action(2));
+    assert!(action_chain.push_action(3));
+    assert!(!action_chain.push_action(1));
+    assert_eq!(vec!(1, 2, 3), action_chain.pop_actions());
+    assert_eq!(action_chain.current_iteration() - start_iter, 1);
+    let empty: Vec<i32> = Vec::new();
+    assert_eq!(empty, action_chain.pop_actions());
+    assert_eq!(action_chain.current_iteration() - start_iter, 2);
+}
+
+#[test]
+/// Tests the creation of an `ActionChain` from an `Iteration`.
+fn test_action_chain_from_iteration() {
+    let mut iter = Iteration::new();
+    for _ in 0..100 {
+        iter = iter.increment();
+    }
+    let action_chain: ActionChain<i32> = iter.into();
+    assert_eq!(action_chain.current_iteration(), iter);
+    assert_eq!(action_chain.current_iteration() - Iteration::new(), 100);
+}
