@@ -1,8 +1,10 @@
 //! The `helper` module contains helper constructs for general workflow.
 extern crate bitvec;
 extern crate rand;
+extern crate serde;
 
 use rand::{Rng, thread_rng};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 /// Randomly returns one of the specified values.
@@ -35,7 +37,7 @@ pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 /// An `Iteration` is a sequential datatype for determining the absolute difference between
 /// to objects of an iterative process, where the maximum distance is capped.
 pub struct Iteration {
