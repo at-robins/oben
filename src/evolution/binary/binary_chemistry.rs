@@ -27,10 +27,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
     /// let b: BinarySubstrate = a.clone();
-    /// assert!(BinaryState::Equals.detect(&[&a,&b]));
+    /// assert!(BinaryState::Equals.detect(&[&a,&b], Iteration::new()));
     /// ```
     Equals,
     /// A state operation comparing two substrates for inequality.
@@ -43,10 +44,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
     /// let b: BinarySubstrate = a.clone();
-    /// assert!(!BinaryState::Not.detect(&[&a,&b]));
+    /// assert!(!BinaryState::Not.detect(&[&a,&b], Iteration::new()));
     /// ```
     Not,
     /// A state operation checking if one substrate is greater than the other.
@@ -59,10 +61,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
     /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
-    /// assert!(BinaryState::Greater.detect(&[&a, &b]));
+    /// assert!(BinaryState::Greater.detect(&[&a, &b], Iteration::new()));
     /// ```
     Greater,
     /// A state operation checking if one substrate is samller than the other.
@@ -75,10 +78,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
     /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
-    /// assert!(BinaryState::Lesser.detect(&[&b, &a]));
+    /// assert!(BinaryState::Lesser.detect(&[&b, &a], Iteration::new()));
     /// ```
     Lesser,
     /// A state operation checking if one substrate is greater or equal to the other.
@@ -91,10 +95,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
     /// let b: BinarySubstrate = a.clone();
-    /// assert!(BinaryState::GreaterOrEqual.detect(&[&a,&b]));
+    /// assert!(BinaryState::GreaterOrEqual.detect(&[&a,&b], Iteration::new()));
     /// ```
     GreaterOrEqual,
     /// A state operation checking if one substrate is smaller or equal to the other.
@@ -107,10 +112,11 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
     /// let b: BinarySubstrate = a.clone();
-    /// assert!(BinaryState::LesserOrEqual.detect(&[&a,&b]));
+    /// assert!(BinaryState::LesserOrEqual.detect(&[&a,&b], Iteration::new()));
     /// ```
     LesserOrEqual,
     /// A state operation checking if a substrate is completely set.
@@ -123,9 +129,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[u8::max_value(), u8::max_value()]);
-    /// assert!(BinaryState::All.detect(&[&a]));
+    /// assert!(BinaryState::All.detect(&[&a], Iteration::new()));
     /// ```
     All,
     /// A state operation checking if a substrate is not completely unset.
@@ -138,9 +145,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
-    /// assert!(BinaryState::Some.detect(&[&a]));
+    /// assert!(BinaryState::Some.detect(&[&a], Iteration::new()));
     /// ```
     Some,
     /// A state operation checking if a substrate is not completely set.
@@ -153,9 +161,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
-    /// assert!(BinaryState::NotAll.detect(&[&a]));
+    /// assert!(BinaryState::NotAll.detect(&[&a], Iteration::new()));
     /// ```
     NotAll,
     /// A state operation checking if a substrate is completely unset.
@@ -168,9 +177,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: BinarySubstrate = BitBox::from_slice(&[0, 0, 0]);
-    /// assert!(BinaryState::None.detect(&[&a]));
+    /// assert!(BinaryState::None.detect(&[&a], Iteration::new()));
     /// ```
     None,
     /// A state operation always returning `true`.
@@ -183,9 +193,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: Vec<&BinarySubstrate> = Vec::new();
-    /// assert!(BinaryState::Always.detect(&a));
+    /// assert!(BinaryState::Always.detect(&a, Iteration::new()));
     /// ```
     Always,
     /// A state operation always returning `false`.
@@ -198,9 +209,10 @@ pub enum BinaryState {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryState;
     /// use oben::evolution::chemistry::State;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let a: Vec<&BinarySubstrate> = Vec::new();
-    /// assert!(!BinaryState::Never.detect(&a));
+    /// assert!(!BinaryState::Never.detect(&a, Iteration::new()));
     /// ```
     Never,
 }
@@ -302,6 +314,7 @@ pub enum BinaryReaction {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255]);
     /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[32]);
@@ -310,7 +323,7 @@ pub enum BinaryReaction {
     /// let product_value: BinarySubstrate = BitBox::from_element(32);
     /// let product = vec!(product_value);
     ///
-    /// assert_eq!(BinaryReaction::And.react(&educts[..]), product);
+    /// assert_eq!(BinaryReaction::And.react(&educts[..], Iteration::new()), product);
     /// ```
     And,
     /// A binary `OR` operation.
@@ -331,6 +344,7 @@ pub enum BinaryReaction {
     /// use oben::evolution::binary::BinarySubstrate;;
     /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255, 32]);
     /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[4, 35]);
@@ -339,7 +353,7 @@ pub enum BinaryReaction {
     /// let product_value: BinarySubstrate = BitBox::from_slice(&[255, 32, 4, 35]);
     /// let product = vec!(product_value);
     ///
-    /// assert_eq!(BinaryReaction::Append.react(&educts[..]), product);
+    /// assert_eq!(BinaryReaction::Append.react(&educts[..], Iteration::new()), product);
     /// ```
     Append,
     /// A binary inversion.
@@ -356,11 +370,12 @@ pub enum BinaryReaction {
     /// use oben::evolution::binary::BinarySubstrate;;
     /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
     /// let educts = vec!(&educt_values);
     ///
-    /// assert_eq!(BinaryReaction::Duplicate.react(&educts[..])[0], *educts[0]);
+    /// assert_eq!(BinaryReaction::Duplicate.react(&educts[..], Iteration::new())[0], *educts[0]);
     /// ```
     Duplicate,
     /// No function.
@@ -370,10 +385,11 @@ pub enum BinaryReaction {
     /// use oben::evolution::binary::BinarySubstrate;
     /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let educts: Vec<&BinarySubstrate> = vec!();
     ///
-    /// assert!(BinaryReaction::Misfunction.react(&educts[..]).is_empty());
+    /// assert!(BinaryReaction::Misfunction.react(&educts[..], Iteration::new()).is_empty());
     /// ```
     Misfunction,
     /// A random binary number.
@@ -386,11 +402,12 @@ pub enum BinaryReaction {
     /// use oben::evolution::binary::BinarySubstrate;;
     /// use oben::evolution::binary::BinaryReaction;
     /// use oben::evolution::chemistry::Reaction;
+    /// use oben::evolution::helper::Iteration;
     ///
     /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
     /// let educts = vec!(&educt_values);
     ///
-    /// assert_eq!(BinaryReaction::Random.react(&educts[..])[0].len(), educts[0].len());
+    /// assert_eq!(BinaryReaction::Random.react(&educts[..], Iteration::new())[0].len(), educts[0].len());
     /// ```
     Random,
 }
