@@ -19,11 +19,13 @@ pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cross
     /// # Parameters
     ///
     /// * `substrates` - the substrates to perform the logical operation on
+    /// * `detection_time` - the timepoint at which the detection happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
     ///
     /// # Panics
     ///
     /// If the number of substrates is not exactly equal to the required one.
-    fn detect(&self, substrates: &[&T]) -> bool;
+    fn detect(&self, substrates: &[&T], detection_time: Iteration) -> bool;
 
     /// Returns the number of substrates required to perform the logical comparison.
     fn get_substrate_number(&self) -> usize;
@@ -39,7 +41,7 @@ pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cr
     /// # Parameters
     ///
     /// * `educts` - the educts to convert into products
-    /// * `time_of_catalysis` - the timepoint at which the reaction happens
+    /// * `reaction_time` - the timepoint at which the reaction happens
     /// as [`Iteration`](oben::evolution::helper::Iteration)
     ///
     /// # Panics

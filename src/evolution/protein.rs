@@ -107,9 +107,14 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Receptor<R, S, T> {
     /// Detects the [`State`] of its substrates and determines if triggering the
     /// [`CatalyticCentre`]'s reaction is appropriate.
     ///
+    /// # Parameters
+    ///
+    /// * `time_of_detection` - the timepoint at which the catalysis happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
-    pub fn detect(&self) ->  bool {
+    pub fn detect(&self, time_of_detection: Iteration) ->  bool {
         // TODO: refactor this ugly code
         let strong: Vec<Rc<RefCell<Substrate<R, S, T>>>> = self.substrates.iter()
             // This unwrap must succeed as the containing structure will always be dropped first
@@ -122,7 +127,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Receptor<R, S, T> {
         let substrate_values: Vec<&T> = substrates.iter()
             .map(|sub| sub.value())
             .collect();
-        self.state.detect(&substrate_values)
+        self.state.detect(&substrate_values, time_of_detection)
     }
 
     /// Triggers a [`CatalyticCentre`]'s reaction. Subsequent ("cascading")

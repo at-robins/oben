@@ -215,7 +215,7 @@ impl State<BinarySubstrate> for BinaryState {
     /// # Panics
     ///
     /// If the number of substrates is not exactly equal to the required one.
-    fn detect(&self, substrates: &[&BinarySubstrate]) -> bool {
+    fn detect(&self, substrates: &[&BinarySubstrate], _detection_time: Iteration) -> bool {
         assert_eq!(substrates.len(), self.get_substrate_number(),
             "The number of required substrates is {}, but {} substrates were supplied.",
             self.get_substrate_number(), substrates.len());

@@ -83,7 +83,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
             actions
                 .pop_actions()
                 .iter()
-                .filter(|receptor| receptor.detect())
+                .filter(|receptor| receptor.detect(time))
                 .flat_map(|receptor| receptor.catalyse(time))
                 .for_each(|cascading_receptor| {actions.push_action(cascading_receptor);});
 
