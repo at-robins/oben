@@ -199,8 +199,13 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
     /// Calculates the values of the products after performing the
     /// [`Reaction`] specific for this catalytic centre.
     ///
+    /// # Parameters
+    ///
+    /// * `time_of_catalysis` - the timepoint at which the catalysis happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
-    fn calculate_product_values(&self) -> Vec<T> {
+    fn calculate_product_values(&self, time_of_catalysis: Iteration) -> Vec<T> {
         // TODO: refactor this ugly code
         let strong: Vec<Rc<RefCell<Substrate<R, S, T>>>> = self.educts.iter()
             // This unwrap must succeed as the containing structure will always be dropped first
@@ -213,7 +218,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
         let educts: Vec<&T> = educts.iter()
             .map(|sub| sub.value())
             .collect();
-        self.reaction.react(&educts)
+        self.reaction.react(&educts, time_of_catalysis)
     }
 
     /// Catalyses the [`Reaction`] specific for this catalytic centre.
@@ -225,7 +230,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
     ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
     pub fn catalyse(&self, time_of_catalysis: Iteration) {
-        let mut product_values = self.calculate_product_values();
+        let mut product_values = self.calculate_product_values(time_of_catalysis);
         for product in &self.products {
             // TODO: maybe switch to VecDeque and use pop_first()
             // This unwrap must succeed as the containing structure will always be dropped first

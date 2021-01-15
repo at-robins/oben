@@ -3,6 +3,7 @@
 // extern crate serde;
 
 use super::gene::CrossOver;
+use super::helper::Iteration;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -38,12 +39,14 @@ pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cr
     /// # Parameters
     ///
     /// * `educts` - the educts to convert into products
+    /// * `time_of_catalysis` - the timepoint at which the reaction happens
+    /// as [`Iteration`](oben::evolution::helper::Iteration)
     ///
     /// # Panics
     ///
     /// If the number of supplied educts and created products is not
     /// exactly equal to the required one.
-    fn react(&self, educts: &[&T]) -> Vec<T>;
+    fn react(&self, educts: &[&T], reaction_time: Iteration) -> Vec<T>;
 
     /// Returns the number of educts required to perform the reaction.
     fn get_educt_number(&self) -> usize;

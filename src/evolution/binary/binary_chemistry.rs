@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use super::BinarySubstrate;
 use super::super::chemistry::{Reaction, State};
+use super::super::helper::Iteration;
 use super::super::gene::CrossOver;
 use super::super::helper::do_a_or_b;
 
@@ -405,7 +406,7 @@ impl Reaction<BinarySubstrate> for BinaryReaction {
     ///
     /// If the number of supplied educts and created products is not
     /// exactly equal to the required one.
-    fn react(&self, educts: &[&BinarySubstrate]) -> Vec<BinarySubstrate> {
+    fn react(&self, educts: &[&BinarySubstrate], _reaction_time: Iteration) -> Vec<BinarySubstrate> {
         assert_eq!(educts.len(), self.get_educt_number(),
             "The number of required educts is {}, but {} educts were supplied.",
             self.get_educt_number(), educts.len());
