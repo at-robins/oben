@@ -183,7 +183,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
     fn test_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>) -> f64 {
-        let organism = inner.load_organism(individual.clone());
+        let mut organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
         // function.

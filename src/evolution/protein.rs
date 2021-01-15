@@ -15,13 +15,12 @@ use super::helper::Iteration;
 pub struct Substrate<R, S, T> {
     value: T,
     receptors: Vec<Rc<Receptor<R, S, T>>>,
-    last_change: Iteration,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// Creates a new `Substrate` with the specified binary value.
     pub fn new(value: T) -> Self {
-            Substrate{value, receptors: vec!(), last_change: Iteration::new()}
+            Substrate{value, receptors: vec!()}
     }
 
     /// Set the value of this substrate.
@@ -30,19 +29,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// # Parameters
     ///
     /// * `value` - the new value of the substrate
-    /// * `time_of_change` - the timepoint at which the change in value happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
     ///
     /// [`Receptor`]: ./struct.Receptor.html
-    pub fn set_value(&mut self, value: T, time_of_change: Iteration) {
+    pub fn set_value(&mut self, value: T) {
         self.value = value;
-        self.last_change = time_of_change;
-    }
-
-    /// Returns the [`Iteration`](oben::evolution::helper::Iteration) when the `Substrate`
-    /// was last changed.
-    pub fn last_change(&self) -> Iteration {
-        self.last_change
     }
 
     /// Returns the binary value of this substrate.
@@ -243,7 +233,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
             product.upgrade()
                 .unwrap()
                 .borrow_mut()
-                .set_value(product_values.remove(0), time_of_catalysis);
+                .set_value(product_values.remove(0));
         }
     }
 

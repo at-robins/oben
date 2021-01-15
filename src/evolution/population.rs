@@ -30,6 +30,7 @@ pub struct Organism<R, S, T> {
     substrates: Vec<Rc<RefCell<Substrate<R, S, T>>>>,
     input: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
     output: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
+    time_alive: Iteration,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
@@ -45,7 +46,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     pub fn new(substrates: Vec<Rc<RefCell<Substrate<R, S, T>>>>,
         input: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
         output: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>) -> Self {
-        Organism{substrates, input, output}
+        Organism{substrates, input, output, time_alive: Iteration::new()}
     }
 
     /// Starts activity of all [`Receptor`]s and [`CatalyticCentre`]s linked to the [`Substrate`]s
@@ -60,11 +61,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Receptor`]: ../protein/struct.Receptor.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn live<M>(&self, environment: &Environment<M, R, S, T>) -> Duration
+    pub fn live<M>(&mut self, environment: &Environment<M, R, S, T>) -> Duration
         where M: GenomeMutation<R, S, T> {
         let birth = Instant::now();
         // Set the current time to the last update, so the organsim can be reused (set_input()).
-        let mut actions: ActionChain<Rc<Receptor<R, S, T>>> = self.last_substrate_change_time().into();
+        let mut actions: ActionChain<Rc<Receptor<R, S, T>>> = self.time_alive().into();
         // Add all receptors detecting changes to the input.
         for input_substrate in self.input.iter().filter_map(|val| val.as_ref()) {
             for receptor in input_substrate.borrow().receptors() {
@@ -88,6 +89,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
                 .for_each(|cascading_receptor| {actions.push_action(cascading_receptor);});
 
         }
+        self.time_alive = actions.current_iteration();
         // Return the time it took to perform the task, but never more than the lifespan.
         let run_time = birth.elapsed();
         if run_time < environment.lifespan() {
@@ -120,12 +122,9 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
         self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
     }
 
-    /// Returns the time the last substrate change was performed.
-    pub fn last_substrate_change_time(&self) -> Iteration {
-        self.substrates.iter()
-            .map(|s| s.borrow().last_change())
-            .max()
-            .unwrap_or(Iteration::new())
+    /// Returns the time the `Organism` is alive.
+    pub fn time_alive(&self) -> Iteration {
+        self.time_alive
     }
 
     /// Sets the input of the `Organism` to the specified values.
@@ -143,7 +142,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
         }
         for ip in input.into_iter().enumerate() {
             if let Some(substrate) = self.input[ip.0].as_ref() {
-                substrate.borrow_mut().set_value(ip.1, self.last_substrate_change_time());
+                substrate.borrow_mut().set_value(ip.1);
             }
         }
     }
