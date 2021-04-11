@@ -39,7 +39,7 @@ pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 /// An `Iteration` is a sequential datatype for determining the absolute difference between
-/// to objects of an iterative process, where the maximum distance is capped.
+/// two objects of an iterative process, where the maximum distance is capped.
 pub struct Iteration {
     current_iteration: i128,
 }

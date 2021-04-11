@@ -21,7 +21,16 @@ impl Resource {
     ///
     /// * `total` - the total amount of `Resource`s available
     /// * `half_life` - the half life time for recycling `Resource`s in generations
+    ///
+    /// # Panics
+    ///
+    /// If the specified `total` amount of resources or the `half_life` time is not a valid positive number.
     pub fn new(total: f64, half_life: f64) -> Self {
+        if total.is_nan() || total < 0.0 {
+            panic!("The total amount of resources cannot be {}", total);
+        } else if half_life.is_nan() || half_life < 0.0 {
+            panic!("The half life cannot be {}", half_life);
+        }
         Resource {
             available: total,
             recycling: 0.0,
@@ -72,7 +81,7 @@ impl Resource {
     ///
     /// If the specified `amount` is not a valid positive number.
     pub fn claim_resources(&mut self, amount: f64) -> f64 {
-        if amount >= 0.0 {
+        if amount >= 0.0 && !amount.is_nan() {
             if amount >= self.available() {
                 let all_resources = self.available();
                 self.available = 0.0;
@@ -96,7 +105,7 @@ impl Resource {
     ///
     /// If the specified `amount` is not a valid positive number.
     pub fn repatriate_resources(&mut self, amount: f64) {
-        if amount >= 0.0 {
+        if !amount.is_nan() && amount >= 0.0 {
             self.recycling += amount;
         } else {
             panic!("{} resources cannot be repatriated.", amount);
@@ -109,3 +118,6 @@ impl Default for Resource {
         Resource::new(100_000.0, 3.0)
     }
 }
+
+#[cfg(test)]
+mod tests;

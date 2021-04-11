@@ -5,6 +5,7 @@ authors = ["at-robins <30956028+at-robins@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
+approx = "0.4"
 bitvec = {version = "0.17.4", features = ["serde"]}
 rand = "0.7.3"
 rand_distr = "0.2.2"
