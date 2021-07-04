@@ -56,4 +56,12 @@ fn test_panic_greater_as_f64() {
     as_f64(&test_substrate);
 }
 
+#[test]
+/// Tests if the function `f64_as_binary` can correctly convert a `f64` into a 64 bit `BitBox`.
+fn test_f64_as_binary() {
+    let test_f64: f64 = thread_rng().gen();
+    let test_substrate: BinarySubstrate = f64_to_binary(test_f64);
+    assert_eq!(test_f64, as_f64(&test_substrate));
+}
+
 mod test_binary_substrate;

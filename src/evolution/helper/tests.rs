@@ -37,6 +37,20 @@ fn test_do_a_or_b() {
 }
 
 #[test]
+/// Tests if the function `nonlinear_normal_positve` correctly returns the supplied value.
+fn test_nonlinear_normal_positve() {
+    assert_eq!(nonlinear_normal_positve(0.0), 0.0);
+    assert_eq!(nonlinear_normal_positve(23.45), 23.45);
+    assert_eq!(nonlinear_normal_positve(-0.0), 0.0);
+    assert_eq!(nonlinear_normal_positve(-23.45), 0.0);
+    assert_eq!(nonlinear_normal_positve(f64::INFINITY), 0.0);
+    assert_eq!(nonlinear_normal_positve(f64::NEG_INFINITY), 0.0);
+    assert_eq!(nonlinear_normal_positve(f64::NAN), 0.0);
+    assert_eq!(nonlinear_normal_positve(f64::MIN_POSITIVE / 2.0), 0.0);
+    assert_eq!(nonlinear_normal_positve(f64::MAX * 2.0), 0.0);
+}
+
+#[test]
 /// Tests if the function 'increment' of `Iteration` works as expected.
 fn test_iteration_increment() {
     let start = Iteration::new();

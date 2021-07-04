@@ -37,6 +37,21 @@ pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
     }
 }
 
+/// Returns the supplied value if the specified number is positve and normal;
+/// returns `0.0` if not to introduce nonlinearity to the function.
+///
+/// # Parameters
+///
+/// * `value` - the number to transform 
+pub fn nonlinear_normal_positve(value: f64) -> f64 {
+    if value.is_normal() && value.is_sign_positive() {
+        value
+    } else {
+        // Introduces non-linearity.
+        0.0
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 /// An `Iteration` is a sequential datatype for determining the absolute difference between
 /// two objects of an iterative process, where the maximum distance is capped.

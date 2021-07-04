@@ -56,6 +56,16 @@ pub fn as_f64(substrate: &BinarySubstrate) -> f64 {
     f64::from_be_bytes(as_64(substrate))
 }
 
+/// Converts a 64 bit float into its binary reprsentation 
+/// as a [`BinarySubstrate`] that allows cross-over.
+///
+/// # Parameters
+///
+/// * `value` - the number to convert to its binary representation.
+pub fn f64_to_binary(value: f64) -> BinarySubstrate {
+    BitBox::from_slice(&value.to_be_bytes())
+}
+
 impl CrossOver for BinarySubstrate {
     fn is_similar(&self, other: &Self) -> bool {
         self.len() == other.len()

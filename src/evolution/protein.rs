@@ -20,7 +20,7 @@ pub struct Substrate<R, S, T> {
 impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// Creates a new `Substrate` with the specified binary value.
     pub fn new(value: T) -> Self {
-            Substrate{value, receptors: vec!()}
+        Substrate{value, receptors: vec!()}
     }
 
     /// Set the value of this substrate.
