@@ -2,7 +2,7 @@
 extern crate bitvec;
 extern crate rmp_serde;
 
-use std::cell::{Ref, RefCell};
+use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
 use super::chemistry::{Information, Reaction, State};
 use super::helper::Iteration;
@@ -15,12 +15,13 @@ use super::helper::Iteration;
 pub struct Substrate<R, S, T> {
     value: T,
     receptors: Vec<Rc<Receptor<R, S, T>>>,
+    last_updated: Iteration,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
     /// Creates a new `Substrate` with the specified binary value.
     pub fn new(value: T) -> Self {
-        Substrate{value, receptors: vec!()}
+        Substrate{value, receptors: vec!(), last_updated: Iteration::new()}
     }
 
     /// Set the value of this substrate.
@@ -35,13 +36,23 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Substrate<R, S, T> {
         self.value = value;
     }
 
-    /// Returns the binary value of this substrate.
-    pub fn value(&self) -> &T {
+    /// Returns the value of this substrate at the specified timepoint.
+    ///
+    /// # Parameters
+    ///
+    /// * time - the timepoint the substrate is accessed
+    pub fn value(&mut self, time: Iteration) -> &T {
+        if time != self.last_updated {
+            let time_passed = time - self.last_updated;
+            self.value.update_value(time_passed);
+            self.last_updated = time;
+        }
         &self.value
     }
 
     /// Returns the number of bits encoded by this `Substrate`.
     pub fn binary_size(&self) -> usize {
+        // TODO: Revise this implementation as it is potentially very expensive.
         rmp_serde::to_vec(&self.value).expect("Serialisation of the genome failed.").len() * 8
     }
 
@@ -111,11 +122,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Receptor<R, S, T> {
             // and no substrate references are leaked.
             .map(|weak| weak.upgrade().unwrap())
             .collect();
-        let substrates: Vec<Ref<Substrate<R, S, T>>> = strong.iter()
-            .map(|sub| sub.borrow())
+        let mut substrates: Vec<RefMut<Substrate<R, S, T>>> = strong.iter()
+            .map(|sub| sub.borrow_mut())
             .collect();
-        let substrate_values: Vec<&T> = substrates.iter()
-            .map(|sub| sub.value())
+        let substrate_values: Vec<&T> = substrates.iter_mut()
+            .map(|sub| sub.value(time_of_detection))
             .collect();
         self.state.detect(&substrate_values, time_of_detection)
     }
@@ -207,11 +218,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
             // and no substrate references are leaked.
             .map(|weak| weak.upgrade().unwrap())
             .collect();
-        let educts: Vec<Ref<Substrate<R, S, T>>> = strong.iter()
-            .map(|sub| sub.borrow())
+        let mut educts: Vec<RefMut<Substrate<R, S, T>>> = strong.iter()
+            .map(|sub| sub.borrow_mut())
             .collect();
-        let educts: Vec<&T> = educts.iter()
-            .map(|sub| sub.value())
+        let educts: Vec<&T> = educts.iter_mut()
+            .map(|sub| sub.value(time_of_catalysis))
             .collect();
         self.reaction.react(&educts, time_of_catalysis)
     }

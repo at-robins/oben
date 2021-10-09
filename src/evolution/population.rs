@@ -119,7 +119,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_result(&self) -> Vec<Option<T>> {
-        self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow().value().clone()))).collect()
+        self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow_mut().value(self.time_alive()).clone()))).collect()
     }
 
     /// Returns the time the `Organism` is alive.

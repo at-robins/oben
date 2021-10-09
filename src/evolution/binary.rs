@@ -90,7 +90,9 @@ impl CrossOver for BinarySubstrate {
 }
 
 impl Information for BinarySubstrate {
-
+    fn update_value(&mut self, _time_passed: i32) {
+        // Does nothing as no update of the internal value is required.
+    }
 }
 
 mod binary_chemistry;

@@ -9,7 +9,12 @@ use std::fmt::Debug;
 
 /// An `Information` is a generic recombinable piece of data containing any informative value.
 pub trait Information: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
-
+    /// Updates the internal information value based on the time that passed since the last update.
+    ///
+    /// # Parameters
+    ///
+    /// * `time_passed` - the time passed since the last update of the value in iteration steps
+    fn update_value(&mut self, time_passed: i32);
 }
 
 /// A `State` is an elementary operation for comparing binary substrates.
