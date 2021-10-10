@@ -167,3 +167,56 @@ fn test_action_chain_from_iteration() {
     assert_eq!(action_chain.current_iteration(), iter);
     assert_eq!(action_chain.current_iteration() - Iteration::new(), 100);
 }
+
+#[test]
+/// Tests the `increment` function of the `ScalingFactor` struct.
+fn test_scaling_factor_increment() {
+    let mut factor = ScalingFactor::new(2.0);
+    assert_ulps_eq!(factor.value(), 1.0);
+    assert_eq!(factor.exponent(), 0);
+    factor.increment();
+    assert_ulps_eq!(factor.value(), 2.0);
+    assert_eq!(factor.exponent(), 1);
+    factor.increment();
+    factor.increment();
+    factor.decrement();
+    factor.increment();
+    assert_ulps_eq!(factor.value(), 8.0);
+    assert_eq!(factor.exponent(), 3);
+}
+
+#[test]
+/// Tests the `decrement` function of the `ScalingFactor` struct.
+fn test_scaling_factor_decrement() {
+    let mut factor = ScalingFactor::new(2.0);
+    assert_ulps_eq!(factor.value(), 1.0);
+    assert_eq!(factor.exponent(), 0);
+    factor.decrement();
+    assert_ulps_eq!(factor.value(), 0.5);
+    assert_eq!(factor.exponent(), -1);
+    factor.decrement();
+    factor.decrement();
+    factor.increment();
+    factor.decrement();
+    assert_ulps_eq!(factor.value(), 0.125);
+    assert_eq!(factor.exponent(), -3);
+}
+
+#[test]
+/// Tests the `ScalingFactor` struct with a different base.
+fn test_scaling_factor_base() {
+    let mut factor = ScalingFactor::new(1.1);
+    assert_ulps_eq!(factor.value(), 1.0);
+    assert_eq!(factor.exponent(), 0);
+    factor.increment();
+    assert_ulps_eq!(factor.value(), 1.1);
+    assert_eq!(factor.exponent(), 1);
+    factor.increment();
+    assert_ulps_eq!(factor.value(), 1.21);
+    assert_eq!(factor.exponent(), 2);
+    factor.decrement();
+    factor.decrement();
+    factor.decrement();
+    assert_ulps_eq!(factor.value(), 1.0/1.1);
+    assert_eq!(factor.exponent(), -1);
+}

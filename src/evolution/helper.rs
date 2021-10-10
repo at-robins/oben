@@ -178,5 +178,43 @@ impl<T, I: std::borrow::Borrow<Iteration>> From<I> for ActionChain<T> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// A scaling factor to scale the fitness function based on the current mean fitness of the population.
+pub struct ScalingFactor {
+    factor: i32,
+    base: f64,
+}
+
+impl ScalingFactor {
+    /// Creates a new `ScalingFactor` with the specified base value.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `base` - the base to scale by
+    pub fn new(base: f64) -> ScalingFactor {
+        ScalingFactor{factor: 0, base}
+    }
+
+    /// Returns the scaling exponent.
+    pub fn exponent(&self) -> i32 {
+        self.factor
+    }
+
+    /// Increases the scaling factor.
+    pub fn increment(&mut self) {
+        self.factor += 1;
+    }
+
+    /// Decreases the scaling factor.
+    pub fn decrement(&mut self) {
+        self.factor -= 1;
+    }
+
+    /// Returns the current scaling factor.
+    pub fn value(&self) -> f64 {
+        self.base.powi(self.factor)
+    }
+}
+
 #[cfg(test)]
 mod tests;

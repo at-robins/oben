@@ -10,6 +10,8 @@ use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use crate::evolution::helper::ScalingFactor;
+
 use super::configuration::Environment;
 use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{Genome, GenomeMutation};
@@ -43,7 +45,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
         environment: Environment<M, R, S, T>,
         population: Population<R, S, T>,
         supplier_function: Box<dyn Fn() -> (Vec<T>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>) -> f64 + Send + Sync + 'static>) -> Self {
+        fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>, ScalingFactor) -> f64 + Send + Sync + 'static>) -> Self {
         EcologicalNiche {
             inner: Arc::new(InnerEcologicalNiche {
                 environment: Arc::new(environment),
@@ -75,6 +77,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
         // Start the network.
         println!("Starting execution...");
         let mut generation: u64 = 0;
+        let mut fitness_scaling: ScalingFactor = ScalingFactor::new(1.1);
         let mut start = Instant::now();
         loop {
             let spawn_counter = Arc::new(Mutex::new(0u32));
@@ -85,7 +88,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
             self.inner.increment_age();
             // Challenge the organisms in the population.
             self.inner.individuals().par_iter().for_each(|individual| {
-                Self::spawn_organism(self.inner.clone(), individual.clone());
+                Self::spawn_organism(self.inner.clone(), individual.clone(), fitness_scaling);
                 *spawn_counter.lock().unwrap() += 1;
                 if *spawn_counter.lock().unwrap() % 1000 == 0 {
                     println!("     Spawn Organism {}", *spawn_counter.lock().unwrap());
@@ -114,16 +117,24 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
                 .map(|a| InnerEcologicalNiche::<I, M, R, S, T>::get_accumulated_resources(a.clone()) + 1.0)
                 .sum();
             res += self.inner.resources().total();
-            println!("Size: {} : Bytes: {} ; Fitness: {} ; Total Resources: {} ; Resources: {:?}",
+            let mean_fitness: f64 = self.inner.population_mean_fitness();
+            println!("Size: {} : Bytes: {} ; Fitness: {} ; Fitness Scaling: {} ; Total Resources: {} ; Resources: {:?}",
                 self.inner.population_size(),
                 self.inner.population_mean_genome_size(),
-                self.inner.population_mean_fitness(),
+                mean_fitness,
+                fitness_scaling.exponent(),
                 res,
                 self.inner.resources());
             // Save the population in regular intervalls with a timestamp and print some information.
             if start.elapsed() >= self.environment().population_save_intervall() {
                 self.save_population();
                 start = Instant::now();
+            }
+            // Modify the fitness function scaling factor.
+            if mean_fitness > 0.3 {
+                fitness_scaling.decrement();
+            } else if mean_fitness < 0.2 {
+                fitness_scaling.increment();
             }
         }
     }
@@ -147,11 +158,11 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>) {
+    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>, fitness_scaling: ScalingFactor) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
-            Self::add_fitness(individual.clone(), Self::test_organism(inner.clone(), individual.clone()));
+            Self::add_fitness(individual.clone(), Self::test_organism(inner.clone(), individual.clone(), fitness_scaling));
         }
     }
 
@@ -182,7 +193,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn test_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>) -> f64 {
+    fn test_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>, fitness_scaling: ScalingFactor) -> f64 {
         let mut organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
@@ -206,7 +217,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
                 )
             );
         }
-        (inner.fitness_function)(organism_informations)
+        (inner.fitness_function)(organism_informations, fitness_scaling)
     }
 
     /// Adds the specified fitness to the specified [`Individual`].
@@ -257,7 +268,7 @@ struct InnerEcologicalNiche<I, M, R, S, T> {
     environment: Arc<Environment<M, R, S, T>>,
     population: Arc<Mutex<Population<R, S, T>>>,
     supplier_function: Box<dyn Fn() -> (Vec<T>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>) -> f64 + Send + Sync + 'static>,
+    fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>, ScalingFactor) -> f64 + Send + Sync + 'static>,
     phantom: PhantomData<M>,
 }
 
