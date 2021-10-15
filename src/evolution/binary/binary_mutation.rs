@@ -754,7 +754,7 @@ fn mutate_substrate_based_on(base_length: usize) -> BinarySubstrate {
 /// [`Substrate`]: ../protein/struct.Substrate.html
 fn mutate_substrate_single_bit(base_substrate: &mut BinarySubstrate) {
     if base_substrate.is_empty() {
-        panic!("No byte can be flipped in an empty substrate.");
+        panic!("No bit can be flipped in an empty substrate.");
     }
     let random_bit_index = thread_rng().gen_range(0, base_substrate.len());
     // The unwrap should always work, since the index being in range was checked for.

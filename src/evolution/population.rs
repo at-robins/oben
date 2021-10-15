@@ -6,7 +6,6 @@ extern crate serde;
 extern crate uuid;
 
 use rand::{thread_rng, Rng};
-use rand_distr::{Normal, Distribution};
 use serde::{Serialize, Deserialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -784,14 +783,11 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
                     .fitness() {
                 // Aquire resources. The higher the fitness, the slighter the difference needed
                 // for significant resource advantage.
-                let mean = ((fitness / 1.00001).log(0.5) * 0.9995).recip() + 1.0;
-                let mut request = Normal::new(mean, mean * 0.01)
-                    .expect("The standard deviation may not be smaller than or equal to zero.")
-                    .sample(&mut rand::thread_rng());
-                // Prevent negativ resource aquirement.
-                if request < 0.0 {
-                    request = 0.0;
-                }
+                let request = if fitness < 0.5 {
+                    1.0 + 2.0 * fitness
+                } else {
+                    196.0 * fitness - 96.0
+                };
                 total_request += request;
                 requests.push((individual.clone(), request));
             }

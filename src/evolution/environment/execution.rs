@@ -131,9 +131,9 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
                 start = Instant::now();
             }
             // Modify the fitness function scaling factor.
-            if mean_fitness > 0.3 {
+            if mean_fitness > 0.5 {
                 fitness_scaling.decrement();
-            } else if mean_fitness < 0.2 {
+            } else if mean_fitness < 0.4 {
                 fitness_scaling.increment();
             }
         }
