@@ -581,12 +581,12 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
         // additionally to the accumulated resources.
         let resources = Self::get_accumulated_resources(individual) + 1.0;
         {
-            &self.population.lock()
+            self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .repatriate_resources(resources);
         }
         {
-            &self.population.lock()
+            self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .remove(uuid)
             .expect("The individual could not be removed.");
@@ -597,7 +597,7 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Resource`]: ../resource/struct.Resource.html
     fn recycle(&self) {
-        &self.population.lock()
+        self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .recycle();
     }

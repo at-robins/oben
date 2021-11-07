@@ -17,7 +17,7 @@ pub trait Information: Clone + Debug + PartialEq + Send + Sync + CrossOver + Ser
     fn update_value(&mut self, time_passed: i32);
 }
 
-/// A `State` is an elementary operation for comparing binary substrates.
+/// A `State` is an elementary operation for comparing substrates.
 pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
     /// Compares a number of substrates for a logical property.
     ///
@@ -39,7 +39,7 @@ pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cross
     fn random() -> Self;
 }
 
-/// A `Reaction` represents an elementary operation for modification of binary substrates.
+/// A `Reaction` represents an elementary operation for modification of substrates.
 pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
     /// Performs the specified reaction and returns the products.
     ///

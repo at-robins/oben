@@ -153,13 +153,9 @@ impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for Receptor<R, S, T
         if self.enzyme != other.enzyme { return false; }
         if self.substrates.len() != other.substrates.len() { return false; }
         // Compare the raw pointers.
-        let educt_pairs = self.substrates.iter()
-            .map(|w| w.as_ptr())
-            .zip(other.substrates.iter().map(|w| w.as_ptr()));
-        for (a, b) in educt_pairs {
-            if a != b { return false; }
-        }
-        true
+        self.substrates.iter()
+            .zip(other.substrates.iter())
+            .all(|(a, b)| a.ptr_eq(b))
     }
 }
 
@@ -255,7 +251,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CatalyticCentre<R, S, T> {
     pub fn cascading_receptors(&self) -> Vec<Rc<Receptor<R, S, T>>> {
         // This unwrap must succeed as the containing structure will always be dropped first
         // and no substrate references are leaked.
-        self.products.iter().flat_map(|product| product.upgrade().unwrap().borrow().receptors()).collect()
+        self.products.iter().flat_map(substrate_reference_to_receptors).collect()
     }
 }
 
@@ -265,18 +261,23 @@ impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for CatalyticCentre<
         if self.educts.len() != other.educts.len() { return false; }
         if self.products.len() != other.products.len() { return false; }
         // Compare the raw pointers.
-        let educt_pairs = self.educts.iter()
-            .map(|w| w.as_ptr())
-            .zip(other.educts.iter().map(|w| w.as_ptr()));
-        for (a, b) in educt_pairs {
-            if a != b { return false; }
-        }
-        let product_pairs = self.products.iter()
-            .map(|w| w.as_ptr())
-            .zip(other.products.iter().map(|w| w.as_ptr()));
-        for (a, b) in product_pairs {
-            if a != b { return false; }
-        }
-        true
+        let educt_pairs_not_matching = self.educts.iter()
+            .zip(other.educts.iter())
+            .any(|(a, b)| !a.ptr_eq(b));
+        if educt_pairs_not_matching { return false; }
+        self.products.iter()
+            .zip(other.products.iter())
+            .all(|(a, b)| a.ptr_eq(b))
     }
+}
+
+/// Returns the receptors of a weak substrate reference.
+/// 
+/// # Parameters
+/// 
+/// * `substrate` - the substrate reference
+fn substrate_reference_to_receptors<R: Reaction<T>, S: State<T>, T: Information>(substrate: &Weak<RefCell<Substrate<R, S, T>>>) -> Vec<Rc<Receptor<R, S, T>>> {
+    let upgrade: Rc<RefCell<Substrate<R, S, T>>> = substrate.upgrade().unwrap();
+    let s: &RefCell<Substrate<R, S, T>> = upgrade.borrow();
+    return s.borrow().receptors();
 }
