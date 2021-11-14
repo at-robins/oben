@@ -66,6 +66,31 @@ pub fn f64_to_binary(value: f64) -> BinarySubstrate {
     BitBox::from_slice(&value.to_be_bytes())
 }
 
+/// Converts the [`Substrate`] into a 64 bit unsigned integer.
+///
+/// # Parameters
+///
+/// * `substrate` - the [`Substrate`] to convert
+///
+/// # Panics
+///
+/// If the [`Substrate`] is not of length `64`.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+pub fn as_u64(substrate: &BinarySubstrate) -> u64 {
+    u64::from_be_bytes(as_64(substrate))
+}
+
+/// Converts a 64 bit unsigned integer into its binary reprsentation 
+/// as a [`BinarySubstrate`] that allows cross-over.
+///
+/// # Parameters
+///
+/// * `value` - the number to convert to its binary representation.
+pub fn u64_to_binary(value: u64) -> BinarySubstrate {
+    BitBox::from_slice(&value.to_be_bytes())
+}
+
 impl CrossOver for BinarySubstrate {
     fn is_similar(&self, other: &Self) -> bool {
         self.len() == other.len()

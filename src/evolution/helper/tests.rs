@@ -220,3 +220,174 @@ fn test_scaling_factor_base() {
     assert_ulps_eq!(factor.value(), 1.0/1.1);
     assert_eq!(factor.exponent(), -1);
 }
+
+#[test]
+/// Tests the `value` function of the `Nlbf64` struct.
+fn test_nlbf64_value() {
+    {
+        let x = Nlbf64 { value: 0 };
+        assert_ulps_eq!(x.value(), 0.0);
+    } {
+        let x = Nlbf64 { value: u64::MAX / 4};
+        assert_ulps_eq!(x.value(), 0.25);
+    } {
+        let x = Nlbf64 { value: u64::MAX / 2 };
+        assert_ulps_eq!(x.value(), 0.5);
+    } {
+        let x = Nlbf64 { value: (u64::MAX / 4) * 3 };
+        assert_ulps_eq!(x.value(), 0.75);
+    } {
+        let x = Nlbf64 { value: u64::MAX };
+        assert_ulps_eq!(x.value(), 1.0);
+    }
+}
+
+#[test]
+/// Tests the `from` function for conversion of `f64` to `Nlbf64`.
+fn test_nlbf64_from_f64() {
+    { // Default conversion.
+        let initial_value = 0.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), initial_value);
+    } { // Smaller zero.
+        let initial_value = -0.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Larger one.
+        let initial_value = 1.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), 1.0);
+    } { // NaN.
+        let x: Nlbf64 = f64::NAN.into();
+        assert_ulps_eq!(x.value(), 0.0);
+    }
+}
+
+#[test]
+/// Tests the `from` function for conversion of `&f64` to `Nlbf64`.
+fn test_nlbf64_from_f64_ref() {
+    { // Default conversion.
+        let initial_value = &0.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), initial_value);
+    } { // Smaller zero.
+        let initial_value = &-0.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Larger one.
+        let initial_value = &1.3584503953569;
+        let x: Nlbf64 = initial_value.into();
+        assert_ulps_eq!(x.value(), 1.0);
+    } { // NaN.
+        let x: Nlbf64 = (&f64::NAN).into();
+        assert_ulps_eq!(x.value(), 0.0);
+    }
+}
+
+#[test]
+/// Tests the `add` function for the `Nlbf64` struct.
+fn test_nlbf64_addition() {
+    { // Default addition.
+        let a: f64 = 0.3;
+        let b: f64 = 0.4;
+        let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), a + b);
+    } { // Zero addition.
+        let a: f64 = 0.0;
+        let b: f64 = 0.0;
+        let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Overflow addition.
+        let a: f64 = 0.6;
+        let b: f64 = 0.7;
+        let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 1.0);
+    } 
+}
+
+#[test]
+/// Tests the `add` function for `&Nlbf64`.
+fn test_nlbf64_addition_ref() {
+    { // Default addition.
+        let a: f64 = 0.3;
+        let b: f64 = 0.4;
+        let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), a + b);
+    } { // Zero addition.
+        let a: f64 = 0.0;
+        let b: f64 = 0.0;
+        let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Overflow addition.
+        let a: f64 = 0.6;
+        let b: f64 = 0.7;
+        let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 1.0);
+    } 
+}
+
+#[test]
+/// Tests the `add_assign` function for the `Nlbf64` struct.
+fn test_nlbf64_add_assign() {
+    { // Default addition.
+        let a: f64 = 0.3;
+        let b: f64 = 0.4;
+        let mut x: Nlbf64 = Nlbf64::from(a);
+        x += Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), a + b);
+    } { // Zero addition.
+        let a: f64 = 0.0;
+        let b: f64 = 0.0;
+        let mut x: Nlbf64 = Nlbf64::from(a);
+        x += Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Overflow addition.
+        let a: f64 = 0.6;
+        let b: f64 = 0.7;
+        let mut x: Nlbf64 = Nlbf64::from(a);
+        x += Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 1.0);
+    } 
+}
+
+#[test]
+/// Tests the `sub` function for the `Nlbf64` struct.
+fn test_nlbf64_subtraction() {
+    { // Default subtraction.
+        let a: f64 = 0.4;
+        let b: f64 = 0.3;
+        let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), a - b);
+    } { // Zero subtraction.
+        let a: f64 = 0.0;
+        let b: f64 = 0.0;
+        let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Overflow subtraction.
+        let a: f64 = 0.2;
+        let b: f64 = 0.7;
+        let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } 
+}
+
+#[test]
+/// Tests the `sub` function for `&Nlbf64`.
+fn test_nlbf64_subtraction_ref() {
+    { // Default subtraction.
+        let a: f64 = 0.4;
+        let b: f64 = 0.3;
+        let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), a - b);
+    } { // Zero subtraction.
+        let a: f64 = 0.0;
+        let b: f64 = 0.0;
+        let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } { // Overflow subtraction.
+        let a: f64 = 0.2;
+        let b: f64 = 0.7;
+        let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
+        assert_ulps_eq!(x.value(), 0.0);
+    } 
+}

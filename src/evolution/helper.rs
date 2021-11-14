@@ -5,7 +5,9 @@ extern crate serde;
 
 use rand::{Rng, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{borrow::Borrow, convert::TryFrom, ops::{Add, AddAssign, Sub, SubAssign}};
+
+use super::{binary::{as_u64, u64_to_binary}, gene::CrossOver};
 
 /// Randomly returns one of the specified values.
 ///
@@ -89,7 +91,7 @@ impl Iteration {
     }
 }
 
-impl std::ops::Sub for Iteration {
+impl Sub for Iteration {
     type Output = i32;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -97,7 +99,7 @@ impl std::ops::Sub for Iteration {
     }
 }
 
-impl std::ops::Sub for &Iteration {
+impl Sub for &Iteration {
     type Output = i32;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -172,7 +174,7 @@ impl<T: PartialEq> ActionChain<T> {
 
 }
 
-impl<T, I: std::borrow::Borrow<Iteration>> From<I> for ActionChain<T> {
+impl<T, I: Borrow<Iteration>> From<I> for ActionChain<T> {
     fn from(starting_iteration: I) -> Self {
         Self{mean_size: 0, iteration: *starting_iteration.borrow(), actions: Vec::new()}
     }
@@ -213,6 +215,109 @@ impl ScalingFactor {
     /// Returns the current scaling factor.
     pub fn value(&self) -> f64 {
         self.base.powi(self.factor)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// A non linear, equally spaced floating point representation bound between 0 and 1.
+pub struct Nlbf64 {
+    value: u64,
+}
+
+impl Nlbf64 {
+    /// Retruns the value as floating point number.
+    pub fn value(&self) -> f64 {
+       if self.value == 0 {
+           0.0
+       } else if self.value == u64::MAX {
+           1.0
+       } else {
+           (self.value as f64) / (u64::MAX as f64)
+       }
+    }
+}
+
+impl From<f64> for Nlbf64 {
+    fn from(value: f64) -> Self {
+        if value <= 0.0 {
+            Self { value: 0 }
+        } else if value >= 1.0 {
+            Self { value: u64::MAX }
+        } else {
+            Self { value: (value * u64::MAX as f64) as u64 } 
+        }
+    }
+}
+
+impl From<&f64> for Nlbf64 {
+    fn from(value: &f64) -> Self {
+        if *value <= 0.0 {
+            Self { value: 0 }
+        } else if *value >= 1.0 {
+            Self { value: u64::MAX }
+        } else {
+            Self { value: (value * u64::MAX as f64) as u64 } 
+        }
+    }
+}
+
+impl Add for Nlbf64 {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self { value: self.value.checked_add(other.value).unwrap_or(u64::MAX) }
+    }
+}
+
+impl Add for &Nlbf64 {
+    type Output = Nlbf64;
+
+    fn add(self, other: Self) -> Self::Output {
+        *self + *other
+    }
+}
+
+impl<T: Borrow<Nlbf64>> AddAssign<T> for Nlbf64 {
+    fn add_assign(&mut self, other: T) {
+        *self = *self + *other.borrow();
+    }
+}
+
+impl Sub for Nlbf64 {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self { value: self.value.checked_sub(other.value).unwrap_or(0) }
+    }
+}
+
+impl Sub for &Nlbf64 {
+    type Output = Nlbf64;
+
+    fn sub(self, other: Self) -> Self::Output {
+        *self - *other
+    }
+}
+
+impl<T: Borrow<Nlbf64>> SubAssign<T> for Nlbf64 {
+    fn sub_assign(&mut self, other: T) {
+        *self = *self - *other.borrow();
+    }
+}
+
+impl Default for Nlbf64 {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
+}
+
+impl CrossOver for Nlbf64 {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        Nlbf64{value: as_u64(&u64_to_binary(self.value).cross_over(&u64_to_binary(other.value)))}
     }
 }
 

@@ -64,4 +64,38 @@ fn test_f64_as_binary() {
     assert_eq!(test_f64, as_f64(&test_substrate));
 }
 
+#[test]
+/// Tests if the function `as_u64` can correctly convert a 64 bit `BitBox` into a `u64`.
+fn test_as_u64() {
+    let test_u64: u64 = thread_rng().gen();
+    let test_substrate: BinarySubstrate = BitBox::from_slice(&test_u64.to_be_bytes());
+    assert_eq!(test_u64, as_u64(&test_substrate));
+}
+
+#[test]
+#[should_panic]
+/// Tests if the function `as_u64` panics if the passed substrate contains less than 64 bit.
+fn test_panic_less_as_u64() {
+    let test_u64: [u8; 7] = thread_rng().gen();
+    let test_substrate: BinarySubstrate = BitBox::from_slice(&test_u64);
+    as_u64(&test_substrate);
+}
+
+#[test]
+#[should_panic]
+/// Tests if the function `as_u64` panics if the passed substrate contains more than 64 bit.
+fn test_panic_greater_as_u64() {
+    let test_u64: [u8; 9] = thread_rng().gen();
+    let test_substrate: BinarySubstrate = BitBox::from_slice(&test_u64);
+    as_u64(&test_substrate);
+}
+
+#[test]
+/// Tests if the function `u64_as_binary` can correctly convert a `u64` into a 64 bit `BitBox`.
+fn test_u64_as_binary() {
+    let test_u64: u64 = thread_rng().gen();
+    let test_substrate: BinarySubstrate = u64_to_binary(test_u64);
+    assert_eq!(test_u64, as_u64(&test_substrate));
+}
+
 mod test_binary_substrate;
