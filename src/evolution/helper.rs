@@ -4,6 +4,7 @@ extern crate rand;
 extern crate serde;
 
 use rand::{Rng, thread_rng};
+use rand_distr::{Distribution, Standard};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, convert::TryFrom, ops::{Add, AddAssign, Sub, SubAssign}};
 
@@ -308,6 +309,12 @@ impl<T: Borrow<Nlbf64>> SubAssign<T> for Nlbf64 {
 impl Default for Nlbf64 {
     fn default() -> Self {
         Self { value: 0 }
+    }
+}
+
+impl Distribution<Nlbf64> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Nlbf64 {
+        Nlbf64 { value: rng.gen() }
     }
 }
 

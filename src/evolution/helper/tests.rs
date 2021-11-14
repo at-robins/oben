@@ -391,3 +391,29 @@ fn test_nlbf64_subtraction_ref() {
         assert_ulps_eq!(x.value(), 0.0);
     } 
 }
+
+#[test]
+/// Tests if the function `is_similar` of the `CrossOver` trait can correctly detect similar
+/// substrates.
+fn test_nlbf64_cross_over_is_similar() {
+    // Test similar substrates.
+    let a: Nlbf64 = 0.1.into();
+    let b: Nlbf64 = 0.6.into();
+    assert!(a.is_similar(&b));
+}
+
+#[test]
+/// Tests if the function `cross_over` of the `CrossOver` trait can correctly recombine
+/// substrates.
+fn test_nlbf64_cross_over_cross_over() {
+    let a: Nlbf64 = thread_rng().gen();
+    let b: Nlbf64 = thread_rng().gen();
+    let binary_a = u64_to_binary(a.value);
+    let binary_b = u64_to_binary(b.value);
+    let recombined = a.cross_over(&b);
+    let binary_recombined = u64_to_binary(recombined.value);
+    for i in 0.. binary_a.len() {
+        assert!(binary_recombined.get(i) == binary_a.get(i)
+            || binary_recombined.get(i) == binary_b.get(i));
+    }
+}
