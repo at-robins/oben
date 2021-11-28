@@ -6,6 +6,8 @@ use rand::{thread_rng, Rng};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use crate::evolution::helper::ScalingFactor;
+
 use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{Genome, GenomeMutation};
 use super::super::resource::Resource;
@@ -74,6 +76,8 @@ pub struct EnvironmentBuilder {
     ///
     /// [`Organism`]: ../population/struct.Organism.html
     max_organism_size: usize,
+    /// The initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    initial_fitness_scaling_factor: ScalingFactor,
 }
 
 impl EnvironmentBuilder {
@@ -92,7 +96,8 @@ impl EnvironmentBuilder {
             lateral_gene_transfer_chance: None,
             testing_chance_sigmoid_midpoint: 50.0,
             testing_repetitions: 1,
-            max_organism_size: 8 * 1024 * 1024 * 50
+            max_organism_size: 8 * 1024 * 1024 * 50,
+            initial_fitness_scaling_factor: ScalingFactor::new(1.1),
         }
     }
 
@@ -119,6 +124,7 @@ impl EnvironmentBuilder {
             testing_repetitions: self.testing_repetitions,
             max_organism_size: self.max_organism_size,
             uuid_context: Context::new(0),
+            initial_fitness_scaling_factor: self.initial_fitness_scaling_factor,
         }
     }
 
@@ -263,6 +269,16 @@ impl EnvironmentBuilder {
         self.testing_repetitions = testing_repetitions;
         self
     }
+    
+    /// Sets the initial fitness [`ScalingFactor`].
+    /// 
+    /// # Parameters
+    /// 
+    /// * `intial_fitness_scaling_factor` - the initial fitness scaling
+    pub fn initial_fitness_scaling_factor(&mut self, initial_fitness_scaling_factor: ScalingFactor) -> &mut Self {
+        self.initial_fitness_scaling_factor = initial_fitness_scaling_factor;
+        self
+    }
 
     /// Returns the mutation rate if set. Otherwise defaults to a population size dependent value.
     fn mutation_rate_or_default(&self) -> f64 {
@@ -347,6 +363,8 @@ pub struct Environment<M, R, S, T> {
     max_organism_size: usize,
     /// The context for UUID creation.
     uuid_context: Context,
+    /// The initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    initial_fitness_scaling_factor: ScalingFactor,
 }
 
 impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> Environment<M, R, S, T> {
@@ -530,6 +548,11 @@ impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> En
     /// [`Population`]: ../population/struct.Population.html
     pub fn population_save_intervall(&self) -> Duration {
         self.population_save_intervall
+    }
+
+    /// Returns the initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    pub fn initial_fitness_scaling_factor(&self) -> ScalingFactor {
+        self.initial_fitness_scaling_factor
     }
 
     /// Initialises the environment.

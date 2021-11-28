@@ -77,7 +77,7 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
         // Start the network.
         println!("Starting execution...");
         let mut generation: u64 = 0;
-        let mut fitness_scaling: ScalingFactor = ScalingFactor::new(1.1);
+        let mut fitness_scaling: ScalingFactor = self.environment().initial_fitness_scaling_factor();
         let mut start = Instant::now();
         loop {
             let spawn_counter = Arc::new(Mutex::new(0u32));
