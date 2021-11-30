@@ -2,7 +2,7 @@
 name = "oben"
 version = "0.1.0"
 authors = ["at-robins <30956028+at-robins@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 approx = "0.4"
