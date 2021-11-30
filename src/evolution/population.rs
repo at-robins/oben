@@ -25,14 +25,14 @@ use super::environment::Environment;
 use super::resource::Resource;
 use uuid::Uuid;
 
-pub struct Organism<R, S, T> {
-    substrates: Vec<Rc<RefCell<Substrate<R, S, T>>>>,
-    input: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
-    output: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
+pub struct Organism<ReactionType, StateType, InformationType> {
+    substrates: Vec<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
+    input: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+    output: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
     time_alive: Iteration,
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>, InformationType: Information> Organism<ReactionType, StateType, InformationType> {
     /// Creates a new `Organism` from the specified [`Substrate`]s.
     ///
     /// # Parameters
@@ -42,9 +42,9 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     /// * `output` - the [`Substrate`]s linked to the output
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn new(substrates: Vec<Rc<RefCell<Substrate<R, S, T>>>>,
-        input: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>,
-        output: Vec<Option<Rc<RefCell<Substrate<R, S, T>>>>>) -> Self {
+    pub fn new(substrates: Vec<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
+        input: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+        output: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>) -> Self {
         Organism{substrates, input, output, time_alive: Iteration::new()}
     }
 
@@ -60,11 +60,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Receptor`]: ../protein/struct.Receptor.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn live<M>(&mut self, environment: &Environment<M, R, S, T>) -> Duration
-        where M: GenomeMutation<R, S, T> {
+    pub fn live<MutationType>(&mut self, environment: &Environment<MutationType, ReactionType, StateType, InformationType>) -> Duration
+        where MutationType: GenomeMutation<ReactionType, StateType, InformationType> {
         let birth = Instant::now();
         // Set the current time to the last update, so the organsim can be reused (set_input()).
-        let mut actions: ActionChain<Rc<Receptor<R, S, T>>> = self.time_alive().into();
+        let mut actions: ActionChain<Rc<Receptor<ReactionType, StateType, InformationType>>> = self.time_alive().into();
         // Add all receptors detecting changes to the input.
         for input_substrate in self.input.iter().filter_map(|val| val.as_ref()) {
             for receptor in input_substrate.borrow().receptors() {
@@ -117,7 +117,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     /// Returns the values of output [`Substrate`]s if any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_result(&self) -> Vec<Option<T>> {
+    pub fn get_result(&self) -> Vec<Option<InformationType>> {
         self.output.iter().map(|sub| sub.as_ref().and_then(|some| Some(some.borrow_mut().value(self.time_alive()).clone()))).collect()
     }
 
@@ -135,7 +135,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
     /// # Panics
     ///
     /// If the length of `input` is not equal to the number of inputs specified by the organism.
-    pub fn set_input(&self, input: Vec<T>) {
+    pub fn set_input(&self, input: Vec<InformationType>) {
         if input.len() != self.input.len() {
             panic!("The organism needs {} inputs, but {} were specified.", self.input.len(), input.len());
         }
@@ -151,9 +151,9 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Organism<R, S, T> {
 /// Information of about an [`Organism`]s performance.
 ///
 /// [`Organism`]: ./struct.Organism.html
-pub struct OrganismInformation<I, T> {
-    result: Vec<Option<T>>,
-    result_info: I,
+pub struct OrganismInformation<SupplierResultInformationType, ExecutionResultElementType> {
+    result: Vec<Option<ExecutionResultElementType>>,
+    result_info: SupplierResultInformationType,
     genome_size: usize,
     run_time: Duration,
     max_run_time: Duration,
@@ -163,12 +163,12 @@ pub struct OrganismInformation<I, T> {
     max_organism_size: usize,
 }
 
-impl<I, T: Information> OrganismInformation<I, T> {
+impl<SupplierResultInformationType, ExecutionResultElementType: Information> OrganismInformation<SupplierResultInformationType, ExecutionResultElementType> {
     /// Creates a new `OrganismInformation` containig information about the performance of an
     /// [`Organism`] during a specific task.
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn new(result: Vec<Option<T>>, result_info: I, genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, associated_outputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
+    pub fn new(result: Vec<Option<ExecutionResultElementType>>, result_info: SupplierResultInformationType, genome_size: usize, run_time: Duration, max_run_time: Duration, associated_inputs: usize, associated_outputs: usize, organism_size: usize, max_organism_size: usize) -> Self {
         OrganismInformation{
             result,
             result_info,
@@ -185,13 +185,13 @@ impl<I, T: Information> OrganismInformation<I, T> {
     /// Returns the result of one testing run as calculated by the [`Organism`].
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn result(&self) -> &Vec<Option<T>> {
+    pub fn result(&self) -> &Vec<Option<ExecutionResultElementType>> {
         &self.result
     }
 
     /// Returns the result related information about the testing run supplied by the
     /// supplier function; e.g. the real result.
-    pub fn result_info(&self) -> &I {
+    pub fn result_info(&self) -> &SupplierResultInformationType {
         &self.result_info
     }
 
@@ -269,12 +269,12 @@ impl<I, T: Information> OrganismInformation<I, T> {
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
 /// [`Organism`]: ./struct.Organism.html
-pub struct Individual<R, S, T> {
-    phantom_r: PhantomData<R>,
-    phantom_s: PhantomData<S>,
-    phantom_t: PhantomData<T>,
+pub struct Individual<ReactionType, StateType, InformationType> {
+    phantom_r: PhantomData<ReactionType>,
+    phantom_s: PhantomData<StateType>,
+    phantom_t: PhantomData<InformationType>,
     source: Uuid,
-    genome: Genome<R, S, T>,
+    genome: Genome<ReactionType, StateType, InformationType>,
     fitness: Option<f64>,
     bytes: usize,
     age: u32,
@@ -282,7 +282,7 @@ pub struct Individual<R, S, T> {
     resources: f64
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>, InformationType: Information> Individual<ReactionType, StateType, InformationType> {
     /// Creates a new `Individual`.
     ///
     /// # Parameters
@@ -291,7 +291,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
     /// * `genome` - the [`Genome`] of the `Individual`
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn new(uuid: Uuid, genome: Genome<R, S, T>) -> Self {
+    pub fn new(uuid: Uuid, genome: Genome<ReactionType, StateType, InformationType>) -> Self {
         let bytes = genome.binary_size();
         Individual{
             phantom_r: PhantomData,
@@ -355,7 +355,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
     }
 
     /// Returns the values of all outputs for this `Individual`.
-    pub fn output_values(&self) -> Vec<Option<T>> {
+    pub fn output_values(&self) -> Vec<Option<InformationType>> {
         self.genome().get_output_values()
     }
 
@@ -394,7 +394,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
     /// * `partner` - the mating partner's [`Genome`]
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mate(&self, partner: Genome<R, S, T>) -> Genome<R, S, T> {
+    pub fn mate(&self, partner: Genome<ReactionType, StateType, InformationType>) -> Genome<ReactionType, StateType, InformationType> {
         self.genome().cross_over(&partner)
     }
 
@@ -408,15 +408,15 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mate_and_mutate<M> (&self, partner: Genome<R, S, T>, environment: &Environment<M, R, S, T>) -> Individual<R, S, T>
-        where M: GenomeMutation<R, S, T> {
+    pub fn mate_and_mutate<MutationType> (&self, partner: Genome<ReactionType, StateType, InformationType>, environment: &Environment<MutationType, ReactionType, StateType, InformationType>) -> Individual<ReactionType, StateType, InformationType>
+        where MutationType: GenomeMutation<ReactionType, StateType, InformationType> {
         let offspring_genome = self.mate(partner);
         let random_chance: f64 = rand::thread_rng().gen_range(0.0, 1.0);
         // Calculate the number of mutations corresponding to the generated uniform random percentage.
         //    P("n mutations in a single genome") = "mutation rate" ^ n
         // => n = log(base: "mutation rate", value: P)
         let number_of_mutations = random_chance.log(environment.mutation_rate()).floor() as usize;
-        if let Some(mutated_offspring_genome) = Environment::<M, R, S, T>::mutate_n_times(number_of_mutations, &offspring_genome) {
+        if let Some(mutated_offspring_genome) = Environment::<MutationType, ReactionType, StateType, InformationType>::mutate_n_times(number_of_mutations, &offspring_genome) {
             // If the mutation was successful, return the mutated individual.
             Individual::new(environment.generate_uuid(), mutated_offspring_genome)
         } else {
@@ -433,7 +433,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
     /// If loading the [`Genome`] from its associated file failed.
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn genome(&self) -> &Genome<R, S, T> {
+    pub fn genome(&self) -> &Genome<ReactionType, StateType, InformationType> {
         &self.genome
     }
 
@@ -464,16 +464,16 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Individual<R, S, T> {
 /// be serialised and deserialised.
 ///
 /// [`Population`]: ./struct.Population.html
-struct SerialisablePopulation<R, S, T> {
-    individuals: Vec<Individual<R, S, T>>,
+struct SerialisablePopulation<ReactionType, StateType, InformationType> {
+    individuals: Vec<Individual<ReactionType, StateType, InformationType>>,
     resources: Resource,
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information> SerialisablePopulation<R, S, T> {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>, InformationType: Information> SerialisablePopulation<ReactionType, StateType, InformationType> {
     /// Returns the UUID and fitness of the fittest individual of the population.
-    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<Individual<R, S, T>>, Option<Vec<Option<T>>>) {
+    fn fittest_individual(&self) -> (Option<Uuid>, Option<f64>, Option<Individual<ReactionType, StateType, InformationType>>, Option<Vec<Option<InformationType>>>) {
         let (mut uuid, mut fitness, mut ind, mut out) = (None, None, None, None);
-        let filter: Vec<&Individual<R, S, T>> = self.individuals.iter().filter(|i| i.age() >= 1).collect();
+        let filter: Vec<&Individual<ReactionType, StateType, InformationType>> = self.individuals.iter().filter(|i| i.age() >= 1).collect();
         for individual in filter {
             match fitness {
                 Some(fit) if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
@@ -488,8 +488,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> SerialisablePopulation<R, S, T
     }
 }
 
-impl<R: Reaction<T>, S: State<T>,T: Information> From<&Population<R, S, T>> for SerialisablePopulation<R, S, T> {
-    fn from(pop: &Population<R, S, T>) -> Self {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>,InformationType: Information> From<&Population<ReactionType, StateType, InformationType>> for SerialisablePopulation<ReactionType, StateType, InformationType> {
+    fn from(pop: &Population<ReactionType, StateType, InformationType>) -> Self {
         let mut serialisable_population = SerialisablePopulation{individuals: vec!(), resources: pop.resources};
         for individual in pop.individuals.values() {
             match individual.lock() {
@@ -497,7 +497,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> From<&Population<R, S, T>> for 
                 Err(err) => {
                     // A individual cannot end up in an invalid state, so serialising it
                     // does no harm.
-                    let poisoned: Individual<R, S, T> = err.into_inner().clone();
+                    let poisoned: Individual<ReactionType, StateType, InformationType> = err.into_inner().clone();
                     serialisable_population.individuals.push(poisoned);
                 },
             }
@@ -510,12 +510,12 @@ impl<R: Reaction<T>, S: State<T>,T: Information> From<&Population<R, S, T>> for 
 /// A `Population` is a population of individuals with different [`Genome`]s.
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
-pub struct Population<R, S, T> {
-    individuals: HashMap<Uuid, Arc<Mutex<Individual<R, S, T>>>>,
+pub struct Population<ReactionType, StateType, InformationType> {
+    individuals: HashMap<Uuid, Arc<Mutex<Individual<ReactionType, StateType, InformationType>>>>,
     resources: Resource,
 }
 
-impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>,InformationType: Information> Population<ReactionType, StateType, InformationType> {
     /// Creates a new `Population` from the specified individuals.
     ///
     /// # Parameters
@@ -525,7 +525,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     ///
     /// [`Individual`]: ./struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    pub fn new(founding_individuals: Vec<Individual<R, S, T>>, resources: Resource) -> Self {
+    pub fn new(founding_individuals: Vec<Individual<ReactionType, StateType, InformationType>>, resources: Resource) -> Self {
         let mut individuals = HashMap::new();
         for ind in founding_individuals.into_iter() {
             individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind)));
@@ -541,7 +541,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// * `path_to_file` - the JSON file the `Population` should be written to
     pub fn snapshot_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error + 'static>> where P: AsRef<Path> {
         let mut file = File::create(&path_to_file)?;
-        let serialisable_population: SerialisablePopulation<R, S, T> = self.into();
+        let serialisable_population: SerialisablePopulation<ReactionType, StateType, InformationType> = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
         let (id, fitness, ind, out) = serialisable_population.fittest_individual();
         println!("\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\n\n{:#?}\nValues: {:?}\n\n",
@@ -560,14 +560,14 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
         let mut file = File::open(&path_to_file)?;
         let mut file_content = Vec::new();
         file.read_to_end(&mut file_content)?;
-        let serialisable_population: SerialisablePopulation<R, S, T> = rmp_serde::from_read_ref(&file_content)?;
+        let serialisable_population: SerialisablePopulation<ReactionType, StateType, InformationType> = rmp_serde::from_read_ref(&file_content)?;
         Ok(serialisable_population.into())
     }
 
     /// Returns the [`Individual`]s that are part of this `Population`.
     ///
     /// [`Individual`]: ./struct.Individual.html
-    pub fn individuals(&self) -> Vec<Arc<Mutex<Individual<R, S, T>>>> {
+    pub fn individuals(&self) -> Vec<Arc<Mutex<Individual<ReactionType, StateType, InformationType>>>> {
         self.individuals.values().map(|val| val.clone()).collect()
     }
 
@@ -578,7 +578,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// * `individuals` - the [`Individual`]s to append
     ///
     /// [`Individual`]: ./struct.Individual.html
-    pub fn append(&mut self, individuals: Vec<Individual<R, S, T>>) {
+    pub fn append(&mut self, individuals: Vec<Individual<ReactionType, StateType, InformationType>>) {
         for ind in individuals.into_iter() {
             if let Some(ele) = self.individuals.insert(*ind.uuid(), Arc::new(Mutex::new(ind))) {
                 // Should - for some reason - a duplicate UUID arise, repatriate the resources of
@@ -598,7 +598,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ./struct.Individual.html
-    pub fn random_gene(&self) -> Option<Gene<R, S, T>> {
+    pub fn random_gene(&self) -> Option<Gene<ReactionType, StateType, InformationType>> {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -624,7 +624,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     ///
     /// [`Individual`]: ./struct.Individual.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn random_genome(&self) -> Option<Genome<R, S, T>> {
+    pub fn random_genome(&self) -> Option<Genome<ReactionType, StateType, InformationType>> {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -646,7 +646,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ./struct.Individual.html
-    pub fn random_individual(&self) -> Option<Arc<Mutex<Individual<R, S, T>>>> {
+    pub fn random_individual(&self) -> Option<Arc<Mutex<Individual<ReactionType, StateType, InformationType>>>> {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -669,7 +669,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// [`Genome`]: ../gene/struct.Genome.html
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Individual`]: ./struct.Individual.html
-    pub fn remove(&mut self, individual_uuid: Uuid) -> Result<Arc<Mutex<Individual<R, S, T>>>, Box<dyn Error>> {
+    pub fn remove(&mut self, individual_uuid: Uuid) -> Result<Arc<Mutex<Individual<ReactionType, StateType, InformationType>>>, Box<dyn Error>> {
         let removed = self.individuals.remove(&individual_uuid)
             .ok_or::<RemoveError>(RemoveError::new(&individual_uuid))?;
         Ok(removed)
@@ -774,7 +774,7 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     /// [`Individual`]: ./struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn distribute_resources(&mut self) {
-        let mut requests: Vec<(Arc<Mutex<Individual<R, S, T>>>, f64)> = Vec::with_capacity(self.individuals.capacity());
+        let mut requests: Vec<(Arc<Mutex<Individual<ReactionType, StateType, InformationType>>>, f64)> = Vec::with_capacity(self.individuals.capacity());
         let mut total_request = 0.0;
         // Calculate the maximum resources per individual that might be aquired.
         for individual in self.individuals() {
@@ -805,8 +805,8 @@ impl<R: Reaction<T>, S: State<T>,T: Information> Population<R, S, T> {
     }
 }
 
-impl<R: Reaction<T>, S: State<T>,T: Information> From<SerialisablePopulation<R, S, T>> for Population<R, S, T> {
-    fn from(serial: SerialisablePopulation<R, S, T>) -> Self {
+impl<ReactionType: Reaction<InformationType>, StateType: State<InformationType>, InformationType: Information> From<SerialisablePopulation<ReactionType, StateType, InformationType>> for Population<ReactionType, StateType, InformationType> {
+    fn from(serial: SerialisablePopulation<ReactionType, StateType, InformationType>) -> Self {
         Self::new(serial.individuals, serial.resources)
     }
 }
