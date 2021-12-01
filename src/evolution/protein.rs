@@ -2,6 +2,7 @@
 extern crate bitvec;
 extern crate rmp_serde;
 
+use std::borrow::Borrow;
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
 use super::chemistry::{Information, Reaction, State};
