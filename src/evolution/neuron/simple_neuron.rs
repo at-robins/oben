@@ -70,7 +70,11 @@ impl CrossOver for SimpleNeuron {
     }
 }
 
-impl Information for SimpleNeuron {}
+impl Information for SimpleNeuron {
+    fn update_value(&mut self, time_passed: i32) {
+        // TODO: Implement
+    }
+}
 
 #[cfg(test)]
 mod tests;
