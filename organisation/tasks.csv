@@ -1,2 +1,3 @@
 ID;Title;Category;Description;Result;Status
 1;Setup a task file;Organisation;A task file is to be set up to mimic a very basic ticket system.;;Done
+2;Setup GitHub pipeline;Organisation;A basic GitHub pipeline should be created to validate pushed code.;;Open
