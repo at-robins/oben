@@ -3,12 +3,19 @@ extern crate bitvec;
 extern crate rand;
 extern crate serde;
 
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 use rand_distr::{Distribution, Standard};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, convert::TryFrom, ops::{Add, AddAssign, Sub, SubAssign}};
+use std::{
+    borrow::Borrow,
+    convert::TryFrom,
+    ops::{Add, AddAssign, Sub, SubAssign},
+};
 
-use super::{binary::{as_u64, u64_to_binary}, gene::CrossOver};
+use super::{
+    binary::{as_u64, u64_to_binary},
+    gene::CrossOver,
+};
 
 /// Randomly returns one of the specified values.
 ///
@@ -30,9 +37,11 @@ pub fn a_or_b<T>(a: T, b: T) -> T {
 ///
 /// * `a` - the first function
 /// * `b` - the second function
-pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
+pub fn do_a_or_b<F, G, T>(a: F, b: G) -> T
+where
     F: FnOnce() -> T,
-    G: FnOnce() -> T {
+    G: FnOnce() -> T,
+{
     if thread_rng().gen() {
         a()
     } else {
@@ -45,7 +54,7 @@ pub fn do_a_or_b<F,G,T>(a: F, b: G) -> T where
 ///
 /// # Parameters
 ///
-/// * `value` - the number to transform 
+/// * `value` - the number to transform
 pub fn nonlinear_normal_positve(value: f64) -> f64 {
     if value.is_normal() && value.is_sign_positive() {
         value
@@ -65,12 +74,16 @@ pub struct Iteration {
 impl Iteration {
     /// Creates a new `Iteration`.
     pub fn new() -> Self {
-        Self{current_iteration: 0}
+        Self {
+            current_iteration: 0,
+        }
     }
 
     /// Increments the `Iteration` to its sequentially next step.
     pub fn increment(&self) -> Self {
-        Self{current_iteration: self.current_iteration + 1}
+        Self {
+            current_iteration: self.current_iteration + 1,
+        }
     }
 
     /// Returns the difference in steps between both `Iteration`s. If the difference is out
@@ -80,7 +93,7 @@ impl Iteration {
     /// # Parameters
     ///
     /// * `other` - the `Iteration` to calculate the difference from
-    pub fn difference<T: std::borrow::Borrow<Iteration>> (&self, other: T) -> i32 {
+    pub fn difference<T: std::borrow::Borrow<Iteration>>(&self, other: T) -> i32 {
         let real_difference = self.current_iteration - other.borrow().current_iteration;
         i32::try_from(real_difference).unwrap_or_else(|_| -> i32 {
             if real_difference > i32::MAX as i128 {
@@ -134,7 +147,11 @@ impl<T: PartialEq> ActionChain<T> {
     /// Creates a new `ActionChain` starting a new
     /// [`Iteration`](oben::evolution::helper::Iteration) cycle.
     pub fn new() -> Self {
-        Self{mean_size: 0, iteration: Iteration::new(), actions: Vec::new()}
+        Self {
+            mean_size: 0,
+            iteration: Iteration::new(),
+            actions: Vec::new(),
+        }
     }
 
     /// Returns the current [`Iteration`](oben::evolution::helper::Iteration) the actions
@@ -172,12 +189,15 @@ impl<T: PartialEq> ActionChain<T> {
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
-
 }
 
 impl<T, I: Borrow<Iteration>> From<I> for ActionChain<T> {
     fn from(starting_iteration: I) -> Self {
-        Self{mean_size: 0, iteration: *starting_iteration.borrow(), actions: Vec::new()}
+        Self {
+            mean_size: 0,
+            iteration: *starting_iteration.borrow(),
+            actions: Vec::new(),
+        }
     }
 }
 
@@ -190,12 +210,12 @@ pub struct ScalingFactor {
 
 impl ScalingFactor {
     /// Creates a new `ScalingFactor` with the specified base value.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `base` - the base to scale by
     pub fn new(base: f64) -> ScalingFactor {
-        ScalingFactor{factor: 0, base}
+        ScalingFactor { factor: 0, base }
     }
 
     /// Returns the scaling exponent.
@@ -219,7 +239,7 @@ impl ScalingFactor {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 /// A non linear, equally spaced floating point representation bound between 0 and 1.
 pub struct Nlbf64 {
     value: u64,
@@ -228,13 +248,13 @@ pub struct Nlbf64 {
 impl Nlbf64 {
     /// Retruns the value as floating point number.
     pub fn value(&self) -> f64 {
-       if self.value == 0 {
-           0.0
-       } else if self.value == u64::MAX {
-           1.0
-       } else {
-           (self.value as f64) / (u64::MAX as f64)
-       }
+        if self.value == 0 {
+            0.0
+        } else if self.value == u64::MAX {
+            1.0
+        } else {
+            (self.value as f64) / (u64::MAX as f64)
+        }
     }
 }
 
@@ -245,7 +265,9 @@ impl From<f64> for Nlbf64 {
         } else if value >= 1.0 {
             Self { value: u64::MAX }
         } else {
-            Self { value: (value * u64::MAX as f64) as u64 } 
+            Self {
+                value: (value * u64::MAX as f64) as u64,
+            }
         }
     }
 }
@@ -257,7 +279,9 @@ impl From<&f64> for Nlbf64 {
         } else if *value >= 1.0 {
             Self { value: u64::MAX }
         } else {
-            Self { value: (value * u64::MAX as f64) as u64 } 
+            Self {
+                value: (value * u64::MAX as f64) as u64,
+            }
         }
     }
 }
@@ -266,7 +290,9 @@ impl Add for Nlbf64 {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        Self { value: self.value.checked_add(other.value).unwrap_or(u64::MAX) }
+        Self {
+            value: self.value.checked_add(other.value).unwrap_or(u64::MAX),
+        }
     }
 }
 
@@ -288,7 +314,9 @@ impl Sub for Nlbf64 {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        Self { value: self.value.checked_sub(other.value).unwrap_or(0) }
+        Self {
+            value: self.value.checked_sub(other.value).unwrap_or(0),
+        }
     }
 }
 
@@ -324,7 +352,9 @@ impl CrossOver for Nlbf64 {
     }
 
     fn cross_over(&self, other: &Self) -> Self {
-        Nlbf64{value: as_u64(&u64_to_binary(self.value).cross_over(&u64_to_binary(other.value)))}
+        Nlbf64 {
+            value: as_u64(&u64_to_binary(self.value).cross_over(&u64_to_binary(other.value))),
+        }
     }
 }
 

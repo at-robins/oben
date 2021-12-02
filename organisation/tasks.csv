@@ -1,3 +1,40 @@
 ID;Title;Category;Description;Result;Status
 1;Setup a task file;Organisation;A task file is to be set up to mimic a very basic ticket system.;;Done
-2;Setup GitHub pipeline;Organisation;A basic GitHub pipeline should be created to validate pushed code.;;Open
+2;Setup GitHub pipeline;Organisation;A basic GitHub pipeline should be created to validate pushed code.;;Done
+3;Implement input sensor;Feature;The input mechanism needs to be generified to a genomic component.;;
+4;Implement output sensor;Feature;The output mechanism needs to be generified to a genomic component.;;
+5;Allow configuration of constant size organisms;Feature;The binary size calculation of organisms is performed on every update cycle and might pose a performance bottleneck for organisms that have a constant size at runtime. A configuration should be introduced to allow size calculations to be performed only once. It should be disabled by default to prevent accidental memory growth for arbitrary implementations.;;
+6;Implementation of simple neuronal networks;Feature;Simple neuronal network components need to be integrated into / natively supported by the framework.;;
+7;Replace random function with distribution trait;Feature;All random functions defined in interfaces need to be replaced with the native Distribution trait to allow easier code maintainability.;;
+8;;;;;
+9;;;;;
+10;;;;;
+11;;;;;
+12;;;;;
+13;;;;;
+14;;;;;
+15;;;;;
+16;;;;;
+17;;;;;
+18;;;;;
+19;;;;;
+20;;;;;
+21;;;;;
+22;;;;;
+23;;;;;
+24;;;;;
+25;;;;;
+26;;;;;
+27;;;;;
+28;;;;;
+29;;;;;
+30;;;;;
+31;;;;;
+32;;;;;
+33;;;;;
+34;;;;;
+35;;;;;
+36;;;;;
+37;;;;;
+38;;;;;
+39;;;;;
