@@ -186,3 +186,55 @@ fn test_cross_over() {
     );
     assert!(neuron_recombined <= neuron_a + neuron_b);
 }
+
+#[test]
+/// Tests if the function `update_value` correctly updates neuron values.
+fn test_update_value() {
+    { // Test same base and current potential.
+        let potential: Nlbf64 = 0.4336654.into();
+        let neuron_original: SimpleNeuron = SimpleNeuron{current_potential: potential, base_potential: potential};
+        let mut neuron_updated: SimpleNeuron = neuron_original.clone();
+        assert_eq!(neuron_original, neuron_updated);
+        neuron_updated.update_value(5869);
+        assert_eq!(neuron_original, neuron_updated);
+    }
+    { // Test positive difference between base and current potential.
+        let base_potential: Nlbf64 = 0.4.into();
+        let current_potential: Nlbf64 = 0.9.into();
+        let neuron_original: SimpleNeuron = SimpleNeuron{current_potential, base_potential};
+        let mut neuron_updated: SimpleNeuron = neuron_original.clone();
+        assert_eq!(neuron_original, neuron_updated);
+        neuron_updated.update_value(POTENTIAL_HALFLIFE_TIME as i32);
+        assert_ne!(neuron_original, neuron_updated);
+        assert_eq!(neuron_updated.base_potential(), neuron_original.base_potential());
+        assert_ulps_eq!(neuron_updated.current_potential().value(), 0.65);
+        neuron_updated.update_value((POTENTIAL_HALFLIFE_TIME * 1.5) as i32);
+        assert_ne!(neuron_original, neuron_updated);
+        assert_eq!(neuron_updated.base_potential(), neuron_original.base_potential());
+        assert_ulps_eq!(neuron_updated.current_potential().value(), 0.48838834764831845);
+    }
+    { // Test negative difference between base and current potential.
+        let base_potential: Nlbf64 = 0.9.into();
+        let current_potential: Nlbf64 = 0.1.into();
+        let neuron_original: SimpleNeuron = SimpleNeuron{current_potential, base_potential};
+        let mut neuron_updated: SimpleNeuron = neuron_original.clone();
+        assert_eq!(neuron_original, neuron_updated);
+        neuron_updated.update_value((POTENTIAL_HALFLIFE_TIME as i32) * 2);
+        assert_ne!(neuron_original, neuron_updated);
+        assert_eq!(neuron_updated.base_potential(), neuron_original.base_potential());
+        assert_ulps_eq!(neuron_updated.current_potential().value(), 0.7);
+        neuron_updated.update_value((POTENTIAL_HALFLIFE_TIME * 1.5) as i32);
+        assert_ne!(neuron_original, neuron_updated);
+        assert_eq!(neuron_updated.base_potential(), neuron_original.base_potential());
+        assert_ulps_eq!(neuron_updated.current_potential().value(), 0.8292893218813453);
+    }
+    { // Test no time passed.
+        let base_potential: Nlbf64 = 0.5.into();
+        let current_potential: Nlbf64 = 0.4.into();
+        let neuron_original: SimpleNeuron = SimpleNeuron{current_potential, base_potential};
+        let mut neuron_updated: SimpleNeuron = neuron_original.clone();
+        assert_eq!(neuron_original, neuron_updated);
+        neuron_updated.update_value(0);
+        assert_eq!(neuron_original, neuron_updated);
+    }
+}
