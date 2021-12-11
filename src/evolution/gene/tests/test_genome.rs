@@ -1,63 +1,55 @@
-extern crate bitvec;
+use crate::evolution::helper::noop::{NoOpGene, NoOpGenome};
 
-use bitvec::boxed::BitBox;
 use super::*;
-use super::super::super::binary::{BinaryReaction, BinaryState, BinarySubstrate};
 
 #[test]
 /// Tests if the function `validate_associations` of the `Genome` struct.
 fn test_validate_associations() {
     // Test invalid substrates.
     {
-        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            substrates: Vec::new(),
-            receptors: Vec::new()
+        let gene: NoOpGene = Gene::new(vec![()]);
+        let invalid_gene_substrate = GeneSubstrate {
+            gene: 1,
+            substrate: 1,
         };
-        gene.add_substrate(BitBox::empty());
-        let invalid_gene_substrate = GeneSubstrate{gene: 1, substrate: 1};
-        let invalid_association = GeneAssociation{
-            substrate: BitBox::empty(),
-            associations: vec!(invalid_gene_substrate.clone())
+        let input_sensor = GenomicInputSensor::new(vec![Some(invalid_gene_substrate)], Vec::new(), ());
+        let invalid_association = GeneAssociation {
+            substrate: (),
+            associations: vec![invalid_gene_substrate.clone()],
         };
-        let mut genome = Genome {
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            input: vec!(Some(invalid_gene_substrate.clone())),
-            output: vec!(Some(invalid_gene_substrate.clone())),
-            genes: vec!(gene),
-            associations: vec!(invalid_association),
+        let mut genome: NoOpGenome = Genome {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            phantom_input_sensor: PhantomData,
+            input: input_sensor,
+            output: vec![Some(invalid_gene_substrate.clone())],
+            genes: vec![gene],
+            associations: vec![invalid_association],
         };
         genome.validate_associations();
-        assert_eq!(genome.input, vec!(None));
+        assert_eq!(genome.input.input_substrates, vec!(None));
         assert_eq!(genome.output, vec!(None));
-        assert_eq!(genome.associations, vec!(GeneAssociation{substrate: BitBox::empty(), associations: Vec::new()}));
+        assert_eq!(
+            genome.associations,
+            vec!(GeneAssociation {
+                substrate: (),
+                associations: Vec::new()
+            })
+        );
     }
     // Test duplicate I/O-substrates.
     {
-        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            substrates: Vec::new(),
-            receptors: Vec::new()
+        let gene: NoOpGene = Gene::new(vec![()]);
+        let gene_substrate = GeneSubstrate {
+            gene: 0,
+            substrate: 0,
         };
-        gene.add_substrate(BitBox::empty());
-        let gene_substrate = GeneSubstrate{gene: 0, substrate: 0};
-        let mut genome = Genome {
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            input: vec!(Some(gene_substrate.clone()), Some(gene_substrate.clone())),
-            output: vec!(Some(gene_substrate.clone()), Some(gene_substrate.clone())),
-            genes: vec!(gene),
-            associations: Vec::new(),
-        };
+        let input_sensor = GenomicInputSensor::new(vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())], Vec::new(), ());
+        let mut genome: NoOpGenome = Genome::new(input_sensor, vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())], vec![gene]);
         genome.validate_associations();
-        assert_eq!(genome.input, vec!(Some(gene_substrate.clone()), None));
+        assert_eq!(genome.input.input_substrates, vec!(Some(gene_substrate.clone()), None));
         assert_eq!(genome.output, vec!(Some(gene_substrate.clone()), None));
     }
 }
@@ -66,28 +58,23 @@ fn test_validate_associations() {
 /// Tests if the function `has_substrate` of the `Genome` struct.
 fn test_has_substrate() {
     {
-        let mut gene: Gene<BinaryReaction, BinaryState, BinarySubstrate> = Gene{
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            substrates: Vec::new(),
-            receptors: Vec::new()
+        let gene: NoOpGene = Gene::new(vec![()]);
+        let input_sensor = GenomicInputSensor::new(Vec::new(), Vec::new(), ());
+        let genome: NoOpGenome = Genome::new(input_sensor, Vec::new(), vec![gene]);
+        let positive = GeneSubstrate {
+            gene: 0,
+            substrate: 0,
         };
-        gene.add_substrate(BitBox::empty());
-        let genome = Genome {
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            input: Vec::new(),
-            output: Vec::new(),
-            genes: vec!(gene),
-            associations: Vec::new(),
+        let negative_a = GeneSubstrate {
+            gene: 0,
+            substrate: 1,
         };
-        let positive = GeneSubstrate{gene: 0, substrate: 0};
-        let negative_a = GeneSubstrate{gene: 0, substrate: 1};
-        let negative_b = GeneSubstrate{gene: 1, substrate: 1};
-        assert!(Genome::has_substrate(&genome.genes, &positive));
-        assert!(!Genome::has_substrate(&genome.genes, &negative_a));
-        assert!(!Genome::has_substrate(&genome.genes, &negative_b));
+        let negative_b = GeneSubstrate {
+            gene: 1,
+            substrate: 1,
+        };
+        assert!(NoOpGenome::has_substrate(&genome.genes, &positive));
+        assert!(!NoOpGenome::has_substrate(&genome.genes, &negative_a));
+        assert!(!NoOpGenome::has_substrate(&genome.genes, &negative_b));
     }
 }

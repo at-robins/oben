@@ -3,6 +3,7 @@
 extern crate serde;
 
 use crate::evolution::chemistry::Input;
+use crate::evolution::gene::Gene;
 
 use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{CrossOver, Genome, GenomeMutation};
@@ -13,6 +14,11 @@ use super::super::helper::Iteration;
 /// without any function.
 pub type NoOpGenome =
     Genome<NoOpReaction, NoOpState, NoOpSubstrate, NoOpInputElement, NoOpInputSensor>;
+
+/// A type alias for the representation of an empty
+/// [`Gene`](crate::evolution::gene::Gene)
+/// without any function.
+pub type NoOpGene = Gene<NoOpReaction, NoOpState, NoOpSubstrate>;
 
 /// A type alias for the underlying representation of a
 /// [`Substrate`](crate::evolution::protein::Substrate)

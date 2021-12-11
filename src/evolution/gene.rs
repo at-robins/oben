@@ -1956,6 +1956,22 @@ impl<
     >
     GenomicInputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
+    pub fn new(
+        input_substrates: Vec<Option<GeneSubstrate>>,
+        feedback_substrates: Vec<Option<GeneSubstrate>>,
+        input: InputSensorType,
+    ) -> Self {
+        Self {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            input_substrates,
+            feedback_substrates,
+            input,
+        }
+    }
+
     /// Get the number of associated input [`Substrate`](crate::evolution::protein::Substrate)s.
     pub fn number_of_associated_inputs(&self) -> usize {
         self.input_substrates.iter().filter(|i| i.is_some()).count()
