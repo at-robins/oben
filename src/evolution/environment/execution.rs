@@ -4,30 +4,70 @@ extern crate bitvec;
 extern crate rand;
 extern crate rayon;
 
+use crate::evolution::chemistry::Input;
+use crate::evolution::gene::CrossOver;
+use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use crate::evolution::helper::ScalingFactor;
 
-use super::configuration::Environment;
 use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{Genome, GenomeMutation};
-use super::super::population::{Individual, Population, Organism, OrganismInformation};
+use super::super::population::{Individual, Organism, OrganismInformation, Population};
 use super::super::resource::Resource;
+use super::configuration::Environment;
 use uuid::Uuid;
 
 /// An `EcologicalNiche` containing a [`Population`] and applying selective pressure.
 ///
 /// [`Population`]: ../population/struct.Population.html
-pub struct EcologicalNiche<I, M, R, S, T> {
-    inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>,
-    phantom: PhantomData<M>,
+pub struct EcologicalNiche<
+    SupplierResultInformationType,
+    MutationType,
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+> {
+    inner: Arc<
+        InnerEcologicalNiche<
+            SupplierResultInformationType,
+            MutationType,
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    >,
+    phantom: PhantomData<MutationType>,
 }
 
-impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> EcologicalNiche<I, M, R, S, T> {
+impl<
+        SupplierResultInformationType: 'static,
+        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    >
+    EcologicalNiche<
+        SupplierResultInformationType,
+        MutationType,
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
+{
     /// Creates a new `EcologicalNiche` executing the evolutionary network by repeated
     /// mutagenesis, fitness evaluation and growth of a [`Population`].
     ///
@@ -42,10 +82,37 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Environment`]: ./struct.Environment.html
     /// [`Population`]: ../population/struct.Population.html
     pub fn new(
-        environment: Environment<M, R, S, T>,
-        population: Population<R, S, T>,
-        supplier_function: Box<dyn Fn() -> (Vec<T>, I)  + Send + Sync + 'static>,
-        fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>, ScalingFactor) -> f64 + Send + Sync + 'static>) -> Self {
+        environment: Environment<
+            MutationType,
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+        population: Population<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+        supplier_function: Box<
+            dyn Fn() -> (InputElementType, SupplierResultInformationType)
+                + Send
+                + Sync
+                + 'static,
+        >,
+        fitness_function: Box<
+            dyn Fn(
+                    Vec<OrganismInformation<SupplierResultInformationType, InformationType>>,
+                    ScalingFactor,
+                ) -> f64
+                + Send
+                + Sync
+                + 'static,
+        >,
+    ) -> Self {
         EcologicalNiche {
             inner: Arc::new(InnerEcologicalNiche {
                 environment: Arc::new(environment),
@@ -66,7 +133,18 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// Returns the [`Environment`] of the network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    fn environment(&self) -> Arc<Environment<M, R, S, T>> {
+    fn environment(
+        &self,
+    ) -> Arc<
+        Environment<
+            MutationType,
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    > {
         self.inner.environment.clone()
     }
 
@@ -77,7 +155,8 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
         // Start the network.
         println!("Starting execution...");
         let mut generation: u64 = 0;
-        let mut fitness_scaling: ScalingFactor = self.environment().initial_fitness_scaling_factor();
+        let mut fitness_scaling: ScalingFactor =
+            self.environment().initial_fitness_scaling_factor();
         let mut start = Instant::now();
         loop {
             let spawn_counter = Arc::new(Mutex::new(0u32));
@@ -105,7 +184,9 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
                 }
             });
             // Kill individuals on statistical basis.
-            self.inner.individuals().par_iter()
+            self.inner
+                .individuals()
+                .par_iter()
                 .filter(|individual| self.inner.died((*individual).clone()))
                 .for_each(|individual| {
                     self.inner.remove_individual(individual.clone());
@@ -113,8 +194,22 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
             // Recycle resources.
             self.inner.recycle();
             // Print statistics
-            let mut res: f64 = self.inner.individuals().par_iter()
-                .map(|a| InnerEcologicalNiche::<I, M, R, S, T>::get_accumulated_resources(a.clone()) + 1.0)
+            let mut res: f64 = self
+                .inner
+                .individuals()
+                .par_iter()
+                .map(|a| {
+                    InnerEcologicalNiche::<
+                        SupplierResultInformationType,
+                        MutationType,
+                        ReactionType,
+                        StateType,
+                        InformationType,
+                        InputElementType,
+                        InputSensorType,
+                    >::get_accumulated_resources(a.clone())
+                        + 1.0
+                })
                 .sum();
             res += self.inner.resources().total();
             let mean_fitness: f64 = self.inner.population_mean_fitness();
@@ -158,11 +253,38 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn spawn_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>, fitness_scaling: ScalingFactor) {
+    fn spawn_organism(
+        inner: Arc<
+            InnerEcologicalNiche<
+                SupplierResultInformationType,
+                MutationType,
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+            >,
+        >,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+        fitness_scaling: ScalingFactor,
+    ) {
         let tested = inner.testing(individual.clone());
         if tested {
             // Transcribe / translate the genome and test the organism.
-            Self::add_fitness(individual.clone(), Self::test_organism(inner.clone(), individual.clone(), fitness_scaling));
+            Self::add_fitness(
+                individual.clone(),
+                Self::test_organism(inner.clone(), individual.clone(), fitness_scaling),
+            );
         }
     }
 
@@ -177,7 +299,30 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
-    fn mate_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>) {
+    fn mate_organism(
+        inner: Arc<
+            InnerEcologicalNiche<
+                SupplierResultInformationType,
+                MutationType,
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+            >,
+        >,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) {
         let offspring = Self::get_offspring(individual.clone(), inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
@@ -193,7 +338,31 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// [`Environment`]: ./struct.Environment.html
     /// [`Organism`]: ../population/struct.Organism.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn test_organism(inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>, individual: Arc<Mutex<Individual<R, S, T>>>, fitness_scaling: ScalingFactor) -> f64 {
+    fn test_organism(
+        inner: Arc<
+            InnerEcologicalNiche<
+                SupplierResultInformationType,
+                MutationType,
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+            >,
+        >,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+        fitness_scaling: ScalingFactor,
+    ) -> f64 {
         let mut organism = inner.load_organism(individual.clone());
         let mut organism_informations = Vec::new();
         // Repeatedly test the organism and supply all the testing information to the fitness
@@ -203,19 +372,17 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
             organism.set_input(input);
             let run_time = organism.live(&inner.environment);
             let output = organism.get_result();
-            organism_informations.push(
-                OrganismInformation::new(
-                    output,
-                    result_information,
-                    inner.get_bytes(individual.clone()) * 8,
-                    run_time,
-                    *(&inner.environment.lifespan()),
-                    inner.get_associated_inputs(individual.clone()),
-                    inner.get_associated_outputs(individual.clone()),
-                    organism.binary_size(),
-                    *(&inner.environment.max_organism_size())
-                )
-            );
+            organism_informations.push(OrganismInformation::new(
+                output,
+                result_information,
+                inner.get_bytes(individual.clone()) * 8,
+                run_time,
+                *(&inner.environment.lifespan()),
+                inner.get_associated_inputs(individual.clone()),
+                inner.get_associated_outputs(individual.clone()),
+                organism.binary_size(),
+                *(&inner.environment.max_organism_size()),
+            ));
         }
         (inner.fitness_function)(organism_informations, fitness_scaling)
     }
@@ -232,8 +399,22 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn add_fitness(individual: Arc<Mutex<Individual<R, S, T>>>, fitness: f64) {
-        let mut ind = individual.lock()
+    fn add_fitness(
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+        fitness: f64,
+    ) {
+        let mut ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.evaluate_new_fitness(fitness)
     }
@@ -250,13 +431,38 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_offspring(individual: Arc<Mutex<Individual<R, S, T>>>, inner: Arc<InnerEcologicalNiche<I, M, R, S, T>>) -> Vec<Individual<R, S, T>> {
+    fn get_offspring(
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+        inner: Arc<
+            InnerEcologicalNiche<
+                SupplierResultInformationType,
+                MutationType,
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+            >,
+        >,
+    ) -> Vec<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
+    {
         let mut offspring = Vec::new();
         // Use the accumulated resources to produce offspring.
         let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
         for _ in 0..number_of_offspring {
             let partner = inner.get_random_genome();
-            let ind = individual.lock()
+            let ind = individual
+                .lock()
                 .expect("A thread paniced while holding the individual's lock.");
             offspring.push(ind.mate_and_mutate(partner, &inner.environment));
         }
@@ -264,15 +470,64 @@ impl<I: 'static, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Inf
     }
 }
 
-struct InnerEcologicalNiche<I, M, R, S, T> {
-    environment: Arc<Environment<M, R, S, T>>,
-    population: Arc<Mutex<Population<R, S, T>>>,
-    supplier_function: Box<dyn Fn() -> (Vec<T>, I) + Send + Sync + 'static>,
-    fitness_function: Box<dyn Fn(Vec<OrganismInformation<I, T>>, ScalingFactor) -> f64 + Send + Sync + 'static>,
-    phantom: PhantomData<M>,
+struct InnerEcologicalNiche<
+    SupplierResultInformationType,
+    MutationType,
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+> {
+    environment: Arc<
+        Environment<
+            MutationType,
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    >,
+    population: Arc<
+        Mutex<
+            Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        >,
+    >,
+    supplier_function: Box<
+        dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static,
+    >,
+    fitness_function: Box<
+        dyn Fn(
+                Vec<OrganismInformation<SupplierResultInformationType, InformationType>>,
+                ScalingFactor,
+            ) -> f64
+            + Send
+            + Sync
+            + 'static,
+    >,
+    phantom: PhantomData<MutationType>,
 }
 
-impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> InnerEcologicalNiche<I, M, R, S, T> {
+impl<
+        SupplierResultInformationType,
+        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    >
+    InnerEcologicalNiche<
+        SupplierResultInformationType,
+        MutationType,
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
+{
     /// Checks if the specified [`Individual`] died of age.
     ///
     /// # Parameters
@@ -284,8 +539,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn died(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> bool {
-        let ind = individual.lock()
+    fn died(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> bool {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         self.environment.death_chance(ind.age()) >= thread_rng().gen_range(0.0, 1.0)
     }
@@ -301,10 +570,26 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn is_juvenil(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> bool {
-        let ind = individual.lock()
+    fn is_juvenil(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> bool {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
-        self.environment.max_testing_age().map_or(true, |max_age| ind.age() < max_age)
+        self.environment
+            .max_testing_age()
+            .map_or(true, |max_age| ind.age() < max_age)
     }
 
     /// Checks if the specified [`Individual`] should be testedby chance.
@@ -318,8 +603,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn testing_by_chance(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> bool {
-        let ind = individual.lock()
+    fn testing_by_chance(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> bool {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(ind.times_tested())
     }
@@ -335,7 +634,20 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn testing(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> bool {
+    fn testing(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> bool {
         self.is_juvenil(individual.clone()) || self.testing_by_chance(individual)
     }
 
@@ -350,8 +662,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_uuid(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> Uuid {
-        let ind = individual.lock()
+    fn get_uuid(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> Uuid {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         *ind.uuid()
     }
@@ -369,8 +695,21 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    fn get_accumulated_resources(individual: Arc<Mutex<Individual<R, S, T>>>) -> f64 {
-        let ind = individual.lock()
+    fn get_accumulated_resources(
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> f64 {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.resources()
     }
@@ -388,8 +727,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    fn spend_resources_for_mating(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> usize {
-        individual.lock()
+    fn spend_resources_for_mating(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> usize {
+        individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.")
             .spend_resources_for_mating()
     }
@@ -405,8 +758,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_bytes(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> usize {
-        let ind = individual.lock()
+    fn get_bytes(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> usize {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.bytes()
     }
@@ -422,8 +789,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_associated_inputs(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> usize {
-        let ind = individual.lock()
+    fn get_associated_inputs(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> usize {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.associated_inputs()
     }
@@ -439,8 +820,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the individual's lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn get_associated_outputs(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> usize {
-        let ind = individual.lock()
+    fn get_associated_outputs(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> usize {
+        let ind = individual
+            .lock()
             .expect("A thread paniced while holding the individual's lock.");
         ind.associated_outputs()
     }
@@ -453,7 +848,9 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// completely extinct.
     ///
     /// [`Individual`]: ./struct.Individual.html
-    fn get_random_genome(&self) -> Genome<R, S, T> {
+    fn get_random_genome(
+        &self,
+    ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .random_genome()
@@ -474,7 +871,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Population`]: ../population/struct.Population.html
     fn save_population<P: AsRef<Path>>(&self, save_path: P) {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .snapshot_to_file(&save_path)
             .expect(&format!("The file {:?} could not be created.", save_path.as_ref()));
@@ -487,8 +885,23 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// If another thread paniced while holding the population lock.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
-    fn individuals(&self) -> Vec<Arc<Mutex<Individual<R, S, T>>>> {
-        self.population.lock()
+    fn individuals(
+        &self,
+    ) -> Vec<
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    > {
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .individuals()
     }
@@ -502,7 +915,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_size(&self) -> usize {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .size()
     }
@@ -516,7 +930,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn increment_age(&self) {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .increment_age()
     }
@@ -528,7 +943,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// [`Population`]: ../population/struct.Population.html
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn distribute_resources(&self) {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .distribute_resources()
     }
@@ -542,7 +958,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_mean_fitness(&self) -> f64 {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .mean_fitness()
     }
@@ -557,7 +974,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Population`]: ../population/struct.Population.html
     fn population_mean_genome_size(&self) -> f64 {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .mean_genome_size()
     }
@@ -575,21 +993,36 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Individual`]: ../population/struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
-    fn remove_individual(&self, individual: Arc<Mutex<Individual<R, S, T>>>) {
+    fn remove_individual(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) {
         let uuid = self.get_uuid(individual.clone());
         // An individual consumes 1.0 resources when being born, so this has to be repatriated
         // additionally to the accumulated resources.
         let resources = Self::get_accumulated_resources(individual) + 1.0;
         {
-            self.population.lock()
-            .expect("A thread paniced while holding the population lock.")
-            .repatriate_resources(resources);
+            self.population
+                .lock()
+                .expect("A thread paniced while holding the population lock.")
+                .repatriate_resources(resources);
         }
         {
-            self.population.lock()
-            .expect("A thread paniced while holding the population lock.")
-            .remove(uuid)
-            .expect("The individual could not be removed.");
+            self.population
+                .lock()
+                .expect("A thread paniced while holding the population lock.")
+                .remove(uuid)
+                .expect("The individual could not be removed.");
         }
     }
 
@@ -597,7 +1030,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Resource`]: ../resource/struct.Resource.html
     fn recycle(&self) {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .recycle();
     }
@@ -606,7 +1040,8 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Resource`]: ../resource/struct.Resource.html
     fn resources(&self) -> Resource {
-        self.population.lock()
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .resources()
     }
@@ -623,8 +1058,22 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Organism`]: ../population/struct.population.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn load_organism(&self, individual: Arc<Mutex<Individual<R, S, T>>>) -> Organism<R, S, T> {
-        individual.lock()
+    fn load_organism(
+        &self,
+        individual: Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    ) -> Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+        individual
+            .lock()
             .expect("Another thread panicked while holding the individual lock.")
             .genome()
             .translate()
@@ -642,10 +1091,15 @@ impl<I, M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>
     ///
     /// [`Population`]: ../population/struct.Population.html
     /// [`Individual`]: ../population/struct.Individual.html
-    fn append_population(&self, individuals: Vec<Individual<R, S, T>>) {
-        self.population.lock()
+    fn append_population(
+        &self,
+        individuals: Vec<
+            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        >,
+    ) {
+        self.population
+            .lock()
             .expect("A thread paniced while holding the population lock.")
             .append(individuals);
     }
-
 }

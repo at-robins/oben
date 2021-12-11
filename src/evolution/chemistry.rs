@@ -8,7 +8,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 /// An `Information` is a generic recombinable piece of data containing any informative value.
-pub trait Information: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
+pub trait Information:
+    Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
+{
     /// Updates the internal information value based on the time that passed since the last update.
     ///
     /// # Parameters
@@ -18,7 +20,9 @@ pub trait Information: Clone + Debug + PartialEq + Send + Sync + CrossOver + Ser
 }
 
 /// A `State` is an elementary operation for comparing substrates.
-pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
+pub trait State<T: Information>:
+    Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
+{
     /// Compares a number of substrates for a logical property.
     ///
     /// # Parameters
@@ -40,7 +44,9 @@ pub trait State<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cross
 }
 
 /// A `Reaction` represents an elementary operation for modification of substrates.
-pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
+pub trait Reaction<T: Information>:
+    Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
+{
     /// Performs the specified reaction and returns the products.
     ///
     /// # Parameters
@@ -62,5 +68,28 @@ pub trait Reaction<T: Information>: Clone + Debug + PartialEq + Send + Sync + Cr
     fn get_product_number(&self) -> usize;
 
     /// Creates a random `Reaction`.
+    fn random() -> Self;
+}
+
+/// An `Input` represents an element that can convert external stimuli to substrates.
+pub trait Input<
+    InputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InformationType: Information,
+>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
+{
+    fn set_input(&mut self, input: InputElement);
+
+    /// Returns the number of educts required to perform the reaction.
+    fn get_input_substrates(&self) -> usize;
+
+    /// Handles changes in the feedback substrates and returns if those changes
+    /// entail a change in the input sensor.
+    ///
+    /// # Parameters
+    ///
+    /// *`changes` - the changed feedback substrate values if a change occurred
+    fn handle_feedback_substrate_changes(&mut self, changes: Vec<Option<InformationType>>) -> bool;
+
+    /// Creates an random `InputSensor`.
     fn random() -> Self;
 }

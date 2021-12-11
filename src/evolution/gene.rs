@@ -1,10 +1,15 @@
 //! The `gene` module contains information structures to describe,
 //! replicate and mutate the evolutionary network.
 extern crate rand;
-extern crate serde;
 extern crate rmp_serde;
+extern crate serde;
 
+use super::chemistry::{Information, Input, Reaction, State};
+use super::helper::{a_or_b, do_a_or_b};
+use super::population::Organism;
+use super::protein::{CatalyticCentre, InputSensor, Receptor, Substrate};
 use rand::{thread_rng, Rng};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -14,28 +19,46 @@ use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::rc::Rc;
-use super::chemistry::{Information, Reaction, State};
-use super::helper::{a_or_b, do_a_or_b};
-use super::population::Organism;
-use super::protein::{CatalyticCentre, Receptor, Substrate};
+use std::rc::{Rc, Weak};
 
 /// A `Genome` is a collection of individual [`Gene`]s and associations between them.
 /// A `Genome` is required to consist of 1 or more genes.
 ///
 /// [`Gene`]: ./struct.Gene.html
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Genome<R, S, T> {
-    phantom_r: PhantomData<R>,
-    phantom_s: PhantomData<S>,
-    phantom_t: PhantomData<T>,
-    input: Vec<Option<GeneSubstrate>>,
+pub struct Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    phantom_reaction: PhantomData<ReactionType>,
+    phantom_state: PhantomData<StateType>,
+    phantom_information: PhantomData<InformationType>,
+    phantom_input_element: PhantomData<InputElementType>,
+    phantom_input_sensor: PhantomData<InputSensorType>,
+    input: GenomicInputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >,
     output: Vec<Option<GeneSubstrate>>,
-    genes: Vec<Gene<R, S, T>>,
-    associations: Vec<GeneAssociation<T>>,
+    genes: Vec<Gene<ReactionType, StateType, InformationType>>,
+    associations: Vec<GeneAssociation<InformationType>>,
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    > Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+{
     /// Creates a new `Genome` containing the specified inputs, outputs and [`Gene`]s.
     /// A `Genome` needs at least 1 [`Gene`].
     ///
@@ -48,14 +71,26 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// # Panics
     ///
     /// If the vector of `genes` is empty.
-    pub fn new(input: Vec<Option<GeneSubstrate>>, output: Vec<Option<GeneSubstrate>>, genes: Vec<Gene<R, S, T>>) -> Self {
+    pub fn new(
+        input: GenomicInputSensor<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+        output: Vec<Option<GeneSubstrate>>,
+        genes: Vec<Gene<ReactionType, StateType, InformationType>>,
+    ) -> Self {
         if genes.is_empty() {
             panic!("A genome needs at least one gene.");
         }
-        Genome{
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
+        Genome {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            phantom_input_sensor: PhantomData,
             input,
             output,
             genes,
@@ -68,21 +103,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     ///
     /// [`Gene`]: ./struct.Gene.html
     pub fn number_of_genes(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.genes.len()).expect("No gene is encoded by this genome. This is forbidden by the contract.")
-    }
-
-    /// Get the number of input [`Substrate`]s in this `Genome`.
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn number_of_inputs(&self) -> usize {
-        self.input.len()
-    }
-
-    /// Get the number of associated input [`Substrate`]s in this `Genome`.
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn number_of_associated_inputs(&self) -> usize {
-        self.input.iter().filter(|i| i.is_some()).count()
+        NonZeroUsize::new(self.genes.len())
+            .expect("No gene is encoded by this genome. This is forbidden by the contract.")
     }
 
     /// Get the number of associated outputs [`Substrate`]s in this `Genome`.
@@ -106,9 +128,30 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
         self.associations.len()
     }
 
-    /// Returns the input at the specified index if any.
-    pub fn input(&self, input_index: usize) -> Option<Option<GeneSubstrate>> {
-        self.input.get(input_index).and_then(|inner| Some(*inner))
+    /// Returns the input.
+    pub fn input(
+        &self,
+    ) -> &GenomicInputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    > {
+        &self.input
+    }
+
+    /// Returns the input as mutable.
+    pub fn input_mut(
+        &mut self,
+    ) -> &mut GenomicInputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    > {
+        &mut self.input
     }
 
     /// Returns the output at the specified index if any.
@@ -117,33 +160,19 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     }
 
     /// Returns the association at the specified index if any.
-    pub fn association(&self, association_index: usize) -> Option<&GeneAssociation<T>> {
+    pub fn association(
+        &self,
+        association_index: usize,
+    ) -> Option<&GeneAssociation<InformationType>> {
         self.associations.get(association_index)
     }
 
     /// Returns the association at the specified index as mutable if any.
-    pub fn association_mut(&mut self, association_index: usize) -> Option<&mut GeneAssociation<T>> {
+    pub fn association_mut(
+        &mut self,
+        association_index: usize,
+    ) -> Option<&mut GeneAssociation<InformationType>> {
         self.associations.get_mut(association_index)
-    }
-
-    /// Sets the input association at the specified index to the specified value
-    /// and returns the previous value.
-    ///
-    /// # Parameters
-    ///
-    /// * `input_index` - the index of the input association to changes
-    /// * `input_value` - the new value for the specified input association
-    ///
-    /// # Panics
-    ///
-    /// If the index is out of bounds.
-    pub fn set_input(&mut self, input_index: usize, input_value: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
-        if input_index >= self.input.len() {
-            panic!("The input vector of this genome is of length {}, but insertion of element {:#?} at index {} was attempted.", self.number_of_inputs(), input_value, input_index);
-        }
-        let old_value = self.input[input_index];
-        self.input[input_index] = input_value;
-        old_value
     }
 
     /// Sets the output association at the specified index to the specified value
@@ -157,7 +186,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// # Panics
     ///
     /// If the index is out of bounds.
-    pub fn set_output(&mut self, output_index: usize, output_value: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+    pub fn set_output(
+        &mut self,
+        output_index: usize,
+        output_value: Option<GeneSubstrate>,
+    ) -> Option<GeneSubstrate> {
         if output_index >= self.output.len() {
             panic!("The output vector of this genome is of length {}, but insertion of element {:#?} at index {} was attempted.", self.number_of_outputs(), output_value, output_index);
         }
@@ -169,28 +202,32 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// Returns a copy of the output [`Substrate`]s.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_output_values(&self) -> Vec<Option<T>> {
-        self.output.iter()
-            .map(|substrate| substrate
-                .and_then(|a| self.get_substrate(a))
-                .and_then(|inner| Some(inner.clone()))
-            )
+    pub fn get_output_values(&self) -> Vec<Option<InformationType>> {
+        self.output
+            .iter()
+            .map(|substrate| {
+                substrate
+                    .and_then(|a| self.get_substrate(a))
+                    .and_then(|inner| Some(inner.clone()))
+            })
             .collect()
     }
 
     /// Returns the specified [`Substrate`] if contained within the `Genome`.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_substrate(&self, substrate: GeneSubstrate) -> Option<&T> {
-        self.genes.get(substrate.gene)
+    pub fn get_substrate(&self, substrate: GeneSubstrate) -> Option<&InformationType> {
+        self.genes
+            .get(substrate.gene)
             .and_then(|gene| gene.substrates.get(substrate.substrate))
     }
 
     /// Returns the specified [`Substrate`] as mutable if contained within the `Genome`.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_substrate_mut(&mut self, substrate: GeneSubstrate) -> Option<&mut T> {
-        self.genes.get_mut(substrate.gene)
+    pub fn get_substrate_mut(&mut self, substrate: GeneSubstrate) -> Option<&mut InformationType> {
+        self.genes
+            .get_mut(substrate.gene)
             .and_then(|gene| gene.substrates.get_mut(substrate.substrate))
     }
 
@@ -203,7 +240,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// * `gene` - the [`Gene`] to add to the `Genome`
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn add_gene(&mut self, gene: Gene<R, S, T>) -> Option<usize>{
+    pub fn add_gene(
+        &mut self,
+        gene: Gene<ReactionType, StateType, InformationType>,
+    ) -> Option<usize> {
         if let Some(new_index) = self.genes.len().checked_add(1) {
             self.genes.push(gene);
             Some(new_index)
@@ -221,9 +261,14 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// * `substrate` - the substrate to add
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn add_substrate_to_gene(&mut self, gene: usize, substrate: T) -> Option<GeneSubstrate> {
+    pub fn add_substrate_to_gene(
+        &mut self,
+        gene: usize,
+        substrate: InformationType,
+    ) -> Option<GeneSubstrate> {
         if self.number_of_genes().get() > gene {
-            self.genes[gene].add_substrate(substrate)
+            self.genes[gene]
+                .add_substrate(substrate)
                 .and_then(|sub_index| Some(GeneSubstrate::new(gene, sub_index)))
         } else {
             None
@@ -244,19 +289,18 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the index is out of bounds or the `Genome` contains only a single [`Gene`].
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn remove_gene(&mut self, gene: usize) -> Gene<R, S, T> {
+    pub fn remove_gene(&mut self, gene: usize) -> Gene<ReactionType, StateType, InformationType> {
         if self.number_of_genes().get() <= 1 {
             panic!("A genome needs to contain at least one gene, so no gene can be removed.");
         }
         // Remove all inputs pointing to the removed gene.
-        for input_value in &mut self.input {
-            if input_value.and_then(|input| Some(input.is_gene(gene))).unwrap_or(false) {
-                *input_value = None;
-            }
-        }
+        self.input.remove_associations_with_gene(gene);
         // Remove all outputs pointing to the removed gene.
         for output_value in &mut self.output {
-            if output_value.and_then(|output| Some(output.is_gene(gene))).unwrap_or(false) {
+            if output_value
+                .and_then(|output| Some(output.is_gene(gene)))
+                .unwrap_or(false)
+            {
                 *output_value = None;
             }
         }
@@ -281,12 +325,15 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the indices are out of bounds or the [`Gene`] contains only a single substrate.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn remove_substrate(&mut self, substrate: GeneSubstrate) -> T {
+    pub fn remove_substrate(&mut self, substrate: GeneSubstrate) -> InformationType {
         if self.get_gene(substrate.gene()).number_of_substrates().get() <= 1 {
-            panic!("A gene needs to contain at least one substrate, so no substrate can be removed.");
+            panic!(
+                "A gene needs to contain at least one substrate, so no substrate can be removed."
+            );
         }
         let removed = self.genes[substrate.gene()].remove_substrate(substrate.substrate());
-        self.adjust_input_after_gene_substrate_removal(substrate);
+        self.input_mut()
+            .adjust_after_gene_substrate_removal(substrate);
         self.adjust_output_after_gene_substrate_removal(substrate);
         self.adjust_associations_after_gene_substrate_removal(substrate);
         self.validate_associations();
@@ -305,7 +352,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the index is out of bounds.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn duplicate_gene(&self, gene: usize) -> Gene<R, S, T> {
+    pub fn duplicate_gene(&self, gene: usize) -> Gene<ReactionType, StateType, InformationType> {
         self.genes[gene].duplicate()
     }
 
@@ -313,7 +360,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// for further processing.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn duplicate_random_gene(&self) -> Gene<R, S, T> {
+    pub fn duplicate_random_gene(&self) -> Gene<ReactionType, StateType, InformationType> {
         self.get_gene(self.get_random_gene()).duplicate()
     }
 
@@ -328,7 +375,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the index is out of bounds.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn get_gene(&self, gene: usize) -> &Gene<R, S, T> {
+    pub fn get_gene(&self, gene: usize) -> &Gene<ReactionType, StateType, InformationType> {
         &self.genes[gene]
     }
 
@@ -343,7 +390,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the index is out of bounds.
     ///
     /// [`Gene`]: ./struct.Gene.html
-    pub fn get_gene_mut(&mut self, gene: usize) -> &mut Gene<R, S, T> {
+    pub fn get_gene_mut(
+        &mut self,
+        gene: usize,
+    ) -> &mut Gene<ReactionType, StateType, InformationType> {
         &mut self.genes[gene]
     }
 
@@ -356,24 +406,15 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     ///
     /// [`Gene`]: ./struct.Gene.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn has_substrate(genes: &Vec<Gene<R, S, T>>, substrate: &GeneSubstrate) -> bool {
+    fn has_substrate(
+        genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
+        substrate: &GeneSubstrate,
+    ) -> bool {
         if let Some(gene) = genes.get(substrate.gene) {
             gene.substrates.len() > substrate.substrate
         } else {
             false
         }
-    }
-
-    /// Checks if the [`Substrate`] is an input to the `Genome`.
-    ///
-    /// # Parameters
-    /// * `substrate` - the substrate to check for
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn has_input_substrate(&self, substrate: &GeneSubstrate) -> bool {
-        self.input.iter()
-            .filter_map(|potential_input| potential_input.as_ref())
-            .any(|input|  input == substrate)
     }
 
     /// Checks if the [`Substrate`] is an output to the `Genome`.
@@ -383,9 +424,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn has_output_substrate(&self, substrate: &GeneSubstrate) -> bool {
-        self.output.iter()
+        self.output
+            .iter()
             .filter_map(|potential_output| potential_output.as_ref())
-            .any(|output|  output == substrate)
+            .any(|output| output == substrate)
     }
 
     /// Returns all substrates of the specified [`Gene`] combined with their [`GeneSubstrate`] pointer.
@@ -400,11 +442,22 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     ///
     /// [`Gene`]: ./struct.Gene.html
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    fn translate_get_gene_substrates(&self, gene: usize) -> Vec<(GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>)> {
+    fn translate_get_gene_substrates(
+        &self,
+        gene: usize,
+    ) -> Vec<(GeneSubstrate, Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>)>
+    {
         let gene_reference = &self.genes[gene];
         (0..gene_reference.number_of_substrates().get())
             .map(|substrate| GeneSubstrate::new(gene, substrate))
-            .map(|gene_substrate| (gene_substrate, Rc::new(RefCell::new(Substrate::new(gene_reference.substrates[gene_substrate.substrate].clone())))))
+            .map(|gene_substrate| {
+                (
+                    gene_substrate,
+                    Rc::new(RefCell::new(Substrate::new(
+                        gene_reference.substrates[gene_substrate.substrate].clone(),
+                    ))),
+                )
+            })
             .collect()
     }
 
@@ -413,17 +466,6 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// [`Gene`]: ./struct.Gene.html
     pub fn get_random_gene(&self) -> usize {
         thread_rng().gen_range(0, self.number_of_genes().get())
-    }
-
-    /// Returns the index of a random input [`GeneSubstrate`] if there is any.
-    ///
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    pub fn get_random_input(&self) -> Option<usize> {
-        if self.number_of_inputs() > 0 {
-            Some(thread_rng().gen_range(0, self.number_of_inputs()))
-        } else {
-            None
-        }
     }
 
     /// Returns the index of a random output [`GeneSubstrate`] if there is any.
@@ -475,7 +517,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// * `association` - the [`GeneAssociation`] to add to the `Genome`
     ///
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
-    pub fn add_association(&mut self, association: GeneAssociation<T>) -> Option<usize>{
+    pub fn add_association(
+        &mut self,
+        association: GeneAssociation<InformationType>,
+    ) -> Option<usize> {
         if let Some(new_index) = self.associations.len().checked_add(1) {
             self.associations.push(association);
             Some(new_index)
@@ -495,36 +540,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// If the index is out of bounds.
     ///
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
-    pub fn remove_association(&mut self, association: usize) -> GeneAssociation<T> {
+    pub fn remove_association(&mut self, association: usize) -> GeneAssociation<InformationType> {
         self.associations.remove(association)
-    }
-
-    /// Adjust the input [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
-    /// [`Gene`] was removed.
-    ///
-    /// # Parameters
-    ///
-    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn adjust_input_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
-        for input_ref in &mut self.input {
-            if input_ref.is_some() {
-                let mut current_reference = input_ref.unwrap();
-                if current_reference == removed_substrate {
-                    // Remove the input association if it points to the removed substrate.
-                    *input_ref = None;
-                } else if current_reference.is_gene(removed_substrate.gene) {
-                    // Adjust the input association if it points to the gene from which the
-                    // substrate was removed.
-                    current_reference.substrate = adjust_index(current_reference.substrate, removed_substrate.substrate);
-                    *input_ref = Some(current_reference);
-                }
-                // Otherwise, leave the input untouched.
-            }
-        }
     }
 
     /// Adjust the output [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
@@ -547,7 +564,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
                 } else if current_reference.is_gene(removed_substrate.gene) {
                     // Adjust the output association if it points to the gene from which the
                     // substrate was removed.
-                    current_reference.substrate = adjust_index(current_reference.substrate, removed_substrate.substrate);
+                    current_reference.substrate =
+                        adjust_index(current_reference.substrate, removed_substrate.substrate);
                     *output_ref = Some(current_reference);
                 }
                 // Otherwise, leave the output untouched.
@@ -565,7 +583,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// [`Gene`]: ./struct.Gene.html
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn adjust_associations_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+    fn adjust_associations_after_gene_substrate_removal(
+        &mut self,
+        removed_substrate: GeneSubstrate,
+    ) {
         for association in &mut self.associations {
             association.adjust_after_gene_substrate_removal(removed_substrate);
         }
@@ -582,12 +603,16 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// [`Gene`]: ./struct.Gene.html
     /// [`Genome`]: ./struct.Genome.html
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    fn validate_input_ouput_associations(genes: &Vec<Gene<R, S, T>>, io_substrates: &mut Vec<Option<GeneSubstrate>>) {
+    fn validate_input_ouput_associations(
+        genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
+        io_substrates: &mut Vec<Option<GeneSubstrate>>,
+    ) {
         let mut duplicate_checker = HashSet::new();
         for io_substrate in io_substrates {
             if let Some(current_substrate) = io_substrate {
-                if !duplicate_checker.insert(current_substrate.clone()) ||
-                    !Genome::has_substrate(genes, current_substrate) {
+                if !duplicate_checker.insert(current_substrate.clone())
+                    || !Self::has_substrate(genes, current_substrate)
+                {
                     // Remove the io association if it points to a duplicate or an invalid substrate.
                     *io_substrate = None;
                 }
@@ -602,8 +627,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
     fn validate_gene_substrate_associations(&mut self) {
         let genes = &self.genes;
-        for association in  &mut self.associations {
-            association.associations.retain(|a| Genome::has_substrate(genes, a));
+        for association in &mut self.associations {
+            association
+                .associations
+                .retain(|a| Self::has_substrate(genes, a));
         }
     }
 
@@ -613,8 +640,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// [`GeneAssociation`]: ./struct.GeneAssociation.html
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     fn validate_associations(&mut self) {
-        Genome::validate_input_ouput_associations(&self.genes, &mut self.input);
-        Genome::validate_input_ouput_associations(&self.genes, &mut self.output);
+        self.input.validate(&self.genes);
+        Self::validate_input_ouput_associations(&self.genes, &mut self.output);
         self.validate_gene_substrate_associations();
     }
 
@@ -624,12 +651,15 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// # Parameters
     ///
     /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
-    pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
-       let mut file = File::open(&path_to_file)?;
-       let mut file_content = Vec::new();
-       file.read_to_end(&mut file_content)?;
-       let genome = rmp_serde::from_read_ref(&file_content)?;
-       Ok(genome)
+    pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(&path_to_file)?;
+        let mut file_content = Vec::new();
+        file.read_to_end(&mut file_content)?;
+        let genome = rmp_serde::from_read_ref(&file_content)?;
+        Ok(genome)
     }
 
     /// Write a `Genome` to a JSON file if possible.
@@ -638,11 +668,14 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     /// # Parameters
     ///
     /// * `path_to_file` - the JSON file the `Genome` should be written to
-    pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
-       let mut file = File::create(path_to_file)?;
-       let ser = rmp_serde::to_vec(&self)?;
-       file.write_all(&ser)?;
-       Ok(file.sync_all()?)
+    pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::create(path_to_file)?;
+        let ser = rmp_serde::to_vec(&self)?;
+        file.write_all(&ser)?;
+        Ok(file.sync_all()?)
     }
 
     /// Returns the binary size of this `Genome` in byte.
@@ -651,22 +684,36 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
     ///
     /// If the underlying serialisation fails.
     pub fn binary_size(&self) -> usize {
-        rmp_serde::to_vec(&self).expect("Serialisation of the genome failed.").len()
+        rmp_serde::to_vec(&self)
+            .expect("Serialisation of the genome failed.")
+            .len()
     }
 
-    pub fn translate(&self) -> Organism<R, S, T> {
-        let mut gene_substrate_map: HashMap<GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>> = HashMap::new();
+    pub fn translate(
+        &self,
+    ) -> Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+        let mut gene_substrate_map: HashMap<
+            GeneSubstrate,
+            Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+        > = HashMap::new();
         // Insert all genome level substrates.
         for gene_association in &self.associations {
-            let genome_level_substrate = Rc::new(RefCell::new(Substrate::new(gene_association.substrate.clone())));
+            let genome_level_substrate =
+                Rc::new(RefCell::new(Substrate::new(gene_association.substrate.clone())));
             for gene_substrate in &gene_association.associations {
-                gene_substrate_map.entry(gene_substrate.clone()).or_insert(genome_level_substrate.clone());
+                gene_substrate_map
+                    .entry(gene_substrate.clone())
+                    .or_insert(genome_level_substrate.clone());
             }
         }
         // Insert all gene level substrates without overwriting genome level ones.
         for gene_index in 0..self.number_of_genes().get() {
-            for (gene_substrate, substrate) in self.translate_get_gene_substrates(gene_index).into_iter() {
-                gene_substrate_map.entry(gene_substrate).or_insert(substrate);
+            for (gene_substrate, substrate) in
+                self.translate_get_gene_substrates(gene_index).into_iter()
+            {
+                gene_substrate_map
+                    .entry(gene_substrate)
+                    .or_insert(substrate);
             }
         }
         // Translate receptors and catalytic centres.
@@ -676,34 +723,71 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Genome<R, S, T> {
             }
         }
         let substrates = gene_substrate_map.values().map(|sub| sub.clone()).collect();
-        let input = self.input.iter()
-            .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
-            .collect();
-        let output = self.output.iter()
-            .map(|substrate| substrate.and_then(|gene_substrate| gene_substrate_map.get(&gene_substrate).and_then(|inner| Some(inner.clone()))))
+        let input = self.input.translate(&gene_substrate_map);
+        let output = self
+            .output
+            .iter()
+            .map(|substrate| {
+                substrate.and_then(|gene_substrate| {
+                    gene_substrate_map
+                        .get(&gene_substrate)
+                        .and_then(|inner| Some(inner.clone()))
+                })
+            })
             .collect();
         Organism::new(substrates, input, output)
     }
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information + Default> Default for Genome<R, S, T> {
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information + Default,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType> + Default,
+    > Default
+    for Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+{
     fn default() -> Self {
         Genome {
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
-            input: Vec::default(),
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            phantom_input_sensor: PhantomData,
+            input: GenomicInputSensor::default(),
             output: Vec::default(),
-            genes: vec!(Gene::<R, S, T>::default()),
+            genes: vec![Gene::<ReactionType, StateType, InformationType>::default()],
             associations: Vec::default(),
         }
     }
 }
 
-impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for Genome<R, S, T> {
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    > CrossOver
+    for Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+{
     fn is_similar(&self, other: &Self) -> bool {
-        self.number_of_inputs() == other.number_of_inputs()
-            && self.number_of_outputs() == other.number_of_outputs()
+        self.number_of_outputs() == other.number_of_outputs()
     }
 
     fn cross_over(&self, other: &Self) -> Self {
@@ -712,11 +796,17 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for Genome<R, S, T> 
             let output = self.output.cross_over(&other.output);
             let genes = self.genes.cross_over(&other.genes);
             let associations = self.associations.cross_over(&other.associations);
-            let mut recombined = Genome{
-                phantom_r: PhantomData,
-                phantom_s: PhantomData,
-                phantom_t: PhantomData,
-                input, output, genes, associations};
+            let mut recombined = Genome {
+                phantom_reaction: PhantomData,
+                phantom_state: PhantomData,
+                phantom_information: PhantomData,
+                phantom_input_element: PhantomData,
+                phantom_input_sensor: PhantomData,
+                input,
+                output,
+                genes,
+                associations,
+            };
             // Remove invalid gene-substrate-associations.
             recombined.validate_associations();
             recombined
@@ -742,7 +832,6 @@ pub struct GeneSubstrate {
 }
 
 impl GeneSubstrate {
-
     /// Creates a new 'GeneSubstrate' reference.
     ///
     /// # Parameters
@@ -753,7 +842,7 @@ impl GeneSubstrate {
     /// [`Gene`]: ./struct.Gene.html
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn new(gene: usize, substrate: usize) -> Self {
-        GeneSubstrate{gene, substrate}
+        GeneSubstrate { gene, substrate }
     }
 
     /// Returns the gene index the reference is pointing to.
@@ -788,7 +877,6 @@ impl GeneSubstrate {
     pub fn is_substrate(&self, substrate_index: usize) -> bool {
         self.substrate == substrate_index
     }
-
 }
 
 impl CrossOver for GeneSubstrate {
@@ -797,9 +885,9 @@ impl CrossOver for GeneSubstrate {
     }
 
     fn cross_over(&self, other: &Self) -> Self {
-            let gene = self.gene.cross_over(&other.gene);
-            let substrate = self.substrate.cross_over(&other.substrate);
-            GeneSubstrate::new(gene, substrate)
+        let gene = self.gene.cross_over(&other.gene);
+        let substrate = self.substrate.cross_over(&other.substrate);
+        GeneSubstrate::new(gene, substrate)
     }
 }
 
@@ -818,8 +906,10 @@ pub struct GeneAssociation<T> {
     associations: Vec<GeneSubstrate>,
 }
 
-impl<T> GeneAssociation<T> where T: Information {
-
+impl<T> GeneAssociation<T>
+where
+    T: Information,
+{
     /// Creates a new `GeneAssociation` from the specified [`Substrate`]
     /// with no initial associations.
     ///
@@ -829,7 +919,10 @@ impl<T> GeneAssociation<T> where T: Information {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn new(substrate: T) -> Self {
-        GeneAssociation{substrate, associations: Vec::new()}
+        GeneAssociation {
+            substrate,
+            associations: Vec::new(),
+        }
     }
 
     /// Returns the substrate of this association.
@@ -918,22 +1011,30 @@ impl<T> GeneAssociation<T> where T: Information {
             if association.is_gene(removed_substrate.gene) {
                 // Adjust the input association if it points to the gene from which the
                 // substrate was removed.
-                association.substrate = adjust_index(association.substrate, removed_substrate.substrate);
+                association.substrate =
+                    adjust_index(association.substrate, removed_substrate.substrate);
             }
             // Otherwise, leave the input untouched.
         }
     }
 }
 
-impl<T> CrossOver for GeneAssociation<T> where T: Information {
+impl<T> CrossOver for GeneAssociation<T>
+where
+    T: Information,
+{
     fn is_similar(&self, other: &Self) -> bool {
-        self.substrate.is_similar(&other.substrate) && self.associations.len() == other.associations.len()
+        self.substrate.is_similar(&other.substrate)
+            && self.associations.len() == other.associations.len()
     }
 
     fn cross_over(&self, other: &Self) -> Self {
-            let substrate = self.substrate.cross_over(&other.substrate);
-            let associations = self.associations.cross_over(&other.associations);
-            GeneAssociation{substrate, associations}
+        let substrate = self.substrate.cross_over(&other.substrate);
+        let associations = self.associations.cross_over(&other.associations);
+        GeneAssociation {
+            substrate,
+            associations,
+        }
     }
 }
 
@@ -966,12 +1067,12 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
         if substrates.is_empty() {
             panic!("A gene needs at least one substrate.");
         }
-        Gene{
+        Gene {
             phantom_r: PhantomData,
             phantom_s: PhantomData,
             phantom_t: PhantomData,
             substrates,
-            receptors: Vec::new()
+            receptors: Vec::new(),
         }
     }
 
@@ -980,7 +1081,8 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn number_of_substrates(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.substrates.len()).expect("No substrate is encoded by this gene. This is forbidden by the contract.")
+        NonZeroUsize::new(self.substrates.len())
+            .expect("No substrate is encoded by this gene. This is forbidden by the contract.")
     }
 
     /// Gets the number of [`GenomicReceptor`]s encoded by this `Gene`.
@@ -1017,7 +1119,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     /// * `substrate` - the [`Substrate`] to add to the `Gene`
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn add_substrate(&mut self, substrate: T) -> Option<usize>{
+    pub fn add_substrate(&mut self, substrate: T) -> Option<usize> {
         if let Some(new_index) = self.substrates.len().checked_add(1) {
             self.substrates.push(substrate);
             Some(new_index)
@@ -1091,10 +1193,13 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn remove_substrate(&mut self, substrate_index: usize) -> T {
         if self.number_of_substrates().get() <= 1 {
-            panic!("A genome needs to contain at least one substrate, so no substrate can be removed.");
+            panic!(
+                "A genome needs to contain at least one substrate, so no substrate can be removed."
+            );
         }
         // Remove all receptors and catalytic centres referencing the substrate.
-        self.receptors.retain(|r| !r.referes_to_substrate(substrate_index));
+        self.receptors
+            .retain(|r| !r.referes_to_substrate(substrate_index));
         // Adjust the indices of the remaining pointers.
         for receptor in &mut self.receptors {
             receptor.adjust_indices(substrate_index);
@@ -1111,7 +1216,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     /// [`Receptor`]: ../protein/struct.Receptor.html
     pub fn fuse(&self, other_gene: &Gene<R, S, T>) -> Option<Gene<R, S, T>> {
         // Prevent overflow of substrates.
-        if let None = self.substrates.len().checked_add(other_gene.substrates.len()) {
+        if let None = self
+            .substrates
+            .len()
+            .checked_add(other_gene.substrates.len())
+        {
             return None;
         };
         // Prevent overflow of receptors.
@@ -1119,14 +1228,34 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
             return None;
         };
         let mut fusion_gene = self.duplicate();
-        fusion_gene.substrates.append(&mut other_gene.substrates.clone());
+        fusion_gene
+            .substrates
+            .append(&mut other_gene.substrates.clone());
         let mut receptors = other_gene.receptors.clone();
         for mut receptor in &mut receptors {
             // Update all substrate indices.
-            receptor.substrates = receptor.substrates.iter().map(|i| i + self.number_of_substrates().get()).collect();
-            receptor.triggers = receptor.triggers.iter().map(|i| i + self.number_of_substrates().get()).collect();
-            receptor.enzyme.educts = receptor.enzyme.educts.iter().map(|i| i + self.number_of_substrates().get()).collect();
-            receptor.enzyme.products = receptor.enzyme.products.iter().map(|i| i + self.number_of_substrates().get()).collect();
+            receptor.substrates = receptor
+                .substrates
+                .iter()
+                .map(|i| i + self.number_of_substrates().get())
+                .collect();
+            receptor.triggers = receptor
+                .triggers
+                .iter()
+                .map(|i| i + self.number_of_substrates().get())
+                .collect();
+            receptor.enzyme.educts = receptor
+                .enzyme
+                .educts
+                .iter()
+                .map(|i| i + self.number_of_substrates().get())
+                .collect();
+            receptor.enzyme.products = receptor
+                .enzyme
+                .products
+                .iter()
+                .map(|i| i + self.number_of_substrates().get())
+                .collect();
         }
         fusion_gene.receptors.append(&mut receptors);
         Some(fusion_gene)
@@ -1141,14 +1270,18 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     /// Creates a random [`GenomicCatalyticCentre`] specific to this `Gene`.
     pub fn random_catalytic_centre(&self) -> GenomicCatalyticCentre<R, S, T> {
         let reaction = R::random();
-        let educts = (0..reaction.get_educt_number()).map(|_| self.get_random_substrate()).collect();
-        let products = (0..reaction.get_product_number()).map(|_| self.get_random_substrate()).collect();
-        GenomicCatalyticCentre{
+        let educts = (0..reaction.get_educt_number())
+            .map(|_| self.get_random_substrate())
+            .collect();
+        let products = (0..reaction.get_product_number())
+            .map(|_| self.get_random_substrate())
+            .collect();
+        GenomicCatalyticCentre {
             phantom_s: PhantomData,
             phantom_t: PhantomData,
             educts,
             products,
-            reaction
+            reaction,
         }
     }
 
@@ -1156,15 +1289,17 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     pub fn random_receptor(&self) -> GenomicReceptor<R, S, T> {
         let state = S::random();
         let enzyme = self.random_catalytic_centre();
-        let substrates = (0..state.get_substrate_number()).map(|_| self.get_random_substrate()).collect();
-        let triggers = vec!(self.get_random_substrate());
-        GenomicReceptor{
+        let substrates = (0..state.get_substrate_number())
+            .map(|_| self.get_random_substrate())
+            .collect();
+        let triggers = vec![self.get_random_substrate()];
+        GenomicReceptor {
             phantom_r: PhantomData,
             phantom_t: PhantomData,
             triggers,
             substrates,
             state,
-            enzyme
+            enzyme,
         }
     }
 }
@@ -1175,7 +1310,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information + Default> Default for Gene<R, 
             phantom_r: PhantomData,
             phantom_s: PhantomData,
             phantom_t: PhantomData,
-            substrates: vec!(T::default()),
+            substrates: vec![T::default()],
             receptors: Vec::default(),
         }
     }
@@ -1190,12 +1325,12 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for Gene<R, S, T> {
         if self.is_similar(other) {
             let substrates = self.substrates.cross_over(&other.substrates);
             let receptors = self.receptors.cross_over(&other.receptors);
-            Gene{
+            Gene {
                 phantom_r: PhantomData,
                 phantom_s: PhantomData,
                 phantom_t: PhantomData,
                 substrates,
-                receptors
+                receptors,
             }
         } else {
             // If the two genes are not similar return a random one.
@@ -1224,7 +1359,10 @@ fn adjust_index(current_index: usize, removed_index: usize) -> usize {
     } else if current_index > removed_index {
         current_index - 1
     } else {
-        panic!("Index {} should have been removed, but was still passed as current index.", current_index);
+        panic!(
+            "Index {} should have been removed, but was still passed as current index.",
+            current_index
+        );
     }
 }
 
@@ -1269,17 +1407,22 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// [`State`]: ../chemistry/struct.State.html
     /// [`Gene`]: ./struct.Gene.html
     /// [`GenomicCatalyticCentre`]: ./struct.GenomicCatalyticCentre.html
-    pub fn new(triggers: Vec<usize>, substrates: Vec<usize>, state: S, enzyme: GenomicCatalyticCentre<R, S, T>) -> Self {
+    pub fn new(
+        triggers: Vec<usize>,
+        substrates: Vec<usize>,
+        state: S,
+        enzyme: GenomicCatalyticCentre<R, S, T>,
+    ) -> Self {
         assert_eq!(substrates.len(), state.get_substrate_number(),
             "The number of required substrates to check for state {:?} is {}, but {} substrates were supplied.",
             state, state.get_substrate_number(), substrates.len());
-        GenomicReceptor{
+        GenomicReceptor {
             phantom_r: PhantomData,
             phantom_t: PhantomData,
             triggers,
             substrates,
             state,
-            enzyme
+            enzyme,
         }
     }
 
@@ -1292,7 +1435,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// * `trigger` - the triggering [`Substrate`] to add to the `GenomicReceptor`
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn add_trigger(&mut self, trigger: usize) -> Option<usize>{
+    pub fn add_trigger(&mut self, trigger: usize) -> Option<usize> {
         if let Some(new_index) = self.triggers.len().checked_add(1) {
             self.triggers.push(trigger);
             Some(new_index)
@@ -1359,7 +1502,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// If the `index` is out of bounds.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn replace_substrate(&mut self, index:usize, substrate: usize) {
+    pub fn replace_substrate(&mut self, index: usize, substrate: usize) {
         self.substrates[index] = substrate;
     }
 
@@ -1445,7 +1588,12 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn referes_to_substrate(&self, substrate_index: usize) -> bool {
-        self.enzyme.referes_to_substrate(substrate_index) || self.triggers.iter().chain(self.substrates.iter()).any(|element| element == &substrate_index)
+        self.enzyme.referes_to_substrate(substrate_index)
+            || self
+                .triggers
+                .iter()
+                .chain(self.substrates.iter())
+                .any(|element| element == &substrate_index)
     }
 
     /// Adjust the indices of [`Substrate`] pointers after removal of a [`Substrate`].
@@ -1485,44 +1633,55 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     /// [`Genome`]: ./struct.Genome.html
     /// [`Gene`]: ./struct.Gene.html
-    fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>>) {
-        let substrates = self.substrates.iter()
+    fn translate(
+        &self,
+        gene_index: usize,
+        substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>>,
+    ) {
+        let substrates = self
+            .substrates
+            .iter()
             .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
-            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
-                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-            ).map(|strong| Rc::downgrade(strong))
+            .map(|gene_substrate| {
+                substrate_lookup.get(&gene_substrate).expect(&format!(
+                    "The substrate lookup map did not contain {:?}.",
+                    &gene_substrate
+                ))
+            })
+            .map(|strong| Rc::downgrade(strong))
             .collect();
         let enzyme = self.enzyme.translate(gene_index, substrate_lookup);
         let state = self.state.clone();
         let receptor = Rc::new(Receptor::new(substrates, state, enzyme));
         for trigger_index in self.triggers.iter() {
             let gene_substrate = GeneSubstrate::new(gene_index, *trigger_index);
-            substrate_lookup.get(&gene_substrate)
+            substrate_lookup
+                .get(&gene_substrate)
                 .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-                .borrow_mut().add_receptor(receptor.clone());
+                .borrow_mut()
+                .add_receptor(receptor.clone());
         }
     }
-
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicReceptor<R, S, T> {
     fn is_similar(&self, other: &Self) -> bool {
-        self.state == other.state
+        self.state.is_similar(&other.state)
     }
 
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
             let triggers = self.triggers.cross_over(&other.triggers);
-            let  substrates = self.substrates.cross_over(&other.substrates);
+            let substrates = self.substrates.cross_over(&other.substrates);
             let state = self.state.cross_over(&other.state);
             let enzyme = self.enzyme.cross_over(&other.enzyme);
-            GenomicReceptor{
+            GenomicReceptor {
                 phantom_r: PhantomData,
                 phantom_t: PhantomData,
                 triggers,
                 substrates,
                 state,
-                enzyme
+                enzyme,
             }
         } else {
             do_a_or_b(|| self.clone(), || other.clone())
@@ -1567,18 +1726,23 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     /// [`Substrate`]: ../protein/struct.Substrate.html
     /// [`Reaction`]: ../chemistry/trait.Reaction.html
     pub fn new(educts: Vec<usize>, products: Vec<usize>, reaction: R) -> Self {
-        assert_eq!(educts.len(), reaction.get_educt_number(),
+        assert_eq!(
+            educts.len(),
+            reaction.get_educt_number(),
             "The number of required educts for reaction {:?} is {}, but {} educts were supplied.",
-            reaction, reaction.get_educt_number(), educts.len());
+            reaction,
+            reaction.get_educt_number(),
+            educts.len()
+        );
         assert_eq!(products.len(), reaction.get_product_number(),
             "The number of required products for reaction {:?} is {}, but {} products were supplied.",
             reaction, reaction.get_product_number(), products.len());
-        GenomicCatalyticCentre{
+        GenomicCatalyticCentre {
             phantom_s: PhantomData,
             phantom_t: PhantomData,
             educts,
             products,
-            reaction
+            reaction,
         }
     }
 
@@ -1603,7 +1767,10 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     fn referes_to_substrate(&self, substrate_index: usize) -> bool {
-        self.educts.iter().chain(self.products.iter()).any(|element| element == &substrate_index)
+        self.educts
+            .iter()
+            .chain(self.products.iter())
+            .any(|element| element == &substrate_index)
     }
 
     /// Adjust the indices of [`Substrate`] pointers after removal of a [`Substrate`].
@@ -1693,28 +1860,43 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     /// [`Substrate`]: ../protein/struct.Substrate.html
     /// [`Genome`]: ./struct.Genome.html
     /// [`Gene`]: ./struct.Gene.html
-    fn translate(&self, gene_index: usize, substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>>) -> CatalyticCentre<R, S, T> {
-        let educts = self.educts.iter()
+    fn translate(
+        &self,
+        gene_index: usize,
+        substrate_lookup: &HashMap<GeneSubstrate, Rc<RefCell<Substrate<R, S, T>>>>,
+    ) -> CatalyticCentre<R, S, T> {
+        let educts = self
+            .educts
+            .iter()
             .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
-            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
-                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-            ).map(|strong| Rc::downgrade(strong))
+            .map(|gene_substrate| {
+                substrate_lookup.get(&gene_substrate).expect(&format!(
+                    "The substrate lookup map did not contain {:?}.",
+                    &gene_substrate
+                ))
+            })
+            .map(|strong| Rc::downgrade(strong))
             .collect();
-        let products = self.products.iter()
+        let products = self
+            .products
+            .iter()
             .map(|substrate_index| GeneSubstrate::new(gene_index, *substrate_index))
-            .map(|gene_substrate| substrate_lookup.get(&gene_substrate)
-                .expect(&format!("The substrate lookup map did not contain {:?}.", &gene_substrate))
-            ).map(|strong| Rc::downgrade(strong))
+            .map(|gene_substrate| {
+                substrate_lookup.get(&gene_substrate).expect(&format!(
+                    "The substrate lookup map did not contain {:?}.",
+                    &gene_substrate
+                ))
+            })
+            .map(|strong| Rc::downgrade(strong))
             .collect();
         let reaction = self.reaction.clone();
         CatalyticCentre::new(educts, products, reaction)
     }
-
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalyticCentre<R, S, T> {
     fn is_similar(&self, other: &Self) -> bool {
-        self.reaction == other.reaction
+        self.reaction.is_similar(&other.reaction)
     }
 
     fn cross_over(&self, other: &Self) -> Self {
@@ -1722,12 +1904,12 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalytic
             let educts = self.educts.cross_over(&other.educts);
             let products = self.products.cross_over(&other.products);
             let reaction = self.reaction.cross_over(&other.reaction);
-            GenomicCatalyticCentre{
+            GenomicCatalyticCentre {
                 phantom_s: PhantomData,
                 phantom_t: PhantomData,
                 educts,
                 products,
-                reaction
+                reaction,
             }
         } else {
             do_a_or_b(|| self.clone(), || other.clone())
@@ -1735,8 +1917,300 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalytic
     }
 }
 
+/// A `GenomicInputSensor` represents the information of an actual
+/// [`InputSensor`](oben::evolution::protein::InputSensor)
+/// that provides input
+/// [`Substrate`](oben::evolution::protein::Substrate)s.
+/// It is contained within a
+/// [`Gene`](oben::evolution::gene::Gene).
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct GenomicInputSensor<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+> {
+    phantom_reaction: PhantomData<ReactionType>,
+    phantom_state: PhantomData<StateType>,
+    phantom_information: PhantomData<InformationType>,
+    phantom_input_element: PhantomData<InputElementType>,
+    input_substrates: Vec<Option<GeneSubstrate>>,
+    feedback_substrates: Vec<Option<GeneSubstrate>>,
+    input: InputSensorType,
+}
 
-pub trait GenomeMutation<R: Reaction<T>, S: State<T>, T: Information>: Sized + Send + Sync {
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    >
+    GenomicInputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+{
+    /// Get the number of associated input [`Substrate`](oben::evolution::protein::Substrate)s.
+    pub fn number_of_associated_inputs(&self) -> usize {
+        self.input_substrates.iter().filter(|i| i.is_some()).count()
+    }
+
+    /// Adjust the input [`GeneSubstrate`] references after the [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    fn adjust_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        Self::adjust_substrates(&mut self.input_substrates, removed_substrate);
+        Self::adjust_substrates(&mut self.feedback_substrates, removed_substrate);
+    }
+
+    fn adjust_substrates(
+        substrates: &mut Vec<Option<GeneSubstrate>>,
+        removed_substrate: GeneSubstrate,
+    ) {
+        for substrate in substrates {
+            *substrate = Self::adjust_substrate(*substrate, removed_substrate);
+        }
+    }
+
+    fn adjust_substrate(
+        substrate_option: Option<GeneSubstrate>,
+        removed_substrate: GeneSubstrate,
+    ) -> Option<GeneSubstrate> {
+        substrate_option.and_then(|substrate| {
+            if substrate == removed_substrate {
+                None
+            } else if substrate.is_gene(removed_substrate.gene()) {
+                Some(GeneSubstrate::new(
+                    substrate.gene(),
+                    adjust_index(substrate.substrate(), removed_substrate.substrate()),
+                ))
+            } else {
+                Some(substrate)
+            }
+        })
+    }
+
+    /// Validates the [`GeneSubstrate`] references after a recombination
+    /// event and removes invalid ones.
+    ///
+    /// # Parameters
+    ///
+    /// * `genes` - the [`Gene`]s of the [`Genome`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`Genome`]: ./struct.Genome.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    fn validate(&mut self, genes: &Vec<Gene<ReactionType, StateType, InformationType>>) {
+        Self::validate_substrates(&mut self.input_substrates, genes);
+        Self::validate_substrates(&mut self.feedback_substrates, genes);
+    }
+
+    fn validate_substrates(
+        substrates: &mut Vec<Option<GeneSubstrate>>,
+        genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
+    ) {
+        let mut duplicate_checker = HashSet::new();
+        for substrate_option in substrates {
+            if let Some(substrate) = substrate_option {
+                // Remove the association if it points to a duplicate or an invalid substrate.
+                if !duplicate_checker.insert(*substrate)
+                    || !Genome::<
+                        ReactionType,
+                        StateType,
+                        InformationType,
+                        InputElementType,
+                        InputSensorType,
+                    >::has_substrate(genes, substrate)
+                {
+                    *substrate_option = None;
+                }
+                // Otherwise, leave it untouched.
+            }
+        }
+    }
+
+    /// Translates the `GenomicInputSensor` into an [`InputSensor`](oben::evolution::protein::InputSensor).
+    ///
+    /// # Parameters
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](oben::evolution::protein::Substrate)s
+    /// of the containing [`Genome`](oben::evolution::gene::Genome)
+    ///
+    /// # Panics
+    ///
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](oben::evolution::protein::Substrate)s.
+    fn translate(
+        &self,
+        substrate_lookup: &HashMap<
+            GeneSubstrate,
+            Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+        >,
+    ) -> InputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    {
+        let input_substrates = Self::translate_substrates(&self.input_substrates, substrate_lookup);
+        let feedback_substrates =
+            Self::translate_substrates(&self.feedback_substrates, substrate_lookup);
+        let input = self.input.clone();
+        InputSensor::new(input, input_substrates, feedback_substrates)
+    }
+
+    pub fn remove_associations_with_gene(&mut self, gene_index: usize) {
+        Self::remove_associations_with_gene_from_substrates(&mut self.input_substrates, gene_index);
+        Self::remove_associations_with_gene_from_substrates(
+            &mut self.feedback_substrates,
+            gene_index,
+        );
+    }
+
+    fn remove_associations_with_gene_from_substrates(
+        substrates: &mut Vec<Option<GeneSubstrate>>,
+        gene_index: usize,
+    ) {
+        for substrate_option in substrates {
+            if let Some(substrate) = substrate_option {
+                if substrate.is_gene(gene_index) {
+                    *substrate_option = None;
+                }
+            }
+        }
+    }
+
+    /// Translates the [`Substrate`](oben::evolution::protein::Substrate)s of a `GenomicInputSensor`
+    ///
+    /// # Parameters
+    /// * `substrates` - the [`Substrate`](oben::evolution::protein::Substrate)s to transcribe
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](oben::evolution::protein::Substrate)s
+    /// of the containing [`Genome`](oben::evolution::gene::Genome)
+    ///
+    /// # Panics
+    ///
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](oben::evolution::protein::Substrate)s.
+    fn translate_substrates(
+        substrates: &Vec<Option<GeneSubstrate>>,
+        substrate_lookup: &HashMap<
+            GeneSubstrate,
+            Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+        >,
+    ) -> Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
+        substrates
+            .iter()
+            .map(Option::as_ref)
+            .map(|gene_substrate_option| {
+                gene_substrate_option.map(|gene_substrate| {
+                    substrate_lookup.get(gene_substrate).expect(&format!(
+                        "The substrate lookup map did not contain {:?}.",
+                        gene_substrate
+                    ))
+                })
+            })
+            .map(|strong_option| strong_option.map(|strong| Rc::downgrade(strong)))
+            .collect()
+    }
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType> + Default,
+    > Default
+    for GenomicInputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
+{
+    fn default() -> Self {
+        GenomicInputSensor {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            input_substrates: Vec::default(),
+            feedback_substrates: Vec::default(),
+            input: InputSensorType::default(),
+        }
+    }
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    > CrossOver
+    for GenomicInputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
+{
+    fn is_similar(&self, other: &Self) -> bool {
+        self.input.is_similar(&other.input)
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let input_substrates = self.input_substrates.cross_over(&other.input_substrates);
+            let feedback_substrates = self
+                .feedback_substrates
+                .cross_over(&other.feedback_substrates);
+            let input = self.input.cross_over(&other.input);
+            GenomicInputSensor {
+                phantom_reaction: PhantomData,
+                phantom_state: PhantomData,
+                phantom_information: PhantomData,
+                phantom_input_element: PhantomData,
+                input_substrates,
+                feedback_substrates,
+                input,
+            }
+        } else {
+            do_a_or_b(|| self.clone(), || other.clone())
+        }
+    }
+}
+
+pub trait GenomeMutation<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, InformationType>,
+>: Sized + Send + Sync
+{
     /// Generates a mutated version of the specified [`Genome`] based on the kind of
     /// `GenomeMutation`.
     ///
@@ -1748,7 +2222,16 @@ pub trait GenomeMutation<R: Reaction<T>, S: State<T>, T: Information>: Sized + S
     /// `genome` - the base [`Genome`] to generate a mutated version of
     ///
     /// [`Genome`]: ./struct.Genome.html
-    fn mutate(&self, genome: &Genome<R, S, T>) -> Option<Genome<R, S, T>>;
+    fn mutate(
+        &self,
+        genome: &Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>;
 
     /// Creates a random `GenomeMutation`.
     fn random() -> Self;
@@ -1784,7 +2267,10 @@ impl CrossOver for usize {
 }
 
 // This implementation improves the usability of the `CrossOver` trait for genomic elements.
-impl<T> CrossOver for Option<T> where T: CrossOver + Sized + Clone {
+impl<T> CrossOver for Option<T>
+where
+    T: CrossOver + Sized + Clone,
+{
     fn is_similar(&self, other: &Self) -> bool {
         match (self, other) {
             (None, None) => true,
@@ -1799,12 +2285,14 @@ impl<T> CrossOver for Option<T> where T: CrossOver + Sized + Clone {
             (Some(a), Some(b)) => Some(a.cross_over(b)),
             _ => do_a_or_b(|| self.clone(), || other.clone()),
         }
-
     }
 }
 
 // This implementation improves the usability of the `CrossOver` trait for genomic elements.
-impl<T> CrossOver for Vec<T> where T: CrossOver + Clone {
+impl<T> CrossOver for Vec<T>
+where
+    T: CrossOver + Clone,
+{
     fn is_similar(&self, _other: &Self) -> bool {
         true
     }

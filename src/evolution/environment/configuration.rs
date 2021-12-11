@@ -2,16 +2,20 @@
 
 extern crate rand;
 
+use crate::evolution::chemistry::Input;
+use crate::evolution::gene::CrossOver;
+use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use crate::evolution::helper::ScalingFactor;
 
 use super::super::chemistry::{Information, Reaction, State};
 use super::super::gene::{Genome, GenomeMutation};
 use super::super::resource::Resource;
-use uuid::{Uuid, v1::Context, v1::Timestamp};
+use uuid::{v1::Context, v1::Timestamp, Uuid};
 
 /// The sub-folder in which genome files are stored.
 const SUBFOLDER_GENOME: &str = "genomes/dummy";
@@ -81,7 +85,6 @@ pub struct EnvironmentBuilder {
 }
 
 impl EnvironmentBuilder {
-
     pub fn new() -> Self {
         EnvironmentBuilder {
             working_directory: PathBuf::from("./working_directory"),
@@ -104,12 +107,30 @@ impl EnvironmentBuilder {
     /// Build an [`Environment`] to specify run time properties of an evolutionary network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    pub fn build<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information>(&self) -> Environment<M, R, S, T> {
+    pub fn build<
+        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    >(
+        &self,
+    ) -> Environment<
+        MutationType,
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    > {
         Environment {
-            phantom_m: PhantomData,
-            phantom_r: PhantomData,
-            phantom_s: PhantomData,
-            phantom_t: PhantomData,
+            phantom_mutation: PhantomData,
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_input_element: PhantomData,
+            phantom_input_sensor: PhantomData,
             working_directory: self.working_directory.clone(),
             mutation_rate: self.mutation_rate_or_default(),
             population_size: self.population_size,
@@ -254,7 +275,10 @@ impl EnvironmentBuilder {
     /// # Parameters
     ///
     /// * `testing_chance_sigmoid_midpoint` - the midpoint of the testing chance sigmoid
-    pub fn testing_chance_sigmoid_midpoint(&mut self, testing_chance_sigmoid_midpoint: f64) -> &mut Self {
+    pub fn testing_chance_sigmoid_midpoint(
+        &mut self,
+        testing_chance_sigmoid_midpoint: f64,
+    ) -> &mut Self {
         self.testing_chance_sigmoid_midpoint = testing_chance_sigmoid_midpoint;
         self
     }
@@ -269,13 +293,16 @@ impl EnvironmentBuilder {
         self.testing_repetitions = testing_repetitions;
         self
     }
-    
+
     /// Sets the initial fitness [`ScalingFactor`].
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `intial_fitness_scaling_factor` - the initial fitness scaling
-    pub fn initial_fitness_scaling_factor(&mut self, initial_fitness_scaling_factor: ScalingFactor) -> &mut Self {
+    pub fn initial_fitness_scaling_factor(
+        &mut self,
+        initial_fitness_scaling_factor: ScalingFactor,
+    ) -> &mut Self {
         self.initial_fitness_scaling_factor = initial_fitness_scaling_factor;
         self
     }
@@ -310,11 +337,20 @@ impl Default for EnvironmentBuilder {
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
 #[derive(Debug)]
-pub struct Environment<M, R, S, T> {
-    phantom_m: PhantomData<M>,
-    phantom_r: PhantomData<R>,
-    phantom_s: PhantomData<S>,
-    phantom_t: PhantomData<T>,
+pub struct Environment<
+    MutationType,
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+> {
+    phantom_mutation: PhantomData<MutationType>,
+    phantom_reaction: PhantomData<ReactionType>,
+    phantom_state: PhantomData<StateType>,
+    phantom_information: PhantomData<InformationType>,
+    phantom_input_element: PhantomData<InputElementType>,
+    phantom_input_sensor: PhantomData<InputSensorType>,
     working_directory: PathBuf,
     /// The chance of a single offspring to carry a mutation.
     mutation_rate: f64,
@@ -367,7 +403,23 @@ pub struct Environment<M, R, S, T> {
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
-impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> Environment<M, R, S, T> {
+impl<
+        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputSensorType: Input<InputElementType, InformationType>,
+    >
+    Environment<
+        MutationType,
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
+{
     /// Returns the path to the working directory.
     pub fn working_directory(&self) -> &Path {
         Path::new(&self.working_directory)
@@ -474,7 +526,8 @@ impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> En
     ///
     /// If the system clock was set to earlier than Unix time start.
     pub fn uuid_timestamp(&self) -> Timestamp {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
             .expect("The system clock is not set correctly, so no UUIDs can be created.");
         Timestamp::from_unix(&self.uuid_context, now.as_secs(), now.subsec_nanos())
     }
@@ -594,7 +647,17 @@ impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> En
     /// * `genome` - the [`Genome`] to mutate
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
-     pub fn mutate_n_times(number_of_mutations: usize, genome: &Genome<R, S, T>) -> Option<Genome<R, S, T>> {
+    pub fn mutate_n_times(
+        number_of_mutations: usize,
+        genome: &Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
+    {
         if number_of_mutations == 0 {
             Some(genome.duplicate())
         } else {
@@ -602,12 +665,12 @@ impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> En
             for i in 0..number_of_mutations {
                 if i == 0 {
                     // If this is the first mutation, mutate the original genome.
-                    mutated_genome = M::random().mutate(genome);
+                    mutated_genome = MutationType::random().mutate(genome);
                 } else if mutated_genome.is_some() {
                     // If this is not the first mutation and the previous mutation was
                     // successful, continue mutating.
                     // Unwrapping must succeed as it was checked beforehand.
-                    mutated_genome = M::random().mutate(&mutated_genome.unwrap());
+                    mutated_genome = MutationType::random().mutate(&mutated_genome.unwrap());
                 } else {
                     // If this is not the first mutation and the previous mutation was not
                     // successful, stop mutating.
@@ -616,5 +679,5 @@ impl<M: GenomeMutation<R, S, T>, R: Reaction<T>, S: State<T>, T: Information> En
             }
             mutated_genome
         }
-     }
+    }
 }
