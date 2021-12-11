@@ -556,7 +556,7 @@ impl<
         let ind = individual
             .lock()
             .expect("A thread paniced while holding the individual's lock.");
-        self.environment.death_chance(ind.age()) >= thread_rng().gen_range(0.0, 1.0)
+        self.environment.death_chance(ind.age()) >= thread_rng().gen_range(0.0..=1.0)
     }
 
     /// Checks if the specified [`Individual`] is juvenil and still needs testing.
@@ -620,7 +620,7 @@ impl<
         let ind = individual
             .lock()
             .expect("A thread paniced while holding the individual's lock.");
-        thread_rng().gen_range(0.0, 1.0) <= self.environment.testing_chance(ind.times_tested())
+        thread_rng().gen_range(0.0..=1.0) <= self.environment.testing_chance(ind.times_tested())
     }
 
     /// Checks if the specified [`Individual`] should be tested.

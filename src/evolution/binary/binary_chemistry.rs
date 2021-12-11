@@ -283,7 +283,7 @@ impl CrossOver for BinaryState {
 
 impl Distribution<BinaryState> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> BinaryState {
-        match rng.gen_range(0u8, 12) {
+        match rng.gen_range(0u8..=11) {
             0 => BinaryState::Equals,
             1 => BinaryState::Not,
             2 => BinaryState::Greater,
@@ -518,7 +518,7 @@ impl CrossOver for BinaryReaction {
 
 impl Distribution<BinaryReaction> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> BinaryReaction {
-        match rng.gen_range(0u8, 11) {
+        match rng.gen_range(0u8..=10) {
             0 => BinaryReaction::And,
             1 => BinaryReaction::Or,
             2 => BinaryReaction::XOr,

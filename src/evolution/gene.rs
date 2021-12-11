@@ -465,7 +465,7 @@ impl<
     ///
     /// [`Gene`]: ./struct.Gene.html
     pub fn get_random_gene(&self) -> usize {
-        thread_rng().gen_range(0, self.number_of_genes().get())
+        thread_rng().gen_range(0..self.number_of_genes().get())
     }
 
     /// Returns the index of a random output [`GeneSubstrate`] if there is any.
@@ -473,7 +473,7 @@ impl<
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     pub fn get_random_output(&self) -> Option<usize> {
         if self.number_of_outputs() > 0 {
-            Some(thread_rng().gen_range(0, self.number_of_outputs()))
+            Some(thread_rng().gen_range(0..self.number_of_outputs()))
         } else {
             None
         }
@@ -484,7 +484,7 @@ impl<
     /// [`GeneSubstrate`]: ./struct.GeneAssociation.html
     pub fn get_random_association(&self) -> Option<usize> {
         if self.number_of_associations() > 0 {
-            Some(thread_rng().gen_range(0, self.number_of_associations()))
+            Some(thread_rng().gen_range(0..self.number_of_associations()))
         } else {
             None
         }
@@ -956,7 +956,7 @@ where
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     pub fn get_random_gene_substrate(&self) -> Option<usize> {
         if self.associations.len() > 0 {
-            Some(thread_rng().gen_range(0, self.associations.len()))
+            Some(thread_rng().gen_range(0..self.associations.len()))
         } else {
             None
         }
@@ -1096,7 +1096,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_substrate(&self) -> usize {
-        thread_rng().gen_range(0, self.number_of_substrates().get())
+        thread_rng().gen_range(0..self.number_of_substrates().get())
     }
 
     /// Returns the index of a random [`GenomicReceptor`] encoded by this `Gene` if there is any.
@@ -1104,7 +1104,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> Gene<R, S, T> {
     /// [`GenomicReceptor`]: ./struct.GenomicReceptor.html
     pub fn get_random_receptor(&self) -> Option<usize> {
         if self.number_of_receptors() > 0 {
-            Some(thread_rng().gen_range(0, self.number_of_receptors()))
+            Some(thread_rng().gen_range(0..self.number_of_receptors()))
         } else {
             None
         }
@@ -1566,7 +1566,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_trigger(&self) -> Option<usize> {
         if self.triggers.len() > 0 {
-            Some(thread_rng().gen_range(0, self.triggers.len()))
+            Some(thread_rng().gen_range(0..self.triggers.len()))
         } else {
             None
         }
@@ -1578,7 +1578,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicReceptor<R, S, T> {
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_substrate(&self) -> Option<usize> {
         if self.substrates.len() > 0 {
-            Some(thread_rng().gen_range(0, self.substrates.len()))
+            Some(thread_rng().gen_range(0..self.substrates.len()))
         } else {
             None
         }
@@ -1799,7 +1799,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_educt(&self) -> Option<usize> {
         if self.educts.len() > 0 {
-            Some(thread_rng().gen_range(0, self.educts.len()))
+            Some(thread_rng().gen_range(0..self.educts.len()))
         } else {
             None
         }
@@ -1811,7 +1811,7 @@ impl<R: Reaction<T>, S: State<T>, T: Information> GenomicCatalyticCentre<R, S, T
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_random_product(&self) -> Option<usize> {
         if self.products.len() > 0 {
-            Some(thread_rng().gen_range(0, self.products.len()))
+            Some(thread_rng().gen_range(0..self.products.len()))
         } else {
             None
         }

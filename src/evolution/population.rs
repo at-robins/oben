@@ -499,7 +499,7 @@ impl<
         >,
     {
         let offspring_genome = self.mate(partner);
-        let random_chance: f64 = rand::thread_rng().gen_range(0.0, 1.0);
+        let random_chance: f64 = rand::thread_rng().gen_range(0.0..1.0);
         // Calculate the number of mutations corresponding to the generated uniform random percentage.
         //    P("n mutations in a single genome") = "mutation rate" ^ n
         // => n = log(base: "mutation rate", value: P)
@@ -788,7 +788,7 @@ impl<
         if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            let random_population_index = thread_rng().gen_range(0..self.individuals.len());
             for (index, value) in self.individuals.values().enumerate() {
                 if random_population_index == index {
                     return Some(
@@ -817,7 +817,7 @@ impl<
         if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            let random_population_index = thread_rng().gen_range(0..self.individuals.len());
             self.individuals
                 .values()
                 .nth(random_population_index)
@@ -846,7 +846,7 @@ impl<
         if self.individuals.len() == 0 {
             None
         } else {
-            let random_population_index = thread_rng().gen_range(0, self.individuals.len());
+            let random_population_index = thread_rng().gen_range(0..self.individuals.len());
             self.individuals
                 .values()
                 .nth(random_population_index)

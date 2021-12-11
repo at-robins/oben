@@ -512,7 +512,7 @@ impl<
 
     /// Checks if lateral gene transfer happend on a statistical basis.
     pub fn lateral_gene_transfer(&self) -> bool {
-        thread_rng().gen_range(0.0, 1.0) <= self.lateral_gene_transfer_chance
+        thread_rng().gen_range(0.0..=1.0) <= self.lateral_gene_transfer_chance
     }
 
     /// Returns the number of repetitions per testing cycle.
