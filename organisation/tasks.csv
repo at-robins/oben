@@ -7,7 +7,7 @@ ID;Title;Category;Description;Result;Status;Date
 6;Implementation of simple neuronal networks;Feature;Simple neuronal network components need to be integrated into / natively supported by the framework.;;;
 7;Replace random function with distribution trait;Feature;All random functions defined in interfaces need to be replaced with the native Distribution trait to allow easier code maintainability.;;;
 8;Update libraries;Feature;All libraries should be updated to their most recent version if possible without major issues.;;;
-9;;;;;;
+9;Remove crossover for usize;Bugfix;The gene module implements the CrossOver trait for usize in a module specific way. This will make custom networks using usize as the information type unusable.;;;
 10;;;;;;
 11;;;;;;
 12;;;;;;

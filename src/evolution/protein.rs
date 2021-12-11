@@ -145,7 +145,7 @@ impl<
     /// # Parameters
     ///
     /// * `time_of_detection` - the timepoint at which the catalysis happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// [`State`]: ../chemistry/struct.State.html
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
@@ -172,7 +172,7 @@ impl<
     /// # Parameters
     ///
     /// * `time_of_catalysis` - the timepoint at which the catalysis happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// [`CatalyticCentre`]: ./struct.CatalyticCentre.html
     pub fn catalyse(
@@ -266,7 +266,7 @@ impl<
     /// # Parameters
     ///
     /// * `time_of_catalysis` - the timepoint at which the catalysis happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
     fn calculate_product_values(&self, time_of_catalysis: Iteration) -> Vec<InformationType> {
@@ -290,7 +290,7 @@ impl<
     /// # Parameters
     ///
     /// * `time_of_catalysis` - the timepoint at which the catalysis happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// [`Reaction`]: ../chemistry/struct.Reaction.html
     pub fn catalyse(&self, time_of_catalysis: Iteration) {

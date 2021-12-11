@@ -29,7 +29,7 @@ pub trait State<T: Information>:
     ///
     /// * `substrates` - the substrates to perform the logical operation on
     /// * `detection_time` - the timepoint at which the detection happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// # Panics
     ///
@@ -53,7 +53,7 @@ pub trait Reaction<T: Information>:
     ///
     /// * `educts` - the educts to convert into products
     /// * `reaction_time` - the timepoint at which the reaction happens
-    /// as [`Iteration`](oben::evolution::helper::Iteration)
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
     ///
     /// # Panics
     ///
@@ -93,3 +93,18 @@ pub trait Input<
     /// Creates an random `InputSensor`.
     fn random() -> Self;
 }
+/*
+/// An `Output` represents an elementary operation for modification of binary substrates.
+pub trait Output<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
+
+    /// Returns the number of educts required to perform the reaction.
+    fn get_input_substrates(&self) -> usize;
+
+    /// Returns if the sensor was changed and the input substrates should be checked again.
+    fn is_changed(&self) -> bool;
+    fn set_changed(&mut self);
+    // TODO: Implement check in every iteration of the organism execution. Only needed on protein level: Remove here!
+
+    /// Creates an random `InputSensor`.
+    fn random() -> Self;
+}*/

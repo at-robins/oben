@@ -80,7 +80,7 @@ pub struct EnvironmentBuilder {
     ///
     /// [`Organism`]: ../population/struct.Organism.html
     max_organism_size: usize,
-    /// The initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    /// The initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
@@ -399,7 +399,7 @@ pub struct Environment<
     max_organism_size: usize,
     /// The context for UUID creation.
     uuid_context: Context,
-    /// The initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    /// The initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
@@ -603,7 +603,7 @@ impl<
         self.population_save_intervall
     }
 
-    /// Returns the initial fitness [`ScalingFactor`](oben::evoluion::helper::ScalingFactor).
+    /// Returns the initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
     pub fn initial_fitness_scaling_factor(&self) -> ScalingFactor {
         self.initial_fitness_scaling_factor
     }

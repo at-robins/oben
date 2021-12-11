@@ -1918,11 +1918,11 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalytic
 }
 
 /// A `GenomicInputSensor` represents the information of an actual
-/// [`InputSensor`](oben::evolution::protein::InputSensor)
+/// [`InputSensor`](crate::evolution::protein::InputSensor)
 /// that provides input
-/// [`Substrate`](oben::evolution::protein::Substrate)s.
+/// [`Substrate`](crate::evolution::protein::Substrate)s.
 /// It is contained within a
-/// [`Gene`](oben::evolution::gene::Gene).
+/// [`Gene`](crate::evolution::gene::Gene).
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GenomicInputSensor<
     ReactionType,
@@ -1956,7 +1956,7 @@ impl<
     >
     GenomicInputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
-    /// Get the number of associated input [`Substrate`](oben::evolution::protein::Substrate)s.
+    /// Get the number of associated input [`Substrate`](crate::evolution::protein::Substrate)s.
     pub fn number_of_associated_inputs(&self) -> usize {
         self.input_substrates.iter().filter(|i| i.is_some()).count()
     }
@@ -2042,15 +2042,15 @@ impl<
         }
     }
 
-    /// Translates the `GenomicInputSensor` into an [`InputSensor`](oben::evolution::protein::InputSensor).
+    /// Translates the `GenomicInputSensor` into an [`InputSensor`](crate::evolution::protein::InputSensor).
     ///
     /// # Parameters
-    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](oben::evolution::protein::Substrate)s
-    /// of the containing [`Genome`](oben::evolution::gene::Genome)
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](crate::evolution::protein::Substrate)s
+    /// of the containing [`Genome`](crate::evolution::gene::Genome)
     ///
     /// # Panics
     ///
-    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](oben::evolution::protein::Substrate)s.
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](crate::evolution::protein::Substrate)s.
     fn translate(
         &self,
         substrate_lookup: &HashMap<
@@ -2087,16 +2087,16 @@ impl<
         }
     }
 
-    /// Translates the [`Substrate`](oben::evolution::protein::Substrate)s of a `GenomicInputSensor`
+    /// Translates the [`Substrate`](crate::evolution::protein::Substrate)s of a `GenomicInputSensor`
     ///
     /// # Parameters
-    /// * `substrates` - the [`Substrate`](oben::evolution::protein::Substrate)s to transcribe
-    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](oben::evolution::protein::Substrate)s
-    /// of the containing [`Genome`](oben::evolution::gene::Genome)
+    /// * `substrates` - the [`Substrate`](crate::evolution::protein::Substrate)s to transcribe
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](crate::evolution::protein::Substrate)s
+    /// of the containing [`Genome`](crate::evolution::gene::Genome)
     ///
     /// # Panics
     ///
-    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](oben::evolution::protein::Substrate)s.
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](crate::evolution::protein::Substrate)s.
     fn translate_substrates(
         substrates: &Vec<Option<GeneSubstrate>>,
         substrate_lookup: &HashMap<
