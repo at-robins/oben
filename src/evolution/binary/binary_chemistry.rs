@@ -4,15 +4,18 @@ extern crate bitvec;
 extern crate rand;
 extern crate serde;
 
-use bitvec::vec::BitVec;
-use rand::{distributions::{Distribution, Standard}, Rng, thread_rng};
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use super::BinarySubstrate;
 use super::super::chemistry::{Reaction, State};
-use super::super::helper::Iteration;
 use super::super::gene::CrossOver;
 use super::super::helper::do_a_or_b;
+use super::super::helper::Iteration;
+use super::BinarySubstrate;
+use bitvec::vec::BitVec;
+use rand::{
+    distributions::{Distribution, Standard},
+    thread_rng, Rng,
+};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 /// A `BinaryState` is an elementary operation for comparing binary substrates.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -29,7 +32,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 12, 34]));
     /// let b: BinarySubstrate = a.clone();
     /// assert!(BinaryState::Equals.detect(&[&a,&b], Iteration::new()));
     /// ```
@@ -46,7 +49,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 12, 34]));
     /// let b: BinarySubstrate = a.clone();
     /// assert!(!BinaryState::Not.detect(&[&a,&b], Iteration::new()));
     /// ```
@@ -63,8 +66,8 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
-    /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([128, 12, 34]));
+    /// let b: BinarySubstrate = BitBox::from_boxed_slice(Box::new([127]));
     /// assert!(BinaryState::Greater.detect(&[&a, &b], Iteration::new()));
     /// ```
     Greater,
@@ -80,8 +83,8 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[128, 12, 34]);
-    /// let b: BinarySubstrate = BitBox::from_slice(&[127]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([128, 12, 34]));
+    /// let b: BinarySubstrate = BitBox::from_boxed_slice(Box::new([127]));
     /// assert!(BinaryState::Lesser.detect(&[&b, &a], Iteration::new()));
     /// ```
     Lesser,
@@ -97,7 +100,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 12, 34]));
     /// let b: BinarySubstrate = a.clone();
     /// assert!(BinaryState::GreaterOrEqual.detect(&[&a,&b], Iteration::new()));
     /// ```
@@ -114,7 +117,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[255, 12, 34]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 12, 34]));
     /// let b: BinarySubstrate = a.clone();
     /// assert!(BinaryState::LesserOrEqual.detect(&[&a,&b], Iteration::new()));
     /// ```
@@ -131,7 +134,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[u8::max_value(), u8::max_value()]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([u8::max_value(), u8::max_value()]));
     /// assert!(BinaryState::All.detect(&[&a], Iteration::new()));
     /// ```
     All,
@@ -147,7 +150,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([0, 1, 0]));
     /// assert!(BinaryState::Some.detect(&[&a], Iteration::new()));
     /// ```
     Some,
@@ -163,7 +166,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 1, 0]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([0, 1, 0]));
     /// assert!(BinaryState::NotAll.detect(&[&a], Iteration::new()));
     /// ```
     NotAll,
@@ -179,7 +182,7 @@ pub enum BinaryState {
     /// use oben::evolution::chemistry::State;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let a: BinarySubstrate = BitBox::from_slice(&[0, 0, 0]);
+    /// let a: BinarySubstrate = BitBox::from_boxed_slice(Box::new([0, 0, 0]));
     /// assert!(BinaryState::None.detect(&[&a], Iteration::new()));
     /// ```
     None,
@@ -228,9 +231,13 @@ impl State<BinarySubstrate> for BinaryState {
     ///
     /// If the number of substrates is not exactly equal to the required one.
     fn detect(&self, substrates: &[&BinarySubstrate], _detection_time: Iteration) -> bool {
-        assert_eq!(substrates.len(), self.get_substrate_number(),
+        assert_eq!(
+            substrates.len(),
+            self.get_substrate_number(),
             "The number of required substrates is {}, but {} substrates were supplied.",
-            self.get_substrate_number(), substrates.len());
+            self.get_substrate_number(),
+            substrates.len()
+        );
 
         match self {
             BinaryState::Equals => substrates[0] == substrates[1],
@@ -296,7 +303,7 @@ impl Distribution<BinaryState> for Standard {
             9 => BinaryState::None,
             10 => BinaryState::Always,
             11 => BinaryState::Never,
-            _ => panic!("A random number with no matching state was created.")
+            _ => panic!("A random number with no matching state was created."),
         }
     }
 }
@@ -316,11 +323,11 @@ pub enum BinaryReaction {
     /// use oben::evolution::chemistry::Reaction;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255]);
-    /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[32]);
+    /// let educt1_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255]));
+    /// let educt2_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([32]));
     /// let educts = vec!(&educt1_value, &educt2_value);
     ///
-    /// let product_value: BinarySubstrate = BitBox::from_element(32);
+    /// let product_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([32]));
     /// let product = vec!(product_value);
     ///
     /// assert_eq!(BinaryReaction::And.react(&educts[..], Iteration::new()), product);
@@ -346,11 +353,11 @@ pub enum BinaryReaction {
     /// use oben::evolution::chemistry::Reaction;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let educt1_value: BinarySubstrate = BitBox::from_slice(&[255, 32]);
-    /// let educt2_value: BinarySubstrate = BitBox::from_slice(&[4, 35]);
+    /// let educt1_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 32]));
+    /// let educt2_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([4, 35]));
     /// let educts = vec!(&educt1_value, &educt2_value);
     ///
-    /// let product_value: BinarySubstrate = BitBox::from_slice(&[255, 32, 4, 35]);
+    /// let product_value: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 32, 4, 35]));
     /// let product = vec!(product_value);
     ///
     /// assert_eq!(BinaryReaction::Append.react(&educts[..], Iteration::new()), product);
@@ -372,7 +379,7 @@ pub enum BinaryReaction {
     /// use oben::evolution::chemistry::Reaction;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
+    /// let educt_values: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 32]));
     /// let educts = vec!(&educt_values);
     ///
     /// assert_eq!(BinaryReaction::Duplicate.react(&educts[..], Iteration::new())[0], *educts[0]);
@@ -404,7 +411,7 @@ pub enum BinaryReaction {
     /// use oben::evolution::chemistry::Reaction;
     /// use oben::evolution::helper::Iteration;
     ///
-    /// let educt_values: BinarySubstrate = BitBox::from_slice(&[255, 32]);
+    /// let educt_values: BinarySubstrate = BitBox::from_boxed_slice(Box::new([255, 32]));
     /// let educts = vec!(&educt_values);
     ///
     /// assert_eq!(BinaryReaction::Random.react(&educts[..], Iteration::new())[0].len(), educts[0].len());
@@ -423,46 +430,63 @@ impl Reaction<BinarySubstrate> for BinaryReaction {
     ///
     /// If the number of supplied educts and created products is not
     /// exactly equal to the required one.
-    fn react(&self, educts: &[&BinarySubstrate], _reaction_time: Iteration) -> Vec<BinarySubstrate> {
-        assert_eq!(educts.len(), self.get_educt_number(),
+    fn react(
+        &self,
+        educts: &[&BinarySubstrate],
+        _reaction_time: Iteration,
+    ) -> Vec<BinarySubstrate> {
+        assert_eq!(
+            educts.len(),
+            self.get_educt_number(),
             "The number of required educts is {}, but {} educts were supplied.",
-            self.get_educt_number(), educts.len());
+            self.get_educt_number(),
+            educts.len()
+        );
 
         let products = match self {
-            BinaryReaction::And => vec!(educts[0].clone() & educts[1].clone()),
-            BinaryReaction::Or => vec!(educts[0].clone() | educts[1].clone()),
-            BinaryReaction::XOr => vec!(educts[0].clone() ^ educts[1].clone()),
-            // TODO: Re-implement the bit shift operations as soon as native BitBox shift gets fixed.
-            // Currently casting to a BitVec is needed otherwise BitBoxes of length n * container
-            // type (here u8 => n * 8) will panic upon shifting.
-            BinaryReaction::ShiftRight => vec!((educts[0].to_vec() >> educts[1].len()).into()),
-            BinaryReaction::ShiftLeft => vec!((educts[0].to_vec() << educts[1].len()).into()),
+            BinaryReaction::And => vec![educts[0].clone() & educts[1].clone()],
+            BinaryReaction::Or => vec![educts[0].clone() | educts[1].clone()],
+            BinaryReaction::XOr => vec![educts[0].clone() ^ educts[1].clone()],
+            BinaryReaction::ShiftRight => {
+                let mut shifted = educts[0].clone();
+                shifted.shift_right(educts[1].len());
+                vec![shifted]
+            }
+            BinaryReaction::ShiftLeft => {
+                let mut shifted = educts[0].clone();
+                shifted.shift_left(educts[1].len());
+                vec![shifted]
+            }
             BinaryReaction::Append => {
                 let mut a = BitVec::from(educts[0].clone());
                 let mut b = BitVec::from(educts[1].clone());
                 a.append(&mut b);
-                vec!(a.into())
-            },
-            BinaryReaction::Inverse => vec!(!educts[0].clone()),
+                vec![a.into()]
+            }
+            BinaryReaction::Inverse => vec![!educts[0].clone()],
             BinaryReaction::Reverse => {
                 let mut a = educts[0].clone();
                 a.reverse();
-                vec!(a)
-            },
-            BinaryReaction::Duplicate => vec!(educts[0].clone()),
-            BinaryReaction::Misfunction => vec!(),
+                vec![a]
+            }
+            BinaryReaction::Duplicate => vec![educts[0].clone()],
+            BinaryReaction::Misfunction => vec![],
             BinaryReaction::Random => {
                 let mut random_bits = BitVec::with_capacity(educts[0].len());
                 for _i in 0..educts[0].len() {
                     random_bits.push(rand::random())
                 }
-                vec!(random_bits.into())
-            },
+                vec![random_bits.into()]
+            }
         };
 
-        assert_eq!(products.len(), self.get_product_number(),
+        assert_eq!(
+            products.len(),
+            self.get_product_number(),
             "The number of required products is {}, but {} products were created.",
-            self.get_product_number(), products.len());
+            self.get_product_number(),
+            products.len()
+        );
 
         products
     }
@@ -530,7 +554,7 @@ impl Distribution<BinaryReaction> for Standard {
             8 => BinaryReaction::Duplicate,
             9 => BinaryReaction::Misfunction,
             10 => BinaryReaction::Random,
-            _ => panic!("A random number with no matching reaction was created.")
+            _ => panic!("A random number with no matching reaction was created."),
         }
     }
 }

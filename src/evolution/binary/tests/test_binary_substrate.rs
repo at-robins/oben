@@ -6,13 +6,13 @@ use super::*;
 fn test_cross_over_is_similar() {
     // Test similar substrates.
     let a: [u8; 8] = thread_rng().gen();
-    let test_substrate_a: BinarySubstrate = BitBox::from_slice(&a);
+    let test_substrate_a: BinarySubstrate = BitBox::from_boxed_slice(Box::new(a));
     let test_substrate_b: BinarySubstrate = test_substrate_a.clone();
     assert!(test_substrate_a.is_similar(&test_substrate_b));
     assert!(test_substrate_b.is_similar(&test_substrate_a));
     // Test non-similar substrates.
     let b: [u8; 16] = thread_rng().gen();
-    let test_substrate_b: BinarySubstrate = BitBox::from_slice(&b);
+    let test_substrate_b: BinarySubstrate = BitBox::from_boxed_slice(Box::new(b));
     assert!(!test_substrate_a.is_similar(&test_substrate_b));
     assert!(!test_substrate_b.is_similar(&test_substrate_a));
 }
@@ -24,8 +24,8 @@ fn test_cross_over_cross_over() {
     // Test similar substrates.
     let a: [u8; 16] = thread_rng().gen();
     let b: [u8; 16] = thread_rng().gen();
-    let test_substrate_a: BinarySubstrate = BitBox::from_slice(&a);
-    let test_substrate_b: BinarySubstrate = BitBox::from_slice(&b);
+    let test_substrate_a: BinarySubstrate = BitBox::from_boxed_slice(Box::new(a));
+    let test_substrate_b: BinarySubstrate = BitBox::from_boxed_slice(Box::new(b));
     let recombined = test_substrate_a.cross_over(&test_substrate_b);
     for i in 0.. test_substrate_a.len() {
         assert!(recombined.get(i) == test_substrate_a.get(i)
@@ -34,8 +34,8 @@ fn test_cross_over_cross_over() {
     // Test non-similar substrates.
     let a: [u8; 8] = thread_rng().gen();
     let b: [u8; 16] = thread_rng().gen();
-    let test_substrate_a: BinarySubstrate = BitBox::from_slice(&a);
-    let test_substrate_b: BinarySubstrate = BitBox::from_slice(&b);
+    let test_substrate_a: BinarySubstrate = BitBox::from_boxed_slice(Box::new(a));
+    let test_substrate_b: BinarySubstrate = BitBox::from_boxed_slice(Box::new(b));
     let recombined = test_substrate_a.cross_over(&test_substrate_b);
     assert!(recombined == test_substrate_a
         || recombined == test_substrate_b);
