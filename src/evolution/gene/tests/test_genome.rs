@@ -29,7 +29,7 @@ fn test_validate_associations() {
             associations: vec![invalid_association],
         };
         genome.validate_associations();
-        assert_eq!(genome.input.input_substrates, vec!(None));
+        assert_eq!(genome.input.input_substrates(), &vec!(None));
         assert_eq!(genome.output, vec!(None));
         assert_eq!(
             genome.associations,
@@ -49,7 +49,7 @@ fn test_validate_associations() {
         let input_sensor = GenomicInputSensor::new(vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())], Vec::new(), ());
         let mut genome: NoOpGenome = Genome::new(input_sensor, vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())], vec![gene]);
         genome.validate_associations();
-        assert_eq!(genome.input.input_substrates, vec!(Some(gene_substrate.clone()), None));
+        assert_eq!(genome.input.input_substrates(), &vec!(Some(gene_substrate.clone()), None));
         assert_eq!(genome.output, vec!(Some(gene_substrate.clone()), None));
     }
 }
