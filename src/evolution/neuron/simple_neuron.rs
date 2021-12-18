@@ -1,5 +1,4 @@
-//! The `neuron` module contains consturcts for working with neuronal networks.
-extern crate bitvec;
+//! The `simple_neuron` module contains consturcts for emulating a simplified biological neuron.
 
 use crate::evolution::helper::Nlbf64;
 use rand::Rng;
@@ -96,7 +95,8 @@ impl Information for SimpleNeuron {
     fn update_value(&mut self, time_passed: i32) {
         if self.current_potential != self.base_potential && time_passed != 0 {
             let diff_potential: f64 = self.current_potential.value() - self.base_potential.value();
-            let change: f64 = diff_potential * 0.5f64.powf(time_passed as f64 / POTENTIAL_HALFLIFE_TIME);
+            let change: f64 =
+                diff_potential * 0.5f64.powf(time_passed as f64 / POTENTIAL_HALFLIFE_TIME);
             self.current_potential = (self.base_potential.value() + change).into();
         }
     }
