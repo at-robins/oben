@@ -1992,6 +1992,16 @@ impl<
         Self::adjust_substrates(&mut self.feedback_substrates, removed_substrate);
     }
 
+    /// Adjust the pointers and indices of referenced 
+    /// [`Substrate`](crate::evolution::protein::Substrate)s
+    /// after removal.
+    ///
+    /// # Parameters
+    /// 
+    /// * `substrates` - the 
+    ///   [`Substrate`](crate::evolution::protein::Substrate)s
+    ///   to adjust
+    /// * `removed_substrate` - the removed [`Substrate`](crate::evolution::protein::Substrate) 
     fn adjust_substrates(
         substrates: &mut Vec<Option<GeneSubstrate>>,
         removed_substrate: GeneSubstrate,
@@ -2001,6 +2011,15 @@ impl<
         }
     }
 
+    /// Adjust a single potential
+    /// [`Substrate`](crate::evolution::protein::Substrate)
+    /// after removal.
+    ///
+    /// # Parameters
+    /// 
+    /// * `substrate_option` - the `Optional` containing a potential 
+    ///   [`Substrate`](crate::evolution::protein::Substrate)
+    /// * `removed_substrate` - the removed [`Substrate`](crate::evolution::protein::Substrate) 
     fn adjust_substrate(
         substrate_option: Option<GeneSubstrate>,
         removed_substrate: GeneSubstrate,
@@ -2019,21 +2038,30 @@ impl<
         })
     }
 
-    /// Validates the [`GeneSubstrate`] references after a recombination
+    /// Validates the internal
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)
+    /// of the references after a recombination
     /// event and removes invalid ones.
     ///
     /// # Parameters
     ///
-    /// * `genes` - the [`Gene`]s of the [`Genome`]
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    /// [`Genome`]: ./struct.Genome.html
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// * `genes` - the [`Gene`](crate::evolution::gene::Gene)s 
+    /// of the [`Genome`](crate::evolution::gene::Genome)
     fn validate(&mut self, genes: &Vec<Gene<ReactionType, StateType, InformationType>>) {
         Self::validate_substrates(&mut self.input_substrates, genes);
         Self::validate_substrates(&mut self.feedback_substrates, genes);
     }
 
+    /// Validates the specified
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)
+    /// of the references after a recombination
+    /// event and removes invalid ones.
+    ///
+    /// # Parameters
+    ///
+    /// * `substrates` - the substrates to validate
+    /// * `genes` - the [`Gene`](crate::evolution::gene::Gene)s 
+    /// of the [`Genome`](crate::evolution::gene::Genome)
     fn validate_substrates(
         substrates: &mut Vec<Option<GeneSubstrate>>,
         genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
@@ -2082,6 +2110,15 @@ impl<
         InputSensor::new(input, input_substrates, feedback_substrates)
     }
 
+    /// Removes all internal
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
+    /// referencing the [`Gene`](crate::evolution::gene::Gene)
+    /// with the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene_index` - the index of the [`Gene`](crate::evolution::gene::Gene) 
+    /// to remove associations to
     pub fn remove_associations_with_gene(&mut self, gene_index: usize) {
         Self::remove_associations_with_gene_from_substrates(&mut self.input_substrates, gene_index);
         Self::remove_associations_with_gene_from_substrates(
@@ -2090,6 +2127,16 @@ impl<
         );
     }
 
+    /// Removes all specified
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
+    /// referencing the [`Gene`](crate::evolution::gene::Gene)
+    /// with the specified index.
+    ///
+    /// # Parameters
+    /// 
+    /// * `substrates` - the list of substrates to remove from
+    /// * `gene_index` - the index of the [`Gene`](crate::evolution::gene::Gene) 
+    /// to remove associations to
     fn remove_associations_with_gene_from_substrates(
         substrates: &mut Vec<Option<GeneSubstrate>>,
         gene_index: usize,

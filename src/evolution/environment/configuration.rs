@@ -80,7 +80,7 @@ pub struct EnvironmentBuilder {
     ///
     /// [`Organism`]: ../population/struct.Organism.html
     max_organism_size: usize,
-    /// The initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
+    /// The initial fitness [`ScalingFactor`](crate::evolution::helper::ScalingFactor).
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
@@ -399,7 +399,7 @@ pub struct Environment<
     max_organism_size: usize,
     /// The context for UUID creation.
     uuid_context: Context,
-    /// The initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
+    /// The initial fitness [`ScalingFactor`](crate::evolution::helper::ScalingFactor).
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
@@ -573,11 +573,14 @@ impl<
         path_to_genome
     }
 
-    /// Returns the file path to the [`Population`] with the specified UUID.
+    /// Returns the file path to the 
+    /// [`Population`](crate::evolution::population::Population)
+    /// with the specified UUID.
     ///
     /// # Parameters
     ///
-    /// * `population_uuid` - the UUID of the [`Population`]
+    /// * `population_uuid` - the UUID of the 
+    /// [`Population`](crate::evolution::population::Population)
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn population_path(&self, population_uuid: &Uuid) -> PathBuf {
@@ -603,7 +606,7 @@ impl<
         self.population_save_intervall
     }
 
-    /// Returns the initial fitness [`ScalingFactor`](crate::evoluion::helper::ScalingFactor).
+    /// Returns the initial fitness [`ScalingFactor`](crate::evolution::helper::ScalingFactor).
     pub fn initial_fitness_scaling_factor(&self) -> ScalingFactor {
         self.initial_fitness_scaling_factor
     }

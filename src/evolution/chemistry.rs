@@ -71,40 +71,31 @@ pub trait Reaction<T: Information>:
     fn random() -> Self;
 }
 
-/// An `Input` represents an element that can convert external stimuli to substrates.
+/// An `Input` represents an element that can convert external stimuli to 
+/// [`Substrate`](crate::evolution::protein::Substrate)s.
 pub trait Input<
     InputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
     InformationType: Information,
 >: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
 {
+    ///
+    /// 
+    /// # Parameters
+    /// 
+    /// * `input` - the input element that is processed and translated into internal 
+    /// [`Information`]
     fn set_input(&mut self, input: InputElement);
-
-    /// Returns the number of educts required to perform the reaction.
-    fn get_input_substrates(&self) -> usize;
 
     /// Handles changes in the feedback substrates and returns if those changes
     /// entail a change in the input sensor.
     ///
     /// # Parameters
     ///
-    /// *`changes` - the changed feedback substrate values if a change occurred
+    /// *`changes` - the changed feedback 
+    /// [`Substrate`](crate::evolution::protein::Substrate) 
+    /// values if a change occurred
     fn handle_feedback_substrate_changes(&mut self, changes: Vec<Option<InformationType>>) -> bool;
 
     /// Creates an random `InputSensor`.
     fn random() -> Self;
 }
-/*
-/// An `Output` represents an elementary operation for modification of binary substrates.
-pub trait Output<T: Information>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned {
-
-    /// Returns the number of educts required to perform the reaction.
-    fn get_input_substrates(&self) -> usize;
-
-    /// Returns if the sensor was changed and the input substrates should be checked again.
-    fn is_changed(&self) -> bool;
-    fn set_changed(&mut self);
-    // TODO: Implement check in every iteration of the organism execution. Only needed on protein level: Remove here!
-
-    /// Creates an random `InputSensor`.
-    fn random() -> Self;
-}*/

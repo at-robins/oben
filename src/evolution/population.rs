@@ -667,7 +667,7 @@ impl<
     /// # Parameters
     ///
     /// `founding_individuals` - the [`Individual`]s to group into a `Population`
-    /// `resources` - the [`Resources`]s the `Population` has access to
+    /// `resources` - the [`Resource`]s the `Population` has access to
     ///
     /// [`Individual`]: ./struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html

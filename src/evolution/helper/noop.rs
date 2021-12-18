@@ -26,7 +26,7 @@ pub type NoOpGene = Gene<NoOpReaction, NoOpState, NoOpSubstrate>;
 pub type NoOpSubstrate = ();
 
 /// A type alias for the underlying representation of a
-/// [`Reaction`](crate::evolution::chemistry::Substrate)
+/// [`Reaction`](crate::evolution::chemistry::Reaction)
 /// having no function.
 pub type NoOpReaction = ();
 
@@ -97,10 +97,6 @@ impl State<NoOpSubstrate> for NoOpState {
 
 impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
     fn set_input(&mut self, _input: NoOpInputElement) {}
-
-    fn get_input_substrates(&self) -> usize {
-        0
-    }
 
     fn handle_feedback_substrate_changes(&mut self, _changes: Vec<Option<NoOpSubstrate>>) -> bool {
         false
