@@ -411,6 +411,16 @@ impl<
         }
     }
 
+    /// Returns the input substrates.
+    pub fn input_substrates(&self) -> &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
+        &self.information_substrates
+    }
+
+    /// Returns the feedback substrates.
+    pub fn feedback_substrates(&self) -> &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
+        &self.feedback_substrates
+    }
+
     /// Set the input currently registered by the `InputSensor`.
     /// 
     /// # Parameters

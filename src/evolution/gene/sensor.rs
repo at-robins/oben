@@ -88,6 +88,11 @@ impl<
         &self.feedback_substrates
     }
 
+    /// Returns the underlying [`Input`](crate::evolution::chemistry::Input) implementation.
+    pub fn input(&self) -> &InputSensorType {
+        &self.input
+    }
+
     /// Get the number of associated input [`Substrate`](crate::evolution::protein::Substrate)s.
     pub fn number_of_associated_inputs(&self) -> usize {
         self.input_substrates.iter().filter(|i| i.is_some()).count()
@@ -107,7 +112,20 @@ impl<
         adjust_substrates(&mut self.input_substrates, removed_substrate);
         adjust_substrates(&mut self.feedback_substrates, removed_substrate);
     }
-
+    
+        /// Adjusts all internal
+        /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
+        /// after removal of the [`Gene`](crate::evolution::gene::Gene)
+        /// with the specified index.
+        ///
+        /// # Parameters
+        ///
+        /// * `gene_index` - the index of the removed [`Gene`](crate::evolution::gene::Gene)
+        pub fn adjust_after_gene_removal(&mut self, gene_index: usize) {
+            adjust_after_gene_removal_from_substrates(&mut self.input_substrates, gene_index);
+            adjust_after_gene_removal_from_substrates(&mut self.feedback_substrates, gene_index);
+        }
+    
     /// Validates the internal
     /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)
     /// of the references after a recombination
@@ -155,20 +173,6 @@ impl<
         let feedback_substrates = translate_substrates(&self.feedback_substrates, substrate_lookup);
         let input = self.input.clone();
         InputSensor::new(input, input_substrates, feedback_substrates)
-    }
-
-    /// Removes all internal
-    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
-    /// referencing the [`Gene`](crate::evolution::gene::Gene)
-    /// with the specified index.
-    ///
-    /// # Parameters
-    ///
-    /// * `gene_index` - the index of the [`Gene`](crate::evolution::gene::Gene)
-    /// to remove associations to
-    pub fn remove_associations_with_gene(&mut self, gene_index: usize) {
-        remove_associations_with_gene_from_substrates(&mut self.input_substrates, gene_index);
-        remove_associations_with_gene_from_substrates(&mut self.feedback_substrates, gene_index);
     }
 }
 
@@ -255,24 +259,27 @@ impl<
     }
 }
 
-/// Removes all specified
+/// Adjusts all specified
 /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
-/// referencing the [`Gene`](crate::evolution::gene::Gene)
-/// with the specified index.
+/// after removal of the [`Gene`](crate::evolution::gene::Gene)
+/// with the specified index and .
 ///
 /// # Parameters
 ///
-/// * `substrates` - the list of substrates to remove from
-/// * `gene_index` - the index of the [`Gene`](crate::evolution::gene::Gene)
-/// to remove associations to
-fn remove_associations_with_gene_from_substrates(
+/// * `substrates` - the list of substrates to adjust
+/// * `gene_index` - the index of the removed [`Gene`](crate::evolution::gene::Gene)
+fn adjust_after_gene_removal_from_substrates(
     substrates: &mut Vec<Option<GeneSubstrate>>,
     gene_index: usize,
 ) {
     for substrate_option in substrates {
         if let Some(substrate) = substrate_option {
             if substrate.is_gene(gene_index) {
+                // Remove the reference if it pointed to the removed gene.
                 *substrate_option = None;
+            } else if substrate.gene() > gene_index {
+                // Adjust the gene index of the reference pointer if relevant.
+                *substrate_option = Some(GeneSubstrate::new(substrate.gene() - 1, substrate.substrate()));
             }
         }
     }
@@ -399,3 +406,6 @@ fn adjust_substrate(
         }
     })
 }
+
+#[cfg(test)]
+mod test_input;

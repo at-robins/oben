@@ -296,7 +296,7 @@ impl<
             panic!("A genome needs to contain at least one gene, so no gene can be removed.");
         }
         // Remove all inputs pointing to the removed gene.
-        self.input.remove_associations_with_gene(gene);
+        self.input.adjust_after_gene_removal(gene);
         // Remove all outputs pointing to the removed gene.
         for output_value in &mut self.output {
             if output_value
@@ -647,12 +647,12 @@ impl<
         self.validate_gene_substrate_associations();
     }
 
-    /// Load a `Genome` from a JSON file if possible.
+    /// Load a `Genome` from a file if possible.
     /// An error will be returned if parsing the file failed.
     ///
     /// # Parameters
     ///
-    /// * `path_to_file` - the JSON file from which the `Genome` should be loaded
+    /// * `path_to_file` - the file from which the `Genome` should be loaded
     pub fn load_from_file<P>(path_to_file: P) -> Result<Self, Box<dyn Error>>
     where
         P: AsRef<Path>,
@@ -664,12 +664,12 @@ impl<
         Ok(genome)
     }
 
-    /// Write a `Genome` to a JSON file if possible.
+    /// Write a `Genome` to a file if possible.
     /// An error will be returned if writing to the file failed.
     ///
     /// # Parameters
     ///
-    /// * `path_to_file` - the JSON file the `Genome` should be written to
+    /// * `path_to_file` - the file the `Genome` should be written to
     pub fn write_to_file<P>(&self, path_to_file: P) -> Result<(), Box<dyn Error>>
     where
         P: AsRef<Path>,
