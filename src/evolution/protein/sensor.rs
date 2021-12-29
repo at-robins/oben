@@ -1,4 +1,4 @@
-//! The `sensor` module contains the executive part of the evolutionary network 
+//! The `sensor` module contains the executive part of the evolutionary network
 //! that connects to external information.
 
 use std::{
@@ -32,6 +32,9 @@ pub struct InputSensor<ReactionType, StateType, InformationType, InputElementTyp
 }
 
 impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
         InputElementType: Clone
             + std::fmt::Debug
             + PartialEq
@@ -41,9 +44,6 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        ReactionType: Reaction<InformationType>,
-        StateType: State<InformationType>,
-        InformationType: Information,
     > InputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
     /// Creates a new `InputSensor` to process input and transform it into internal
@@ -66,7 +66,7 @@ impl<
     {
         let old_feedback_substrate_values: Vec<
             Option<Substrate<ReactionType, StateType, InformationType>>,
-        > = Self::substrates_as_owned(&feedback_substrates);
+        > = substrates_as_owned(&feedback_substrates);
         InputSensor {
             phantom_i: PhantomData,
             input,
@@ -89,6 +89,13 @@ impl<
         &self,
     ) -> &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
         &self.feedback_substrates
+    }
+
+    /// Returns the internal input implementation.
+    pub fn input(
+        &self,
+    ) -> &InputSensorType {
+        &self.input
     }
 
     /// Set the input currently registered by the `InputSensor`.
@@ -114,7 +121,7 @@ impl<
 
     /// Checks all feedback [`Substrate`]s for changens and passes the changes on to the underlying input sensor representation.
     pub fn feedback_update(&mut self) {
-        let current_feedback_values = self.feedback_substrates_as_owned();
+        let current_feedback_values = substrates_as_owned(self.feedback_substrates());
         let changes: Vec<Option<InformationType>> = self
             .old_feedback_substrate_values
             .iter()
@@ -149,39 +156,41 @@ impl<
             .flat_map(substrate_reference_to_receptors)
             .collect()
     }
-
-    /// Returns the feedback [`Substrate`]s as owned structures.
-    fn feedback_substrates_as_owned(
-        &self,
-    ) -> Vec<Option<Substrate<ReactionType, StateType, InformationType>>> {
-        InputSensor::<ReactionType, StateType, InformationType, InputElementType, InputSensorType>::substrates_as_owned(&self.feedback_substrates)
-    }
-
-    /// Converts a vector of references to [`Substrate`]s.
-    ///
-    /// # Parameters
-    ///
-    /// * `substrates` - the [`Substrate`] references
-    fn substrates_as_owned(
-        substrates: &Vec<
-            Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
-        >,
-    ) -> Vec<Option<Substrate<ReactionType, StateType, InformationType>>> {
-        substrates
-            .iter()
-            .map(|substrate| substrate.as_ref())
-            .map(|substrate| substrate.map(Self::substrate_reference_to_owned))
-            .collect()
-    }
-
-    /// Converts a reference to a [`Substrate`].
-    ///
-    /// # Parameters
-    ///
-    /// * `substrate_reference` - the [`Substrate`] reference
-    fn substrate_reference_to_owned(
-        substrate_reference: &Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
-    ) -> Substrate<ReactionType, StateType, InformationType> {
-        (*(substrate_reference.upgrade().unwrap())).borrow().clone()
-    }
 }
+
+/// Converts a vector of references to [`Substrate`]s.
+///
+/// # Parameters
+///
+/// * `substrates` - the [`Substrate`] references
+fn substrates_as_owned<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+>(
+    substrates: &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+) -> Vec<Option<Substrate<ReactionType, StateType, InformationType>>> {
+    substrates
+        .iter()
+        .map(|substrate| substrate.as_ref())
+        .map(|substrate| substrate.map(substrate_reference_to_owned))
+        .collect()
+}
+
+/// Converts a reference to a [`Substrate`].
+///
+/// # Parameters
+///
+/// * `substrate_reference` - the [`Substrate`] reference
+fn substrate_reference_to_owned<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+>(
+    substrate_reference: &Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+) -> Substrate<ReactionType, StateType, InformationType> {
+    (*(substrate_reference.upgrade().unwrap())).borrow().clone()
+}
+
+#[cfg(test)]
+mod test_input;
