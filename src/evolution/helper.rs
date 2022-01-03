@@ -1,7 +1,4 @@
 //! The `helper` module contains helper constructs for general workflow.
-extern crate bitvec;
-extern crate rand;
-extern crate serde;
 
 use rand::{thread_rng, Rng};
 use rand_distr::{Distribution, Standard};
@@ -359,5 +356,6 @@ impl CrossOver for Nlbf64 {
 }
 
 pub mod noop;
+pub mod testing;
 #[cfg(test)]
 mod tests;

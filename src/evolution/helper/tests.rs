@@ -6,10 +6,10 @@ fn test_a_or_b() {
     // let mut first: u64 = 0;
     // let total: u32 = 100_000;
     // for _ in 0..total {
-        let a: u64 = thread_rng().gen();
-        let b: u64 = thread_rng().gen();
-        let result = a_or_b(a, b);
-        assert!(result == a || result == b);
+    let a: u64 = thread_rng().gen();
+    let b: u64 = thread_rng().gen();
+    let result = a_or_b(a, b);
+    assert!(result == a || result == b);
     //     if result == a {
     //         first += 1;
     //     }
@@ -24,10 +24,10 @@ fn test_do_a_or_b() {
     // let mut first: u64 = 0;
     // let total: u32 = 100_000;
     // for _ in 0..total {
-        let a: u64 = thread_rng().gen();
-        let b: u64 = thread_rng().gen();
-        let result = do_a_or_b(|| a, || b);
-        assert!(result == a || result == b);
+    let a: u64 = thread_rng().gen();
+    let b: u64 = thread_rng().gen();
+    let result = do_a_or_b(|| a, || b);
+    assert!(result == a || result == b);
     //     if result == a {
     //         first += 1;
     //     }
@@ -72,14 +72,18 @@ fn test_iteration_difference() {
         assert_eq!(Iteration::new().difference(Iteration::new()), 0);
         let test_difference = 240924246i32;
         let a = Iteration::new();
-        let b = Iteration{current_iteration: test_difference.into()};
+        let b = Iteration {
+            current_iteration: test_difference.into(),
+        };
         assert_eq!(b.difference(a), test_difference);
         assert_eq!(a.difference(b), -test_difference);
     }
     // Test difference out of range.
     {
         let a = Iteration::new();
-        let b = Iteration{current_iteration: i32::MAX as i128 + 429828};
+        let b = Iteration {
+            current_iteration: i32::MAX as i128 + 429828,
+        };
         assert_eq!(b.difference(a), i32::MAX);
         assert_eq!(a.difference(b), i32::MIN);
     }
@@ -93,14 +97,18 @@ fn test_iteration_sub() {
         assert_eq!(Iteration::new() - Iteration::new(), 0);
         let test_difference = 240924246i32;
         let a = Iteration::new();
-        let b = Iteration{current_iteration: test_difference.into()};
+        let b = Iteration {
+            current_iteration: test_difference.into(),
+        };
         assert_eq!(b - a, test_difference);
         assert_eq!(a - b, -test_difference);
     }
     // Test difference out of range.
     {
         let a = Iteration::new();
-        let b = Iteration{current_iteration: i32::MAX as i128 + 429828};
+        let b = Iteration {
+            current_iteration: i32::MAX as i128 + 429828,
+        };
         assert_eq!(b - a, i32::MAX);
         assert_eq!(a - b, i32::MIN);
     }
@@ -217,7 +225,7 @@ fn test_scaling_factor_base() {
     factor.decrement();
     factor.decrement();
     factor.decrement();
-    assert_ulps_eq!(factor.value(), 1.0/1.1);
+    assert_ulps_eq!(factor.value(), 1.0 / 1.1);
     assert_eq!(factor.exponent(), -1);
 }
 
@@ -227,16 +235,26 @@ fn test_nlbf64_value() {
     {
         let x = Nlbf64 { value: 0 };
         assert_ulps_eq!(x.value(), 0.0);
-    } {
-        let x = Nlbf64 { value: u64::MAX / 4};
+    }
+    {
+        let x = Nlbf64 {
+            value: u64::MAX / 4,
+        };
         assert_ulps_eq!(x.value(), 0.25);
-    } {
-        let x = Nlbf64 { value: u64::MAX / 2 };
+    }
+    {
+        let x = Nlbf64 {
+            value: u64::MAX / 2,
+        };
         assert_ulps_eq!(x.value(), 0.5);
-    } {
-        let x = Nlbf64 { value: (u64::MAX / 4) * 3 };
+    }
+    {
+        let x = Nlbf64 {
+            value: (u64::MAX / 4) * 3,
+        };
         assert_ulps_eq!(x.value(), 0.75);
-    } {
+    }
+    {
         let x = Nlbf64 { value: u64::MAX };
         assert_ulps_eq!(x.value(), 1.0);
     }
@@ -245,19 +263,26 @@ fn test_nlbf64_value() {
 #[test]
 /// Tests the `from` function for conversion of `f64` to `Nlbf64`.
 fn test_nlbf64_from_f64() {
-    { // Default conversion.
+    {
+        // Default conversion.
         let initial_value = 0.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), initial_value);
-    } { // Smaller zero.
+    }
+    {
+        // Smaller zero.
         let initial_value = -0.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Larger one.
+    }
+    {
+        // Larger one.
         let initial_value = 1.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), 1.0);
-    } { // NaN.
+    }
+    {
+        // NaN.
         let x: Nlbf64 = f64::NAN.into();
         assert_ulps_eq!(x.value(), 0.0);
     }
@@ -266,19 +291,26 @@ fn test_nlbf64_from_f64() {
 #[test]
 /// Tests the `from` function for conversion of `&f64` to `Nlbf64`.
 fn test_nlbf64_from_f64_ref() {
-    { // Default conversion.
+    {
+        // Default conversion.
         let initial_value = &0.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), initial_value);
-    } { // Smaller zero.
+    }
+    {
+        // Smaller zero.
         let initial_value = &-0.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Larger one.
+    }
+    {
+        // Larger one.
         let initial_value = &1.3584503953569;
         let x: Nlbf64 = initial_value.into();
         assert_ulps_eq!(x.value(), 1.0);
-    } { // NaN.
+    }
+    {
+        // NaN.
         let x: Nlbf64 = (&f64::NAN).into();
         assert_ulps_eq!(x.value(), 0.0);
     }
@@ -287,109 +319,134 @@ fn test_nlbf64_from_f64_ref() {
 #[test]
 /// Tests the `add` function for the `Nlbf64` struct.
 fn test_nlbf64_addition() {
-    { // Default addition.
+    {
+        // Default addition.
         let a: f64 = 0.3;
         let b: f64 = 0.4;
         let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
         assert_ulps_eq!(x.value(), a + b);
-    } { // Zero addition.
+    }
+    {
+        // Zero addition.
         let a: f64 = 0.0;
         let b: f64 = 0.0;
         let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Overflow addition.
+    }
+    {
+        // Overflow addition.
         let a: f64 = 0.6;
         let b: f64 = 0.7;
         let x: Nlbf64 = Nlbf64::from(a) + Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 1.0);
-    } 
+    }
 }
 
 #[test]
 /// Tests the `add` function for `&Nlbf64`.
 fn test_nlbf64_addition_ref() {
-    { // Default addition.
+    {
+        // Default addition.
         let a: f64 = 0.3;
         let b: f64 = 0.4;
         let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), a + b);
-    } { // Zero addition.
+    }
+    {
+        // Zero addition.
         let a: f64 = 0.0;
         let b: f64 = 0.0;
         let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Overflow addition.
+    }
+    {
+        // Overflow addition.
         let a: f64 = 0.6;
         let b: f64 = 0.7;
         let x: Nlbf64 = &Nlbf64::from(a) + &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 1.0);
-    } 
+    }
 }
 
 #[test]
 /// Tests the `add_assign` function for the `Nlbf64` struct.
 fn test_nlbf64_add_assign() {
-    { // Default addition.
+    {
+        // Default addition.
         let a: f64 = 0.3;
         let b: f64 = 0.4;
         let mut x: Nlbf64 = Nlbf64::from(a);
         x += Nlbf64::from(b);
         assert_ulps_eq!(x.value(), a + b);
-    } { // Zero addition.
+    }
+    {
+        // Zero addition.
         let a: f64 = 0.0;
         let b: f64 = 0.0;
         let mut x: Nlbf64 = Nlbf64::from(a);
         x += Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Overflow addition.
+    }
+    {
+        // Overflow addition.
         let a: f64 = 0.6;
         let b: f64 = 0.7;
         let mut x: Nlbf64 = Nlbf64::from(a);
         x += Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 1.0);
-    } 
+    }
 }
 
 #[test]
 /// Tests the `sub` function for the `Nlbf64` struct.
 fn test_nlbf64_subtraction() {
-    { // Default subtraction.
+    {
+        // Default subtraction.
         let a: f64 = 0.4;
         let b: f64 = 0.3;
         let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
         assert_ulps_eq!(x.value(), a - b);
-    } { // Zero subtraction.
+    }
+    {
+        // Zero subtraction.
         let a: f64 = 0.0;
         let b: f64 = 0.0;
         let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Overflow subtraction.
+    }
+    {
+        // Overflow subtraction.
         let a: f64 = 0.2;
         let b: f64 = 0.7;
         let x: Nlbf64 = Nlbf64::from(a) - Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } 
+    }
 }
 
 #[test]
 /// Tests the `sub` function for `&Nlbf64`.
 fn test_nlbf64_subtraction_ref() {
-    { // Default subtraction.
+    {
+        // Default subtraction.
         let a: f64 = 0.4;
         let b: f64 = 0.3;
         let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), a - b);
-    } { // Zero subtraction.
+    }
+    {
+        // Zero subtraction.
         let a: f64 = 0.0;
         let b: f64 = 0.0;
         let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } { // Overflow subtraction.
+    }
+    {
+        // Overflow subtraction.
         let a: f64 = 0.2;
         let b: f64 = 0.7;
         let x: Nlbf64 = &Nlbf64::from(a) - &Nlbf64::from(b);
         assert_ulps_eq!(x.value(), 0.0);
-    } 
+    }
 }
 
 #[test]
@@ -412,8 +469,10 @@ fn test_nlbf64_cross_over_cross_over() {
     let binary_b = u64_to_binary(b.value);
     let recombined = a.cross_over(&b);
     let binary_recombined = u64_to_binary(recombined.value);
-    for i in 0.. binary_a.len() {
-        assert!(binary_recombined.get(i) == binary_a.get(i)
-            || binary_recombined.get(i) == binary_b.get(i));
+    for i in 0..binary_a.len() {
+        assert!(
+            binary_recombined.get(i) == binary_a.get(i)
+                || binary_recombined.get(i) == binary_b.get(i)
+        );
     }
 }
