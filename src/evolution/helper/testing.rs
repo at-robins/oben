@@ -2,10 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::evolution::{
     chemistry::{Information, Input, Reaction, State},
-    gene::CrossOver,
+    gene::{CrossOver, Genome},
 };
 
 use super::noop::NoOpInputElement;
+
+/// A [`Genome`] for testing purposes.
+pub type TestGenome = Genome<TestReaction, TestState, TestInformation, NoOpInputElement, TestInput>;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// An [`Input`] for testing purposes.
@@ -39,6 +42,12 @@ impl CrossOver for TestInput {
 
     fn cross_over(&self, _other: &Self) -> Self {
         Self::random()
+    }
+}
+
+impl Default for TestInput {
+    fn default() -> Self {
+        Self { last_feedback_update: Default::default(), last_set_input: Default::default() }
     }
 }
 
