@@ -243,6 +243,11 @@ pub struct Nlbf64 {
 }
 
 impl Nlbf64 {
+    /// The minimum value of 0.
+    pub const MIN: Nlbf64 = Nlbf64 { value: u64::MIN };
+    /// The maximum value of 1.
+    pub const MAX: Nlbf64 = Nlbf64 { value: u64::MAX };
+
     /// Retruns the value as floating point number.
     pub fn value(&self) -> f64 {
         if self.value == 0 {

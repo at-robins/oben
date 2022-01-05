@@ -476,3 +476,15 @@ fn test_nlbf64_cross_over_cross_over() {
         );
     }
 }
+
+#[test]
+/// Tests if the constant `MIN` of the `Nlbf64` struct returns the correct value.
+fn test_nlbf64_min() {
+    assert_ulps_eq!(Nlbf64::MIN.value(), 0.0);
+}
+
+#[test]
+/// Tests if the constant `MAX` of the `Nlbf64` struct returns the correct value.
+fn test_nlbf64_max() {
+    assert_ulps_eq!(Nlbf64::MAX.value(), 1.0);
+}
