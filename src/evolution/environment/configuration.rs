@@ -1,19 +1,10 @@
 //! The `configuration` module contains the configuration setup of the evolutionary network.
 
-extern crate rand;
-
-use crate::evolution::chemistry::Input;
-use crate::evolution::gene::CrossOver;
 use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use super::super::chemistry::{Information, Reaction, State};
-use super::super::gene::{Genome, GenomeMutation};
 use super::super::resource::Resource;
 use uuid::{v1::Context, v1::Timestamp, Uuid};
 
@@ -34,9 +25,8 @@ const FILE_EXTENSION_POPULATION: &str = "population";
 /// [`Environment`]: ./struct.Environment.html
 #[derive(Debug, PartialEq, Clone)]
 pub struct EnvironmentBuilder {
+    /// The directory to store all information realted to the network execution.
     working_directory: PathBuf,
-    /// The chance of a single offspring to carry a mutation.
-    mutation_rate: Option<f64>,
     /// The maximum size a [`Individual`] can grow to.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
@@ -88,7 +78,6 @@ impl EnvironmentBuilder {
     pub fn new() -> Self {
         EnvironmentBuilder {
             working_directory: PathBuf::from("./working_directory"),
-            mutation_rate: None,
             population_size: 1_000_000,
             resource_half_life: 3.0,
             lifespan: Duration::from_secs(1),
@@ -107,32 +96,9 @@ impl EnvironmentBuilder {
     /// Build an [`Environment`] to specify run time properties of an evolutionary network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    pub fn build<
-        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
-        ReactionType: Reaction<InformationType>,
-        StateType: State<InformationType>,
-        InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
-        InputSensorType: Input<InputElementType, InformationType>,
-    >(
-        &self,
-    ) -> Environment<
-        MutationType,
-        ReactionType,
-        StateType,
-        InformationType,
-        InputElementType,
-        InputSensorType,
-    > {
+    pub fn build(&self) -> Environment {
         Environment {
-            phantom_mutation: PhantomData,
-            phantom_reaction: PhantomData,
-            phantom_state: PhantomData,
-            phantom_information: PhantomData,
-            phantom_input_element: PhantomData,
-            phantom_input_sensor: PhantomData,
             working_directory: self.working_directory.clone(),
-            mutation_rate: self.mutation_rate_or_default(),
             population_size: self.population_size,
             resource_half_life: self.resource_half_life,
             lifespan: self.lifespan,
@@ -156,16 +122,6 @@ impl EnvironmentBuilder {
     /// * `working_directory` - the working directory
     pub fn working_directory<P: AsRef<Path>>(&mut self, working_directory: P) -> &mut Self {
         self.working_directory = working_directory.as_ref().into();
-        self
-    }
-
-    /// Sets the mutation rate as specified.
-    ///
-    /// # Parameters
-    ///
-    /// * `mutation_rate` - the chance of a single mutation occuring
-    pub fn mutation_rate(&mut self, mutation_rate: f64) -> &mut Self {
-        self.mutation_rate = Some(mutation_rate);
         self
     }
 
@@ -307,16 +263,6 @@ impl EnvironmentBuilder {
         self
     }
 
-    /// Returns the mutation rate if set. Otherwise defaults to a population size dependent value.
-    fn mutation_rate_or_default(&self) -> f64 {
-        if let Some(mutation_rate) = self.mutation_rate {
-            mutation_rate
-        } else {
-            // Defaults to around 1000 mutations per generation.
-            1000.0 / self.population_size as f64
-        }
-    }
-
     /// Returns the chance of lateral gene transfer if set.
     /// Otherwise defaults to a population size dependent value.
     fn lateral_gene_transfer_chance_or_default(&self) -> f64 {
@@ -337,23 +283,9 @@ impl Default for EnvironmentBuilder {
 
 /// An `Environment` specifing settings for an evolutionary network to develop in.
 #[derive(Debug)]
-pub struct Environment<
-    MutationType,
-    ReactionType,
-    StateType,
-    InformationType,
-    InputElementType,
-    InputSensorType,
-> {
-    phantom_mutation: PhantomData<MutationType>,
-    phantom_reaction: PhantomData<ReactionType>,
-    phantom_state: PhantomData<StateType>,
-    phantom_information: PhantomData<InformationType>,
-    phantom_input_element: PhantomData<InputElementType>,
-    phantom_input_sensor: PhantomData<InputSensorType>,
+pub struct Environment {
+    /// The directory to store all information realted to the network execution.
     working_directory: PathBuf,
-    /// The chance of a single offspring to carry a mutation.
-    mutation_rate: f64,
     /// The maximum size a [`Individual`] can grow to.
     ///
     /// [`Individual`]: ../population/struct.Individual.html
@@ -403,31 +335,10 @@ pub struct Environment<
     initial_fitness_scaling_factor: ScalingFactor,
 }
 
-impl<
-        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
-        ReactionType: Reaction<InformationType>,
-        StateType: State<InformationType>,
-        InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
-        InputSensorType: Input<InputElementType, InformationType>,
-    >
-    Environment<
-        MutationType,
-        ReactionType,
-        StateType,
-        InformationType,
-        InputElementType,
-        InputSensorType,
-    >
-{
+impl Environment {
     /// Returns the path to the working directory.
     pub fn working_directory(&self) -> &Path {
         Path::new(&self.working_directory)
-    }
-
-    /// Returns the chance of a single offspring carrying a mutation.
-    pub fn mutation_rate(&self) -> f64 {
-        self.mutation_rate
     }
 
     /// Returns the size in individuals a [`Population`] can grow to.
@@ -573,13 +484,13 @@ impl<
         path_to_genome
     }
 
-    /// Returns the file path to the 
+    /// Returns the file path to the
     /// [`Population`](crate::evolution::population::Population)
     /// with the specified UUID.
     ///
     /// # Parameters
     ///
-    /// * `population_uuid` - the UUID of the 
+    /// * `population_uuid` - the UUID of the
     /// [`Population`](crate::evolution::population::Population)
     ///
     /// [`Genome`]: ../gene/struct.Genome.html
@@ -638,49 +549,6 @@ impl<
             // Without those folders the whole network cannot work correctly,
             // so panicing is the preferred option here instead of error handling.
             panic!("The folder {:?} could not be created: {}", folder_path, err);
-        }
-    }
-
-    /// Mutates the specified [`Genome`] the specified amount of times. If any of the mutations
-    /// was not successful `None` is returned.
-    ///
-    /// # Parameters
-    ///
-    /// * `number_of_mutations` - the number of times the genome should be mutated
-    /// * `genome` - the [`Genome`] to mutate
-    ///
-    /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mutate_n_times(
-        number_of_mutations: usize,
-        genome: &Genome<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
-    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    {
-        if number_of_mutations == 0 {
-            Some(genome.duplicate())
-        } else {
-            let mut mutated_genome = None;
-            for i in 0..number_of_mutations {
-                if i == 0 {
-                    // If this is the first mutation, mutate the original genome.
-                    mutated_genome = MutationType::random().mutate(genome);
-                } else if mutated_genome.is_some() {
-                    // If this is not the first mutation and the previous mutation was
-                    // successful, continue mutating.
-                    // Unwrapping must succeed as it was checked beforehand.
-                    mutated_genome = MutationType::random().mutate(&mutated_genome.unwrap());
-                } else {
-                    // If this is not the first mutation and the previous mutation was not
-                    // successful, stop mutating.
-                    break;
-                }
-            }
-            mutated_genome
         }
     }
 }

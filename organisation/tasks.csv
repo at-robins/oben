@@ -8,7 +8,7 @@ ID;Title;Category;Description;Result;Status;Date
 7;Replace random function with distribution trait;Feature;All random functions defined in interfaces need to be replaced with the native Distribution trait to allow easier code maintainability.;;;
 8;Update libraries;Feature;All libraries should be updated to their most recent version if possible without major issues.;;Done;13.12.21
 9;Remove crossover for usize;Bugfix;The gene module implements the CrossOver trait for usize in a module specific way. This will make custom networks using usize as the information type unusable.;;;
-10;Change mutations to a list of trait objects;Feature;Mutations are currently implemented as a typ, which hinders custom implementaitons of mutation lists. Implementing mutations as a list of functions does not interfere with serialisation of the network as mutations are only applied at runtime and not conserved elsewise.  ;;;
+10;Change mutations to a list of trait objects;Feature;Mutations are currently implemented as a typ, which hinders custom implementaitons of mutation lists. Implementing mutations as a list of functions does not interfere with serialisation of the network as mutations are only applied at runtime and not conserved elsewise.;;Done;06.01.2022
 11;Adjust substrates after gene removal;Bugfix;GeneSubstrates need to be adjusted after gene removal, but are currently only adjusted after GeneSubstrate removal.;;;
 12;Switch mutex implementaiton to parking_lot;Feature;The parking_lot crate is the defacto standard for asynchronous types and all usages of Mutex should be replaced accordingly.;;;
 13;;;;;;

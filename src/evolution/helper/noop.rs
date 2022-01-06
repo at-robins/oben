@@ -6,7 +6,7 @@ use crate::evolution::chemistry::Input;
 use crate::evolution::gene::Gene;
 
 use super::super::chemistry::{Information, Reaction, State};
-use super::super::gene::{CrossOver, Genome, GenomeMutation};
+use super::super::gene::{CrossOver, Genome};
 use super::super::helper::Iteration;
 
 /// A type alias for the representation of an empty
@@ -43,11 +43,6 @@ pub type NoOpInputElement = ();
 /// [`Input`](crate::evolution::chemistry::Input)
 /// containing no information or value and having no function.
 pub type NoOpInputSensor = ();
-
-/// A type alias for the representation of an empty
-/// [`GenomeMutation`](crate::evolution::gene::GenomeMutation)
-/// without any function.
-pub type NoOpMutation = ();
 
 impl Information for NoOpSubstrate {
     fn update_value(&mut self, _time_passed: i32) {}
@@ -100,18 +95,6 @@ impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
 
     fn handle_feedback_substrate_changes(&mut self, _changes: Vec<Option<NoOpSubstrate>>) -> bool {
         false
-    }
-
-    fn random() -> Self {
-        ()
-    }
-}
-
-impl GenomeMutation<NoOpReaction, NoOpState, NoOpSubstrate, NoOpInputElement, NoOpInputSensor>
-    for NoOpMutation
-{
-    fn mutate(&self, _genome: &NoOpGenome) -> Option<NoOpGenome> {
-        None
     }
 
     fn random() -> Self {

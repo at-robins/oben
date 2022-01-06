@@ -1,26 +1,22 @@
 //! The `execution` module contains the executive setup of the evolutionary network.
 
-extern crate bitvec;
-extern crate rand;
-extern crate rayon;
-
 use crate::evolution::chemistry::Input;
 use crate::evolution::gene::CrossOver;
 use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
+use serde::Serialize;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use super::super::chemistry::{Information, Reaction, State};
-use super::super::gene::{Genome, GenomeMutation};
+use super::super::gene::Genome;
 use super::super::population::{Individual, Organism, OrganismInformation, Population};
 use super::super::resource::Resource;
 use super::configuration::Environment;
+use super::MutationCompendium;
 use uuid::Uuid;
 
 /// An `EcologicalNiche` containing a [`Population`] and applying selective pressure.
@@ -28,7 +24,6 @@ use uuid::Uuid;
 /// [`Population`]: ../population/struct.Population.html
 pub struct EcologicalNiche<
     SupplierResultInformationType,
-    MutationType,
     ReactionType,
     StateType,
     InformationType,
@@ -38,7 +33,6 @@ pub struct EcologicalNiche<
     inner: Arc<
         InnerEcologicalNiche<
             SupplierResultInformationType,
-            MutationType,
             ReactionType,
             StateType,
             InformationType,
@@ -46,21 +40,25 @@ pub struct EcologicalNiche<
             InputSensorType,
         >,
     >,
-    phantom: PhantomData<MutationType>,
 }
 
 impl<
         SupplierResultInformationType: 'static,
-        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     >
     EcologicalNiche<
         SupplierResultInformationType,
-        MutationType,
         ReactionType,
         StateType,
         InformationType,
@@ -78,18 +76,12 @@ impl<
     /// * `supplier_function` - the function supplying the [`Population`] with test examples
     /// * `fitness_function` - the function evaluating the [`Population`]'s fitness based on
     /// the result obtained after supplying an example
+    /// * `mutations` - a list of mutations that might occur during genome duplication
     ///
     /// [`Environment`]: ./struct.Environment.html
     /// [`Population`]: ../population/struct.Population.html
     pub fn new(
-        environment: Environment<
-            MutationType,
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
+        environment: Environment,
         population: Population<
             ReactionType,
             StateType,
@@ -98,10 +90,7 @@ impl<
             InputSensorType,
         >,
         supplier_function: Box<
-            dyn Fn() -> (InputElementType, SupplierResultInformationType)
-                + Send
-                + Sync
-                + 'static,
+            dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static,
         >,
         fitness_function: Box<
             dyn Fn(
@@ -112,6 +101,13 @@ impl<
                 + Sync
                 + 'static,
         >,
+        mutations: MutationCompendium<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
     ) -> Self {
         EcologicalNiche {
             inner: Arc::new(InnerEcologicalNiche {
@@ -119,9 +115,8 @@ impl<
                 population: Arc::new(Mutex::new(population)),
                 supplier_function,
                 fitness_function,
-                phantom: PhantomData,
+                mutations,
             }),
-            phantom: PhantomData,
         }
     }
 
@@ -133,18 +128,7 @@ impl<
     /// Returns the [`Environment`] of the network.
     ///
     /// [`Environment`]: ./struct.Environment.html
-    fn environment(
-        &self,
-    ) -> Arc<
-        Environment<
-            MutationType,
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
-    > {
+    fn environment(&self) -> Arc<Environment> {
         self.inner.environment.clone()
     }
 
@@ -201,7 +185,6 @@ impl<
                 .map(|a| {
                     InnerEcologicalNiche::<
                         SupplierResultInformationType,
-                        MutationType,
                         ReactionType,
                         StateType,
                         InformationType,
@@ -257,7 +240,6 @@ impl<
         inner: Arc<
             InnerEcologicalNiche<
                 SupplierResultInformationType,
-                MutationType,
                 ReactionType,
                 StateType,
                 InformationType,
@@ -303,7 +285,6 @@ impl<
         inner: Arc<
             InnerEcologicalNiche<
                 SupplierResultInformationType,
-                MutationType,
                 ReactionType,
                 StateType,
                 InformationType,
@@ -342,7 +323,6 @@ impl<
         inner: Arc<
             InnerEcologicalNiche<
                 SupplierResultInformationType,
-                MutationType,
                 ReactionType,
                 StateType,
                 InformationType,
@@ -446,7 +426,6 @@ impl<
         inner: Arc<
             InnerEcologicalNiche<
                 SupplierResultInformationType,
-                MutationType,
                 ReactionType,
                 StateType,
                 InformationType,
@@ -464,7 +443,7 @@ impl<
             let ind = individual
                 .lock()
                 .expect("A thread paniced while holding the individual's lock.");
-            offspring.push(ind.mate_and_mutate(partner, &inner.environment));
+            offspring.push(ind.mate_and_mutate(partner, &inner.mutations, &inner.environment));
         }
         offspring
     }
@@ -472,31 +451,20 @@ impl<
 
 struct InnerEcologicalNiche<
     SupplierResultInformationType,
-    MutationType,
     ReactionType,
     StateType,
     InformationType,
     InputElementType,
     InputSensorType,
 > {
-    environment: Arc<
-        Environment<
-            MutationType,
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
-    >,
+    environment: Arc<Environment>,
     population: Arc<
         Mutex<
             Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
         >,
     >,
-    supplier_function: Box<
-        dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static,
-    >,
+    supplier_function:
+        Box<dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static>,
     fitness_function: Box<
         dyn Fn(
                 Vec<OrganismInformation<SupplierResultInformationType, InformationType>>,
@@ -506,21 +474,32 @@ struct InnerEcologicalNiche<
             + Sync
             + 'static,
     >,
-    phantom: PhantomData<MutationType>,
+    mutations: MutationCompendium<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >,
 }
 
 impl<
         SupplierResultInformationType,
-        MutationType: GenomeMutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     >
     InnerEcologicalNiche<
         SupplierResultInformationType,
-        MutationType,
         ReactionType,
         StateType,
         InformationType,

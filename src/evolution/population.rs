@@ -6,8 +6,8 @@ extern crate serde;
 extern crate uuid;
 
 use super::chemistry::{Information, Input, Reaction, State};
-use super::environment::Environment;
-use super::gene::{CrossOver, Gene, Genome, GenomeMutation};
+use super::environment::{Environment, MutationCompendium};
+use super::gene::{CrossOver, Gene, Genome};
 use super::helper::{ActionChain, Iteration};
 use super::protein::{InputSensor, Receptor, Substrate};
 use super::resource::Resource;
@@ -37,7 +37,14 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     > Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
@@ -81,19 +88,7 @@ impl<
     /// [`CatalyticCentre`]: ../protein/struct.CatalyticCentre.html
     /// [`Receptor`]: ../protein/struct.Receptor.html
     /// [`Environment`]: ../environment/struct.Environment.html
-    pub fn live<MutationType>(
-        &mut self,
-        environment: &Environment<MutationType, ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
-    ) -> Duration
-    where
-        MutationType: GenomeMutation<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
-    {
+    pub fn live(&mut self, environment: &Environment) -> Duration {
         let birth = Instant::now();
         // Set the current time to the last update, so the organsim can be reused (set_input()).
         let mut actions: ActionChain<Rc<Receptor<ReactionType, StateType, InformationType>>> =
@@ -335,7 +330,14 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     > Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
@@ -478,7 +480,7 @@ impl<
     ///
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn mate_and_mutate<MutationType>(
+    pub fn mate_and_mutate(
         &self,
         partner: Genome<
             ReactionType,
@@ -487,29 +489,18 @@ impl<
             InputElementType,
             InputSensorType,
         >,
-        environment: &Environment<MutationType, ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
-    ) -> Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
-    where
-        MutationType: GenomeMutation<
+        mutations: &MutationCompendium<
             ReactionType,
             StateType,
             InformationType,
             InputElementType,
             InputSensorType,
         >,
+        environment: &Environment,
+    ) -> Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
     {
         let offspring_genome = self.mate(partner);
-        let random_chance: f64 = rand::thread_rng().gen_range(0.0..1.0);
-        // Calculate the number of mutations corresponding to the generated uniform random percentage.
-        //    P("n mutations in a single genome") = "mutation rate" ^ n
-        // => n = log(base: "mutation rate", value: P)
-        let number_of_mutations = random_chance.log(environment.mutation_rate()).floor() as usize;
-        if let Some(mutated_offspring_genome) =
-            Environment::<MutationType, ReactionType, StateType, InformationType, InputElementType, InputSensorType>::mutate_n_times(
-                number_of_mutations,
-                &offspring_genome,
-            )
-        {
+        if let Some(mutated_offspring_genome) = mutations.mutate(&offspring_genome) {
             // If the mutation was successful, return the mutated individual.
             Individual::new(environment.generate_uuid(), mutated_offspring_genome)
         } else {
@@ -576,7 +567,14 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     >
     SerialisablePopulation<
@@ -593,12 +591,21 @@ impl<
     ) -> (
         Option<Uuid>,
         Option<f64>,
-        Option<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>,
+        Option<
+            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        >,
         Option<Vec<Option<InformationType>>>,
     ) {
         let (mut uuid, mut fitness, mut ind, mut out) = (None, None, None, None);
-        let filter: Vec<&Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>> =
-            self.individuals.iter().filter(|i| i.age() >= 1).collect();
+        let filter: Vec<
+            &Individual<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+            >,
+        > = self.individuals.iter().filter(|i| i.age() >= 1).collect();
         for individual in filter {
             match fitness {
                 Some(fit)
@@ -619,12 +626,33 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     > From<&Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    for SerialisablePopulation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    for SerialisablePopulation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+    >
 {
-    fn from(pop: &Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>) -> Self {
+    fn from(
+        pop: &Population<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    ) -> Self {
         let mut serialisable_population = SerialisablePopulation {
             individuals: vec![],
             resources: pop.resources,
@@ -635,8 +663,13 @@ impl<
                 Err(err) => {
                     // A individual cannot end up in an invalid state, so serialising it
                     // does no harm.
-                    let poisoned: Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType> =
-                        err.into_inner().clone();
+                    let poisoned: Individual<
+                        ReactionType,
+                        StateType,
+                        InformationType,
+                        InputElementType,
+                        InputSensorType,
+                    > = err.into_inner().clone();
                     serialisable_population.individuals.push(poisoned);
                 }
             }
@@ -650,7 +683,20 @@ impl<
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
 pub struct Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
-    individuals: HashMap<Uuid, Arc<Mutex<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>>,
+    individuals: HashMap<
+        Uuid,
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    >,
     resources: Resource,
 }
 
@@ -658,7 +704,14 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     > Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
@@ -672,7 +725,9 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn new(
-        founding_individuals: Vec<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>,
+        founding_individuals: Vec<
+            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        >,
         resources: Resource,
     ) -> Self {
         let mut individuals = HashMap::new();
@@ -745,7 +800,19 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     pub fn individuals(
         &self,
-    ) -> Vec<Arc<Mutex<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>> {
+    ) -> Vec<
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    > {
         self.individuals.values().map(|val| val.clone()).collect()
     }
 
@@ -758,7 +825,9 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     pub fn append(
         &mut self,
-        individuals: Vec<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>,
+        individuals: Vec<
+            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        >,
     ) {
         for ind in individuals.into_iter() {
             if let Some(ele) = self
@@ -813,7 +882,10 @@ impl<
     ///
     /// [`Individual`]: ./struct.Individual.html
     /// [`Genome`]: ../gene/struct.Genome.html
-    pub fn random_genome(&self) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>> {
+    pub fn random_genome(
+        &self,
+    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
+    {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -842,7 +914,19 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     pub fn random_individual(
         &self,
-    ) -> Option<Arc<Mutex<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>> {
+    ) -> Option<
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+    > {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -869,8 +953,20 @@ impl<
     pub fn remove(
         &mut self,
         individual_uuid: Uuid,
-    ) -> Result<Arc<Mutex<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>, Box<dyn Error>>
-    {
+    ) -> Result<
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                >,
+            >,
+        >,
+        Box<dyn Error>,
+    > {
         let removed = self
             .individuals
             .remove(&individual_uuid)
@@ -982,7 +1078,17 @@ impl<
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn distribute_resources(&mut self) {
         let mut requests: Vec<(
-            Arc<Mutex<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>,
+            Arc<
+                Mutex<
+                    Individual<
+                        ReactionType,
+                        StateType,
+                        InformationType,
+                        InputElementType,
+                        InputSensorType,
+                    >,
+                >,
+            >,
             f64,
         )> = Vec::with_capacity(self.individuals.capacity());
         let mut total_request = 0.0;
@@ -1021,13 +1127,36 @@ impl<
 impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
-        InformationType: Information, 
-        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+        InformationType: Information,
+        InputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > From<SerialisablePopulation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    for Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    >
+    From<
+        SerialisablePopulation<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    > for Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
 {
-    fn from(serial: SerialisablePopulation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>) -> Self {
+    fn from(
+        serial: SerialisablePopulation<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+        >,
+    ) -> Self {
         Self::new(serial.individuals, serial.resources)
     }
 }

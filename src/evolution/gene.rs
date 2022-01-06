@@ -1919,40 +1919,6 @@ impl<R: Reaction<T>, S: State<T>, T: Information> CrossOver for GenomicCatalytic
     }
 }
 
-pub trait GenomeMutation<
-    ReactionType: Reaction<InformationType>,
-    StateType: State<InformationType>,
-    InformationType: Information,
-    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
-    InputSensorType: Input<InputElementType, InformationType>,
->: Sized + Send + Sync
-{
-    /// Generates a mutated version of the specified [`Genome`] based on the kind of
-    /// `GenomeMutation`.
-    ///
-    /// This will fail if the mutated [`Genome`] would be identical to the input or if the
-    /// mutation is impossible for the specified [`Genome`].
-    ///
-    /// # Parameters
-    ///
-    /// `genome` - the base [`Genome`] to generate a mutated version of
-    ///
-    /// [`Genome`]: ./struct.Genome.html
-    fn mutate(
-        &self,
-        genome: &Genome<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-        >,
-    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>;
-
-    /// Creates a random `GenomeMutation`.
-    fn random() -> Self;
-}
-
 /// The `CrossOver` trait allows for genetic elements to be compared for similarity and be
 /// recombined.
 pub trait CrossOver {
