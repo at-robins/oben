@@ -32,7 +32,7 @@ fn test_new() {
         .map(|s| s.map(Rc::downgrade))
         .collect();
     let input: NoOpInputSensor = ();
-    let mut input_sensor: InputSensor<
+    let input_sensor: InputSensor<
         NoOpReaction,
         NoOpState,
         NoOpSubstrate,
@@ -51,49 +51,7 @@ fn test_new() {
         input_sensor.feedback_substrates(),
         &feedback_substrates_weak
     ));
-    assert!(!input_sensor.was_changed());
     assert_eq!(input_sensor.input(), &input);
-}
-
-#[test]
-/// Tests if the function `was_changed` correctly registeres change.
-fn test_was_changed() {
-    let input_substrates = vec![Some(new_noop_substrate()), Some(new_noop_substrate()), None];
-    let feedback_substrates = vec![
-        Some(new_noop_substrate()),
-        None,
-        input_substrates[0].clone(),
-    ];
-    let input_substrates_weak: Vec<
-        Option<Weak<RefCell<Substrate<NoOpReaction, NoOpState, NoOpSubstrate>>>>,
-    > = input_substrates
-        .iter()
-        .map(Option::as_ref)
-        .map(|s| s.map(Rc::downgrade))
-        .collect();
-    let feedback_substrates_weak: Vec<
-        Option<Weak<RefCell<Substrate<NoOpReaction, NoOpState, NoOpSubstrate>>>>,
-    > = feedback_substrates
-        .iter()
-        .map(Option::as_ref)
-        .map(|s| s.map(Rc::downgrade))
-        .collect();
-    let input: NoOpInputSensor = ();
-    let mut input_sensor: InputSensor<
-        NoOpReaction,
-        NoOpState,
-        NoOpSubstrate,
-        NoOpInputElement,
-        NoOpInputSensor,
-    > = InputSensor::new(
-        input.clone(),
-        input_substrates_weak.clone(),
-        feedback_substrates_weak.clone(),
-    );
-    assert!(!input_sensor.was_changed());
-    input_sensor.set_input(());
-    assert!(input_sensor.was_changed());
-    assert!(!input_sensor.was_changed());
 }
 
 #[test]
@@ -140,7 +98,6 @@ fn test_feedback_update() {
     );
     input_sensor.feedback_update();
     assert_eq!(&input_sensor.input().last_feedback_update, &Vec::new());
-    assert!(!input_sensor.was_changed());
     feedback_substrates[0]
         .as_mut()
         .unwrap()
@@ -149,8 +106,6 @@ fn test_feedback_update() {
     input_sensor.feedback_update();
     let expected_changes = vec![Some(TestInformation { value: 3 }), None, None];
     assert_eq!(&input_sensor.input().last_feedback_update, &expected_changes);
-    assert!(input_sensor.was_changed());
-    assert!(!input_sensor.was_changed());
 }
 
 #[test]

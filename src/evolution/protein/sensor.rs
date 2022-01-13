@@ -23,12 +23,11 @@ pub struct InputSensor<ReactionType, StateType, InformationType, InputElementTyp
 {
     phantom_i: PhantomData<InputElementType>,
     input: InputSensorType,
-    information_substrates:
+    input_substrates:
         Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
     feedback_substrates:
         Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
     old_feedback_substrate_values: Vec<Option<Substrate<ReactionType, StateType, InformationType>>>,
-    changed: bool,
 }
 
 impl<
@@ -52,11 +51,11 @@ impl<
     /// # Parameters
     ///
     /// * `input` - the genetic input sensor definition
-    /// * `information_substrates` - the information processing [`Substrate`]s
+    /// * `input_substrates` - the input information processing [`Substrate`]s
     /// * `feedback_substrates` - the [`Substrate`]s used to react to input information flow
     pub fn new(
         input: InputSensorType,
-        information_substrates: Vec<
+        input_substrates: Vec<
             Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
         >,
         feedback_substrates: Vec<
@@ -70,10 +69,9 @@ impl<
         InputSensor {
             phantom_i: PhantomData,
             input,
-            information_substrates,
+            input_substrates,
             feedback_substrates,
             old_feedback_substrate_values,
-            changed: false,
         }
     }
 
@@ -81,7 +79,7 @@ impl<
     pub fn input_substrates(
         &self,
     ) -> &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
-        &self.information_substrates
+        &self.input_substrates
     }
 
     /// Returns the feedback substrates.
@@ -92,9 +90,7 @@ impl<
     }
 
     /// Returns the internal input implementation.
-    pub fn input(
-        &self,
-    ) -> &InputSensorType {
+    pub fn input(&self) -> &InputSensorType {
         &self.input
     }
 
@@ -104,23 +100,37 @@ impl<
     ///
     /// * `input` - the current input
     pub fn set_input(&mut self, input: InputElementType) {
-        self.changed = true;
-        self.input.set_input(input);
+        let input_representation = self.input.set_input(input);
+        self.set_input_substrates(input_representation);
     }
 
-    /// Checks if the input was changed since the last query.
-    /// The change flag is reset upon calling this method.
-    pub fn was_changed(&mut self) -> bool {
-        if self.changed {
-            self.changed = false;
-            true
-        } else {
-            false
+    /// Updates the input [´Substrate´]s based on the supplied information.
+    /// 
+    /// # Parameters
+    /// 
+    /// * ´input_representation´ - the internal information representation to update
+    /// 
+    /// # Panics
+    /// 
+    /// If the specified representation is not of the same length as the internal input substrate vector.
+    fn set_input_substrates(&mut self, input_representation: Vec<InformationType>) {
+        if input_representation.len() != self.input_substrates.len() {
+            panic!("{} input substrates were specified, but the input was transformed into {} substrates: {:?}", 
+                self.input_substrates.len(), 
+                input_representation.len(), 
+                input_representation
+        );
+        }
+        for (i, info) in input_representation.into_iter().enumerate() {
+            if let Some(substrate) = (&self.input_substrates[i]).as_ref() {
+                substrate.upgrade().unwrap().borrow_mut().set_value(info);
+            }
         }
     }
 
     /// Checks all feedback [`Substrate`]s for changens and passes the changes on to the underlying input sensor representation.
-    pub fn feedback_update(&mut self) {
+    /// Updates the input [`Substrate`]s if necessary and returns if changes were detected.
+    pub fn feedback_update(&mut self) -> bool {
         let current_feedback_values = substrates_as_owned(self.feedback_substrates());
         let changes: Vec<Option<InformationType>> = self
             .old_feedback_substrate_values
@@ -135,11 +145,15 @@ impl<
                 _ => None,
             })
             .collect();
-
+        let mut changes_detected = false;
         if changes.iter().any(|o| o.is_some()) {
-            self.changed = self.input.handle_feedback_substrate_changes(changes);
             self.old_feedback_substrate_values = current_feedback_values;
+            if let Some(changed_input_substrates) = self.input.handle_feedback_substrate_changes(changes) {
+                changes_detected = true;
+                self.set_input_substrates(changed_input_substrates);
         }
+        }
+        changes_detected
     }
 
     /// Returns all [`Receptor`]s affected by input changes.
@@ -148,7 +162,7 @@ impl<
     ) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
         // This unwrap must succeed as the containing structure will always be dropped first
         // and no substrate references are leaked.
-        self.information_substrates
+        self.input_substrates
             .iter()
             .filter(|i| i.is_some())
             .map(|i| i.as_ref())

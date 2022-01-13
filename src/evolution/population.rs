@@ -115,8 +115,7 @@ impl<
                     actions.push_action(cascading_receptor);
                 });
             // Update feedback substrates and add all receptors if changes to the input were detected.
-            self.input.feedback_update();
-            if self.input.was_changed() {
+            if self.input.feedback_update() {
                 for receptor in self.input.cascading_receptors() {
                     actions.push_action(receptor);
                 }

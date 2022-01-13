@@ -91,10 +91,12 @@ impl State<NoOpSubstrate> for NoOpState {
 }
 
 impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
-    fn set_input(&mut self, _input: NoOpInputElement) {}
+    fn set_input(&mut self, _input: NoOpInputElement) -> Vec<()> {
+        Vec::new()
+    }
 
-    fn handle_feedback_substrate_changes(&mut self, _changes: Vec<Option<NoOpSubstrate>>) -> bool {
-        false
+    fn handle_feedback_substrate_changes(&mut self, _changes: Vec<Option<NoOpSubstrate>>) -> std::option::Option<Vec<()>> {
+        None
     }
 
     fn random() -> Self {

@@ -71,31 +71,54 @@ pub trait Reaction<T: Information>:
     fn random() -> Self;
 }
 
-/// An `Input` represents an element that can convert external stimuli to 
+/// An `Input` represents an element that can convert external stimuli to
 /// [`Substrate`](crate::evolution::protein::Substrate)s.
 pub trait Input<
     InputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
     InformationType: Information,
 >: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
 {
+    /// Sets the input currently registered by the input sensor and returns the
+    /// internal corresponding [`Information`] representation.
     ///
-    /// 
     /// # Parameters
-    /// 
-    /// * `input` - the input element that is processed and translated into internal 
+    ///
+    /// * `input` - the input element that is processed and translated into internal
     /// [`Information`]
-    fn set_input(&mut self, input: InputElement);
+    fn set_input(&mut self, input: InputElement) -> Vec<InformationType>;
 
-    /// Handles changes in the feedback substrates and returns if those changes
-    /// entail a change in the input sensor.
+    /// Handles changes in the feedback substrates and returns the internal corresponding [`Information`] representation
+    /// if any change occured.
     ///
     /// # Parameters
     ///
-    /// *`changes` - the changed feedback 
-    /// [`Substrate`](crate::evolution::protein::Substrate) 
+    /// *`changes` - the changed feedback
+    /// [`Substrate`](crate::evolution::protein::Substrate)
     /// values if a change occurred
-    fn handle_feedback_substrate_changes(&mut self, changes: Vec<Option<InformationType>>) -> bool;
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        changes: Vec<Option<InformationType>>,
+    ) -> Option<Vec<InformationType>>;
 
     /// Creates an random `InputSensor`.
+    fn random() -> Self;
+}
+
+/// An `Output` represents an element that can convert internal
+/// [`Substrate`](crate::evolution::protein::Substrate)s.
+/// to an external representation.
+pub trait Output<
+    OutputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InformationType: Information,
+>: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
+{
+    /// Returns the output element corresponding to the current
+    /// output [`Information`] representation.
+    fn get_output(&self) -> OutputElement;
+
+    /// Checks if the network signaled that the result is ready.
+    fn is_finished(&self) -> bool;
+
+    /// Creates an random `OutputSensor`.
     fn random() -> Self;
 }
