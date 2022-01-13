@@ -20,12 +20,25 @@ pub struct TestInput {
 impl Input<NoOpInputElement, TestInformation> for TestInput {
     fn set_input(&mut self, input: NoOpInputElement) -> Vec<TestInformation> {
         self.last_set_input = input;
-        (0..self.last_feedback_update.len()).map(|_| TestInformation { value: 0 }).collect()
+        (0..self.last_feedback_update.len())
+            .map(|_| TestInformation::default())
+            .collect()
     }
 
-    fn handle_feedback_substrate_changes(&mut self, changes: Vec<Option<TestInformation>>) -> std::option::Option<Vec<TestInformation>> {
-        self.last_feedback_update = changes;
-        None
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        changes: Vec<Option<TestInformation>>,
+    ) -> std::option::Option<Vec<TestInformation>> {
+        self.last_feedback_update = changes.clone();
+        if changes.iter().any(Option::is_some) {
+            Some(
+                (0..self.last_feedback_update.len())
+                    .map(|_| TestInformation::default())
+                    .collect(),
+            )
+        } else {
+            None
+        }
     }
 
     fn random() -> Self {
@@ -48,7 +61,10 @@ impl CrossOver for TestInput {
 
 impl Default for TestInput {
     fn default() -> Self {
-        Self { last_feedback_update: Default::default(), last_set_input: Default::default() }
+        Self {
+            last_feedback_update: Default::default(),
+            last_set_input: Default::default(),
+        }
     }
 }
 
@@ -69,6 +85,14 @@ impl CrossOver for TestInformation {
 
     fn cross_over(&self, _other: &Self) -> Self {
         self.clone()
+    }
+}
+
+impl Default for TestInformation {
+    fn default() -> Self {
+        Self {
+            value: Default::default(),
+        }
     }
 }
 

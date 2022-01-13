@@ -55,6 +55,86 @@ fn test_new() {
 }
 
 #[test]
+/// Tests if the function `set_input` correctly sets the input.
+fn test_set_input() {
+    let input_substrates = vec![
+        Some(new_test_substrate(10)),
+        Some(new_test_substrate(20)),
+        None,
+    ];
+    let input_substrates_weak: Vec<
+        Option<Weak<RefCell<Substrate<TestReaction, TestState, TestInformation>>>>,
+    > = input_substrates
+        .iter()
+        .map(Option::as_ref)
+        .map(|s| s.map(Rc::downgrade))
+        .collect();
+    let feedback_substrates_weak = Vec::new();
+    let input: TestInput = TestInput {
+        last_feedback_update: (0..input_substrates.len()).map(|_| None).collect(),
+        last_set_input: (),
+    };
+    let mut input_sensor: InputSensor<
+        TestReaction,
+        TestState,
+        TestInformation,
+        NoOpInputElement,
+        TestInput,
+    > = InputSensor::new(
+        input.clone(),
+        input_substrates_weak.clone(),
+        feedback_substrates_weak.clone(),
+    );
+    input_sensor.set_input(());
+    let expected_input_substrate_values: Vec<Option<TestInformation>> = vec![
+        Some(TestInformation::default()),
+        Some(TestInformation::default()),
+        None,
+    ];
+    let input_substrate_values: Vec<Option<TestInformation>> =
+        substrates_as_owned(input_sensor.input_substrates())
+            .into_iter()
+            .map(|o| o.map(|s| s.value))
+            .collect();
+    assert_eq!(expected_input_substrate_values, input_substrate_values);
+}
+
+#[test]
+#[should_panic]
+/// Tests if the function `set_input` correctly panics if the underlying implementation is wrong.
+fn test_set_input_length_mismatch() {
+    let input_substrates = vec![
+        Some(new_test_substrate(1)),
+        Some(new_test_substrate(2)),
+        None,
+    ];
+    let input_substrates_weak: Vec<
+        Option<Weak<RefCell<Substrate<TestReaction, TestState, TestInformation>>>>,
+    > = input_substrates
+        .iter()
+        .map(Option::as_ref)
+        .map(|s| s.map(Rc::downgrade))
+        .collect();
+    let feedback_substrates_weak = Vec::new();
+    let input: TestInput = TestInput {
+        last_feedback_update: Vec::new(),
+        last_set_input: (),
+    };
+    let mut input_sensor: InputSensor<
+        TestReaction,
+        TestState,
+        TestInformation,
+        NoOpInputElement,
+        TestInput,
+    > = InputSensor::new(
+        input.clone(),
+        input_substrates_weak.clone(),
+        feedback_substrates_weak.clone(),
+    );
+    input_sensor.set_input(());
+}
+
+#[test]
 /// Tests if the function `feedback_update` correctly propagates feedback substrate changes.
 fn test_feedback_update() {
     let input_substrates = vec![
@@ -96,14 +176,14 @@ fn test_feedback_update() {
         input_substrates_weak.clone(),
         feedback_substrates_weak.clone(),
     );
-    input_sensor.feedback_update();
+    assert!(!input_sensor.feedback_update());
     assert_eq!(&input_sensor.input().last_feedback_update, &Vec::new());
     feedback_substrates[0]
         .as_mut()
         .unwrap()
         .borrow_mut()
         .set_value(TestInformation { value: 3 });
-    input_sensor.feedback_update();
+    assert!(input_sensor.feedback_update());
     let expected_changes = vec![Some(TestInformation { value: 3 }), None, None];
     assert_eq!(&input_sensor.input().last_feedback_update, &expected_changes);
 }
