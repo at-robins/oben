@@ -19,6 +19,7 @@ pub struct Substrate<ReactionType, StateType, InformationType> {
     value: InformationType,
     receptors: Vec<Rc<Receptor<ReactionType, StateType, InformationType>>>,
     last_updated: Iteration,
+    substrate_type: SubstrateType,
 }
 
 impl<
@@ -27,13 +28,33 @@ impl<
         InformationType: Information,
     > Substrate<ReactionType, StateType, InformationType>
 {
-    /// Creates a new `Substrate` with the specified binary value.
-    pub fn new(value: InformationType) -> Self {
+    /// Creates a new`Substrate` with the specified value and type
+    ///
+    /// # Parameters
+    ///
+    /// * `value` - the value of the `Substrate`
+    /// * `substrate_type` - the type of the substrate
+    pub fn new(value: InformationType, substrate_type: SubstrateType) -> Self {
         Substrate {
             value,
             receptors: vec![],
             last_updated: Iteration::new(),
+            substrate_type,
         }
+    }
+
+    /// Returns the type of this `Substrate`.
+    pub fn substrate_type(&self) -> &SubstrateType {
+        &self.substrate_type
+    }
+
+    /// Changes the [`SubstrateType`] as specified.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `substrate_type` - the new [`SubstrateType`]
+    pub fn set_substrate_type(&mut self, substrate_type: SubstrateType) {
+        self.substrate_type = substrate_type;
     }
 
     /// Set the value of this substrate.
@@ -85,6 +106,34 @@ impl<
     ) {
         self.receptors.push(receptor);
     }
+
+    /// Returns the input feedback associations an the current value if of type [`SubstrateType::InputFeedbackSubstrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * time - the timepoint the substrate is accessed
+    pub fn get_input_feedback_associations(
+        &mut self,
+        time: Iteration,
+    ) -> Option<(Vec<usize>, InformationType)> {
+        match &self.substrate_type {
+            SubstrateType::InputFeedbackSubstrate(feedback_indices) => {
+                Some((feedback_indices.clone(), self.value(time).clone()))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+/// The type of [`Substrate`].
+/// Special types of [`Substrate`]s provide additional information
+/// on unique associations.
+pub enum SubstrateType {
+    /// A convecntional [`Substrate`] without any special associations.
+    ConventionalSubstrate,
+    /// A [`Substrate`] that is associated with feedback to an [`InputSensor`].
+    InputFeedbackSubstrate(Vec<usize>),
 }
 
 /// A `Receptor` is a sensor for [`Substrate`] changes and a trigger
@@ -164,7 +213,7 @@ impl<
 
     /// Triggers a [`CatalyticCentre`]'s reaction. Subsequent ("cascading")
     /// receptors, which are supposed to be checked after the reaction was triggered,
-    /// are returned.
+    /// and returned together with other associations.
     ///
     /// # Parameters
     ///
@@ -175,10 +224,22 @@ impl<
     pub fn catalyse(
         &self,
         time_of_catalysis: Iteration,
-    ) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
+    ) -> CatalysisResult<ReactionType, StateType, InformationType> {
         self.enzyme.catalyse(time_of_catalysis);
-        self.enzyme.cascading_receptors()
+        CatalysisResult {
+            cascading_receptors: self.enzyme.cascading_receptors(),
+            input_feedback_associations: self.enzyme.input_feedback_associations(time_of_catalysis),
+        }
     }
+}
+
+#[derive(Debug, Clone)]
+/// The result of a catalysis.
+pub struct CatalysisResult<ReactionType, StateType, InformationType> {
+    /// The [`Receptor`]s affected by this catalysis.
+    pub cascading_receptors: Vec<Rc<Receptor<ReactionType, StateType, InformationType>>>,
+    /// The input feedback associations affected by this catalysis.
+    pub input_feedback_associations: Vec<(Vec<usize>, InformationType)>,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for Receptor<R, S, T> {
@@ -316,6 +377,28 @@ impl<
         self.products
             .iter()
             .flat_map(substrate_reference_to_receptors)
+            .collect()
+    }
+
+    /// Returns all input feedback associations and values.
+    ///
+    /// # Parameters
+    ///
+    /// * `time` - the timepoint at which the [`Substrate`] values are requested
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
+    pub fn input_feedback_associations(
+        &self,
+        time: Iteration,
+    ) -> Vec<(Vec<usize>, InformationType)> {
+        self.products
+            .iter()
+            .map(|product| {
+                (*product.upgrade().unwrap())
+                    .borrow_mut()
+                    .get_input_feedback_associations(time)
+            })
+            .filter(Option::is_some)
+            .map(Option::unwrap)
             .collect()
     }
 }

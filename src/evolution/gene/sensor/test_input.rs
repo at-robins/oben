@@ -12,11 +12,9 @@ fn test_new() {
         Some(GeneSubstrate::new(1, 0)),
         None,
     ];
-    let feedback_substrates = vec![
-        Some(GeneSubstrate::new(3, 0)),
-        None,
-        Some(GeneSubstrate::new(1, 4)),
-    ];
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(0, GeneSubstrate::new(3, 0));
+    feedback_substrates.insert(2, GeneSubstrate::new(1, 4));
     let input: NoOpInputSensor = ();
     let input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -42,7 +40,7 @@ fn test_number_of_associated_inputs() {
         Some(GeneSubstrate::new(1, 0)),
         None,
     ];
-    let feedback_substrates = Vec::new();
+    let feedback_substrates = HashMap::new();
     let input: NoOpInputSensor = ();
     let input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -66,12 +64,10 @@ fn test_adjust_after_gene_removal() {
         Some(GeneSubstrate::new(2, 1)),
         Some(GeneSubstrate::new(3, 2)),
     ];
-    let feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(3, 3)),
-        Some(GeneSubstrate::new(4, 4)),
-    ];
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    feedback_substrates.insert(2, GeneSubstrate::new(3, 3));
+    feedback_substrates.insert(3, GeneSubstrate::new(4, 4));
     let expected_input_substrates = vec![
         Some(GeneSubstrate::new(0, 0)),
         None,
@@ -81,12 +77,10 @@ fn test_adjust_after_gene_removal() {
         Some(GeneSubstrate::new(1, 1)),
         Some(GeneSubstrate::new(2, 2)),
     ];
-    let expected_feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(2, 3)),
-        Some(GeneSubstrate::new(3, 4)),
-    ];
+    let mut expected_feedback_substrates = HashMap::new();
+    expected_feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    expected_feedback_substrates.insert(2, GeneSubstrate::new(2, 3));
+    expected_feedback_substrates.insert(3, GeneSubstrate::new(3, 4));
     let input: NoOpInputSensor = ();
     let mut input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -112,12 +106,10 @@ fn test_adjust_after_gene_substrate_removal() {
         Some(GeneSubstrate::new(2, 1)),
         Some(GeneSubstrate::new(3, 2)),
     ];
-    let feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(3, 3)),
-        Some(GeneSubstrate::new(4, 4)),
-    ];
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    feedback_substrates.insert(2, GeneSubstrate::new(3, 3));
+    feedback_substrates.insert(3, GeneSubstrate::new(4, 4));
     let expected_input_substrates = vec![
         Some(GeneSubstrate::new(0, 0)),
         Some(GeneSubstrate::new(1, 0)),
@@ -127,12 +119,10 @@ fn test_adjust_after_gene_substrate_removal() {
         Some(GeneSubstrate::new(2, 1)),
         Some(GeneSubstrate::new(3, 2)),
     ];
-    let expected_feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(3, 3)),
-        Some(GeneSubstrate::new(4, 4)),
-    ];
+    let mut expected_feedback_substrates = HashMap::new();
+    expected_feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    expected_feedback_substrates.insert(2, GeneSubstrate::new(3, 3));
+    expected_feedback_substrates.insert(3, GeneSubstrate::new(4, 4));
     let input: NoOpInputSensor = ();
     let mut input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -157,12 +147,10 @@ fn test_validate() {
         Some(GeneSubstrate::new(1, 7)),
         Some(GeneSubstrate::new(2, 1)),
     ];
-    let feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(3, 3)),
-        Some(GeneSubstrate::new(4, 4)),
-    ];
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    feedback_substrates.insert(2, GeneSubstrate::new(3, 3));
+    feedback_substrates.insert(3, GeneSubstrate::new(4, 4));
     let expected_input_substrates = vec![
         Some(GeneSubstrate::new(0, 0)),
         Some(GeneSubstrate::new(1, 0)),
@@ -171,7 +159,8 @@ fn test_validate() {
         None,
         Some(GeneSubstrate::new(2, 1)),
     ];
-    let expected_feedback_substrates = vec![Some(GeneSubstrate::new(0, 0)), None, None, None];
+    let mut expected_feedback_substrates = HashMap::new();
+    expected_feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
     let input: NoOpInputSensor = ();
     let mut input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -199,12 +188,10 @@ fn test_translate() {
         Some(GeneSubstrate::new(1, 3)),
         Some(GeneSubstrate::new(2, 1)),
     ];
-    let feedback_substrates = vec![
-        Some(GeneSubstrate::new(0, 0)),
-        None,
-        Some(GeneSubstrate::new(3, 3)),
-        Some(GeneSubstrate::new(4, 4)),
-    ];
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(0, GeneSubstrate::new(0, 0));
+    feedback_substrates.insert(2, GeneSubstrate::new(3, 3));
+    feedback_substrates.insert(3, GeneSubstrate::new(4, 4));
     let input: NoOpInputSensor = ();
     let input_sensor: GenomicInputSensor<
         NoOpReaction,
@@ -225,21 +212,48 @@ fn test_translate() {
     assert_eq!(protein.input_substrates().len(), input_sensor.input_substrates().len());
     for (i, substrate_option) in input_sensor.input_substrates().iter().enumerate() {
         if let Some(substrate) = substrate_option {
-            assert!(Rc::downgrade(substrate_lookup.get(substrate).unwrap()).ptr_eq(&protein.input_substrates()[i].clone().unwrap()));
+            assert!(Rc::downgrade(substrate_lookup.get(substrate).unwrap())
+                .ptr_eq(&protein.input_substrates()[i].clone().unwrap()));
         } else {
             assert!(protein.input_substrates()[i].is_none());
         }
     }
-    assert_eq!(protein.feedback_substrates().len(), input_sensor.feedback_substrates().len());
-    for (i, substrate_option) in input_sensor.feedback_substrates().iter().enumerate() {
-        if let Some(substrate) = substrate_option {
-            assert!(Rc::downgrade(substrate_lookup.get(substrate).unwrap()).ptr_eq(&protein.feedback_substrates()[i].clone().unwrap()));
-        } else {
-            assert!(protein.feedback_substrates()[i].is_none());
-        }
-    }
+    assert_eq!(
+        SubstrateType::InputFeedbackSubstrate(vec![0]),
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(0, 0)))
+    );
+    assert_eq!(
+        SubstrateType::InputFeedbackSubstrate(vec![2]),
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(3, 3)))
+    );
+    assert_eq!(
+        SubstrateType::InputFeedbackSubstrate(vec![3]),
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(4, 4)))
+    );
+    assert_eq!(
+        SubstrateType::ConventionalSubstrate,
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(1, 0)))
+    );
+    assert_eq!(
+        SubstrateType::ConventionalSubstrate,
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(1, 3)))
+    );
+    assert_eq!(
+        SubstrateType::ConventionalSubstrate,
+        get_substrate_reference_option_type(substrate_lookup.get(&GeneSubstrate::new(2, 1)))
+    );
 }
 
 fn new_noop_substrate() -> Rc<RefCell<Substrate<NoOpReaction, NoOpState, NoOpSubstrate>>> {
-    Rc::new(RefCell::new(Substrate::new(())))
+    Rc::new(RefCell::new(Substrate::new((), SubstrateType::ConventionalSubstrate)))
+}
+
+fn get_substrate_reference_option_type(
+    substrate_reference: Option<&Rc<RefCell<Substrate<NoOpReaction, NoOpState, NoOpSubstrate>>>>,
+) -> SubstrateType {
+    substrate_reference
+        .unwrap()
+        .borrow()
+        .substrate_type()
+        .clone()
 }

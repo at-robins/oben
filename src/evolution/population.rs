@@ -106,19 +106,28 @@ impl<
             && self.binary_size() < environment.max_organism_size()
         {
             let time = actions.current_iteration();
+            let mut input_feedback_changes: HashMap<usize, InformationType> = HashMap::new();
             actions
                 .pop_actions()
                 .iter()
                 .filter(|receptor| receptor.detect(time))
-                .flat_map(|receptor| receptor.catalyse(time))
+                .flat_map(|receptor| {
+                    let result = receptor.catalyse(time);
+                    // Fill the input feedback association map.
+                    for (associations, value) in result.input_feedback_associations.into_iter() {
+                        for association in associations {
+                            input_feedback_changes.insert(association, value.clone());
+                        }    
+                    }
+                    // Return the receptors to be processed in the subsequent step.
+                    result.cascading_receptors
+                })
                 .for_each(|cascading_receptor| {
                     actions.push_action(cascading_receptor);
                 });
             // Update feedback substrates and add all receptors if changes to the input were detected.
-            if self.input.feedback_update() {
-                for receptor in self.input.cascading_receptors() {
-                    actions.push_action(receptor);
-                }
+            for receptor in self.input.feedback_update(input_feedback_changes) {
+                actions.push_action(receptor);
             }
         }
         self.time_alive = actions.current_iteration();

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::evolution::{
@@ -13,29 +15,24 @@ pub type TestGenome = Genome<TestReaction, TestState, TestInformation, NoOpInput
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// An [`Input`] for testing purposes.
 pub struct TestInput {
-    pub last_feedback_update: Vec<Option<TestInformation>>,
+    pub last_feedback_update: HashMap<usize, TestInformation>,
     pub last_set_input: NoOpInputElement,
+    pub mocked_output_vector: Vec<TestInformation>,
 }
 
 impl Input<NoOpInputElement, TestInformation> for TestInput {
     fn set_input(&mut self, input: NoOpInputElement) -> Vec<TestInformation> {
         self.last_set_input = input;
-        (0..self.last_feedback_update.len())
-            .map(|_| TestInformation::default())
-            .collect()
+        self.mocked_output_vector.clone()
     }
 
     fn handle_feedback_substrate_changes(
         &mut self,
-        changes: Vec<Option<TestInformation>>,
+        changes: HashMap<usize, TestInformation>,
     ) -> std::option::Option<Vec<TestInformation>> {
         self.last_feedback_update = changes.clone();
-        if changes.iter().any(Option::is_some) {
-            Some(
-                (0..self.last_feedback_update.len())
-                    .map(|_| TestInformation::default())
-                    .collect(),
-            )
+        if !changes.is_empty() {
+            Some(self.mocked_output_vector.clone())
         } else {
             None
         }
@@ -43,8 +40,9 @@ impl Input<NoOpInputElement, TestInformation> for TestInput {
 
     fn random() -> Self {
         TestInput {
-            last_feedback_update: Vec::new(),
+            last_feedback_update: HashMap::new(),
             last_set_input: (),
+            mocked_output_vector: Vec::new(),
         }
     }
 }
@@ -64,6 +62,7 @@ impl Default for TestInput {
         Self {
             last_feedback_update: Default::default(),
             last_set_input: Default::default(),
+            mocked_output_vector: Default::default(),
         }
     }
 }

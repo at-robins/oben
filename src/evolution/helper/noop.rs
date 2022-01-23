@@ -2,6 +2,8 @@
 //! parameters.
 extern crate serde;
 
+use std::collections::HashMap;
+
 use crate::evolution::chemistry::Input;
 use crate::evolution::gene::Gene;
 
@@ -95,7 +97,10 @@ impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
         Vec::new()
     }
 
-    fn handle_feedback_substrate_changes(&mut self, _changes: Vec<Option<NoOpSubstrate>>) -> std::option::Option<Vec<()>> {
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        _changes: HashMap<usize, ()>,
+    ) -> std::option::Option<Vec<()>> {
         None
     }
 

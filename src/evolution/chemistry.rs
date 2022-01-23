@@ -5,7 +5,7 @@
 use super::gene::CrossOver;
 use super::helper::Iteration;
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 /// An `Information` is a generic recombinable piece of data containing any informative value.
 pub trait Information:
@@ -97,7 +97,7 @@ pub trait Input<
     /// values if a change occurred
     fn handle_feedback_substrate_changes(
         &mut self,
-        changes: Vec<Option<InformationType>>,
+        changes: HashMap<usize, InformationType>,
     ) -> Option<Vec<InformationType>>;
 
     /// Creates an random `InputSensor`.

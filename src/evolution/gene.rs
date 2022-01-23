@@ -9,7 +9,7 @@ pub use sensor::GenomicInputSensor;
 use super::chemistry::{Information, Input, Reaction, State};
 use super::helper::{a_or_b, do_a_or_b};
 use super::population::Organism;
-use super::protein::{CatalyticCentre, Receptor, Substrate};
+use super::protein::{CatalyticCentre, Receptor, Substrate, SubstrateType};
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -457,6 +457,7 @@ impl<
                     gene_substrate,
                     Rc::new(RefCell::new(Substrate::new(
                         gene_reference.substrates[gene_substrate.substrate].clone(),
+                        SubstrateType::ConventionalSubstrate,
                     ))),
                 )
             })
@@ -700,8 +701,10 @@ impl<
         > = HashMap::new();
         // Insert all genome level substrates.
         for gene_association in &self.associations {
-            let genome_level_substrate =
-                Rc::new(RefCell::new(Substrate::new(gene_association.substrate.clone())));
+            let genome_level_substrate = Rc::new(RefCell::new(Substrate::new(
+                gene_association.substrate.clone(),
+                SubstrateType::ConventionalSubstrate,
+            )));
             for gene_substrate in &gene_association.associations {
                 gene_substrate_map
                     .entry(gene_substrate.clone())
