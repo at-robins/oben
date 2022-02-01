@@ -114,10 +114,18 @@ pub trait Output<
 {
     /// Returns the output element corresponding to the current
     /// output [`Information`] representation.
-    fn get_output(&self) -> OutputElement;
+    /// 
+    /// # Parameters
+    /// 
+    /// * `information` - the [`Information`] representation of the output
+    fn get_output(&self, information: Vec<Option<InformationType>>) -> OutputElement;
 
     /// Checks if the network signaled that the result is ready.
-    fn is_finished(&self) -> bool;
+    /// 
+    /// # Parameters
+    /// 
+    /// * `information` - the [`Information`] representing the finished state
+    fn is_finished(&self, information: Option<InformationType>) -> bool;
 
     /// Creates an random `OutputSensor`.
     fn random() -> Self;

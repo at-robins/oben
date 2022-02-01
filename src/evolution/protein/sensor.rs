@@ -10,8 +10,8 @@ use std::{
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::evolution::{
-    chemistry::{Information, Input, Reaction, State},
-    gene::CrossOver,
+    chemistry::{Information, Input, Reaction, State, Output},
+    gene::CrossOver, helper::Iteration,
 };
 
 use super::{substrate_reference_to_receptors, Receptor, Substrate};
@@ -54,7 +54,7 @@ impl<
         input_substrates: Vec<
             Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
         >,
-    ) -> InputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    ) -> Self
     {
         InputSensor {
             phantom_i: PhantomData,
@@ -139,6 +139,100 @@ impl<
             .flat_map(substrate_reference_to_receptors)
             .collect()
     }
+}
+
+/// An `OutputSensor` registers and transforms internal [`Substrate`] information into output elements.
+#[derive(Debug, Clone)]
+pub struct OutputSensor<ReactionType, StateType, InformationType, OutputElementType, OutputSensorType>
+{
+    phantom_i: PhantomData<OutputElementType>,
+    output: OutputSensorType,
+    output_substrates:
+        Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    > OutputSensor<ReactionType, StateType, InformationType, OutputElementType, OutputSensorType>
+{
+    /// Creates a new `InputSensor` to process input and transform it into internal
+    /// [`Substrate`] information.
+    ///
+    /// # Parameters
+    ///
+    /// * `input` - the genetic input sensor definition
+    /// * `input_substrates` - the input information processing [`Substrate`]s
+    pub fn new(
+        output: OutputSensorType,
+        output_substrates: Vec<
+            Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
+        >,
+    ) -> Self
+    {
+        OutputSensor {
+            phantom_i: PhantomData,
+            output,
+            output_substrates,
+        }
+    }
+
+    /// Returns the output at the specified timepoint.
+    /// 
+    /// # Parameters
+    ///
+    /// * `time` - the time of the conversion
+    pub fn get_output(&self, time: Iteration) -> OutputElementType {
+        self.output.get_output(substrates_as_information(&self.output_substrates, time))
+    }
+}
+
+/// Converts a vector of references to underlying [`Information`]s.
+///
+/// # Parameters
+///
+/// * `substrates` - the [`Substrate`] references
+/// * `time` - the time of the conversion
+fn substrates_as_information<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+>(
+    substrates: &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+    time: Iteration,
+) -> Vec<Option<InformationType>> {
+    substrates
+        .iter()
+        .map(|substrate| substrate.as_ref())
+        .map(|substrate| substrate.map(|s|substrate_reference_to_information(s, time)))
+        .collect()
+}
+
+/// Converts a reference to a the underlying [`Information`].
+///
+/// # Parameters
+///
+/// * `substrate_reference` - the [`Substrate`] reference
+/// * `time` - the time of the conversion
+fn substrate_reference_to_information<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+>(
+    substrate_reference: &Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+    time: Iteration,
+) -> InformationType {
+    (*(substrate_reference.upgrade().unwrap())).borrow_mut().value(time).clone()
 }
 
 #[cfg(test)]
