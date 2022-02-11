@@ -5,11 +5,11 @@ extern crate rmp_serde;
 extern crate serde;
 extern crate uuid;
 
-use super::chemistry::{Information, Input, Reaction, State};
+use super::chemistry::{Information, Input, Output, Reaction, State};
 use super::environment::{Environment, MutationCompendium};
 use super::gene::{CrossOver, Gene, Genome};
 use super::helper::{ActionChain, Iteration};
-use super::protein::{InputSensor, Receptor, Substrate};
+use super::protein::{InputSensor, OutputSensor, Receptor, Substrate};
 use super::resource::Resource;
 use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
@@ -26,10 +26,19 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
-pub struct Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+pub struct Organism<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+    OutputElementType,
+    OutputSensorType,
+> {
     substrates: Vec<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>,
     input: InputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
-    output: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+    output:
+        OutputSensor<ReactionType, StateType, InformationType, OutputElementType, OutputSensorType>,
     time_alive: Iteration,
 }
 
@@ -46,7 +55,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    Organism<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates a new `Organism` from the specified [`Substrate`]s.
     ///
@@ -66,7 +93,13 @@ impl<
             InputElementType,
             InputSensorType,
         >,
-        output: Vec<Option<Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>>>,
+        output: OutputSensor<
+            ReactionType,
+            StateType,
+            InformationType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     ) -> Self {
         Organism {
             substrates,
@@ -93,6 +126,7 @@ impl<
         // Set the current time to the last update, so the organsim can be reused (set_input()).
         let mut actions: ActionChain<Rc<Receptor<ReactionType, StateType, InformationType>>> =
             self.time_alive().into();
+        let mut finished = false;
         // Add all receptors detecting changes to the input.
         for receptor in self.input.cascading_receptors() {
             actions.push_action(receptor);
@@ -102,6 +136,7 @@ impl<
         // If the task takes longer than the specified threshold,
         // the run will be aborted.
         while !actions.is_empty()
+            && !finished
             && birth.elapsed() < environment.lifespan()
             && self.binary_size() < environment.max_organism_size()
         {
@@ -117,8 +152,10 @@ impl<
                     for (associations, value) in result.input_feedback_associations.into_iter() {
                         for association in associations {
                             input_feedback_changes.insert(association, value.clone());
-                        }    
+                        }
                     }
+                    // Set the finished flag if necessary.
+                    finished = finished || self.output.is_finished(result.output_finish_substrate);
                     // Return the receptors to be processed in the subsequent step.
                     result.cascading_receptors
                 })
@@ -160,14 +197,8 @@ impl<
     /// Returns the values of output [`Substrate`]s if any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_result(&self) -> Vec<Option<InformationType>> {
-        self.output
-            .iter()
-            .map(|sub| {
-                sub.as_ref()
-                    .and_then(|some| Some(some.borrow_mut().value(self.time_alive()).clone()))
-            })
-            .collect()
+    pub fn get_result(&self) -> OutputElementType {
+        self.output.get_output(self.time_alive())
     }
 
     /// Returns the time the `Organism` is alive.
@@ -190,7 +221,7 @@ impl<
 ///
 /// [`Organism`]: ./struct.Organism.html
 pub struct OrganismInformation<SupplierResultInformationType, ExecutionResultElementType> {
-    result: Vec<Option<ExecutionResultElementType>>,
+    result: ExecutionResultElementType,
     result_info: SupplierResultInformationType,
     genome_size: usize,
     run_time: Duration,
@@ -201,7 +232,7 @@ pub struct OrganismInformation<SupplierResultInformationType, ExecutionResultEle
     max_organism_size: usize,
 }
 
-impl<SupplierResultInformationType, ExecutionResultElementType: Information>
+impl<SupplierResultInformationType, ExecutionResultElementType>
     OrganismInformation<SupplierResultInformationType, ExecutionResultElementType>
 {
     /// Creates a new `OrganismInformation` containig information about the performance of an
@@ -209,7 +240,7 @@ impl<SupplierResultInformationType, ExecutionResultElementType: Information>
     ///
     /// [`Organism`]: ./struct.Organism.html
     pub fn new(
-        result: Vec<Option<ExecutionResultElementType>>,
+        result: ExecutionResultElementType,
         result_info: SupplierResultInformationType,
         genome_size: usize,
         run_time: Duration,
@@ -235,7 +266,7 @@ impl<SupplierResultInformationType, ExecutionResultElementType: Information>
     /// Returns the result of one testing run as calculated by the [`Organism`].
     ///
     /// [`Organism`]: ./struct.Organism.html
-    pub fn result(&self) -> &Vec<Option<ExecutionResultElementType>> {
+    pub fn result(&self) -> &ExecutionResultElementType {
         &self.result
     }
 
@@ -319,14 +350,32 @@ impl<SupplierResultInformationType, ExecutionResultElementType: Information>
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
 /// [`Organism`]: ./struct.Organism.html
-pub struct Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+pub struct Individual<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+    OutputElementType,
+    OutputSensorType,
+> {
     phantom_r: PhantomData<ReactionType>,
     phantom_s: PhantomData<StateType>,
     phantom_t: PhantomData<InformationType>,
     phantom_input_element: PhantomData<InputElementType>,
     phantom_input_sensor: PhantomData<InputSensorType>,
+    phantom_output_element: PhantomData<OutputElementType>,
+    phantom_output_sensor: PhantomData<OutputSensorType>,
     source: Uuid,
-    genome: Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+    genome: Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
     fitness: Option<f64>,
     bytes: usize,
     age: u32,
@@ -347,7 +396,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    Individual<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates a new `Individual`.
     ///
@@ -359,7 +426,15 @@ impl<
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn new(
         uuid: Uuid,
-        genome: Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        genome: Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     ) -> Self {
         let bytes = genome.binary_size();
         Individual {
@@ -368,6 +443,8 @@ impl<
             phantom_t: PhantomData,
             phantom_input_element: PhantomData,
             phantom_input_sensor: PhantomData,
+            phantom_output_element: PhantomData,
+            phantom_output_sensor: PhantomData,
             source: uuid,
             genome,
             fitness: None,
@@ -422,12 +499,7 @@ impl<
 
     /// Returns the number of associated outputs for this `Individual` contains.
     pub fn associated_outputs(&self) -> usize {
-        self.genome().number_of_associated_outputs()
-    }
-
-    /// Returns the values of all outputs for this `Individual`.
-    pub fn output_values(&self) -> Vec<Option<InformationType>> {
-        self.genome().get_output_values()
+        self.genome().output().number_of_associated_outputs()
     }
 
     /// Adds the specified fitness value by setting the fitness to the mean of old and
@@ -473,8 +545,18 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
-    ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         self.genome().cross_over(&partner)
     }
 
@@ -496,6 +578,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
         mutations: &MutationCompendium<
             ReactionType,
@@ -503,10 +587,19 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
         environment: &Environment,
-    ) -> Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
-    {
+    ) -> Individual<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         let offspring_genome = self.mate(partner);
         if let Some(mutated_offspring_genome) = mutations.mutate(&offspring_genome) {
             // If the mutation was successful, return the mutated individual.
@@ -527,7 +620,15 @@ impl<
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn genome(
         &self,
-    ) -> &Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> &Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         &self.genome
     }
 
@@ -564,9 +665,19 @@ struct SerialisablePopulation<
     InformationType,
     InputElementType,
     InputSensorType,
+    OutputElementType,
+    OutputSensorType,
 > {
     individuals: Vec<
-        Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+        Individual<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     >,
     resources: Resource,
 }
@@ -584,6 +695,15 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     >
     SerialisablePopulation<
         ReactionType,
@@ -591,6 +711,8 @@ impl<
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >
 {
     /// Returns the UUID and fitness of the fittest individual of the population.
@@ -600,11 +722,18 @@ impl<
         Option<Uuid>,
         Option<f64>,
         Option<
-            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Individual<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
-        Option<Vec<Option<InformationType>>>,
     ) {
-        let (mut uuid, mut fitness, mut ind, mut out) = (None, None, None, None);
+        let (mut uuid, mut fitness, mut ind) = (None, None, None);
         let filter: Vec<
             &Individual<
                 ReactionType,
@@ -612,21 +741,22 @@ impl<
                 InformationType,
                 InputElementType,
                 InputSensorType,
+                OutputElementType,
+                OutputSensorType,
             >,
         > = self.individuals.iter().filter(|i| i.age() >= 1).collect();
         for individual in filter {
             match fitness {
                 Some(fit)
-                    if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {}
+                    if (individual.fitness.is_none() || fit >= individual.fitness.unwrap()) => {},
                 _ => {
                     uuid = Some(*individual.uuid());
                     fitness = individual.fitness;
                     ind = Some(individual.clone());
-                    out = Some(individual.output_values())
-                }
+                },
             }
         }
-        (uuid, fitness, ind, out)
+        (uuid, fitness, ind)
     }
 }
 
@@ -643,13 +773,35 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > From<&Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    From<
+        &Population<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    >
     for SerialisablePopulation<
         ReactionType,
         StateType,
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >
 {
     fn from(
@@ -659,6 +811,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     ) -> Self {
         let mut serialisable_population = SerialisablePopulation {
@@ -677,9 +831,11 @@ impl<
                         InformationType,
                         InputElementType,
                         InputSensorType,
+                        OutputElementType,
+                        OutputSensorType,
                     > = err.into_inner().clone();
                     serialisable_population.individuals.push(poisoned);
-                }
+                },
             }
         }
         serialisable_population
@@ -690,7 +846,15 @@ impl<
 /// A `Population` is a population of individuals with different [`Genome`]s.
 ///
 /// [`Genome`]: ../gene/struct.Genome.html
-pub struct Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+pub struct Population<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+    OutputElementType,
+    OutputSensorType,
+> {
     individuals: HashMap<
         Uuid,
         Arc<
@@ -701,6 +865,8 @@ pub struct Population<ReactionType, StateType, InformationType, InputElementType
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -721,7 +887,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    Population<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates a new `Population` from the specified individuals.
     ///
@@ -734,7 +918,15 @@ impl<
     /// [`Resource`]: ../resource/struct.Resource.html
     pub fn new(
         founding_individuals: Vec<
-            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Individual<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
         resources: Resource,
     ) -> Self {
@@ -765,16 +957,17 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         > = self.into();
         // TODO: Remove debug print statement and return an PopulationInformation struct instead.
-        let (id, fitness, ind, out) = serialisable_population.fittest_individual();
+        let (id, fitness, ind) = serialisable_population.fittest_individual();
         println!(
-            "\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\n\n{:#?}\nValues: {:?}\n\n",
+            "\nFittest:\nPopulation: {:?}\nID: {:?}\nFitness: {:?}\n\n{:#?}\n\n",
             path_to_file.as_ref(),
             id,
             fitness,
-            ind,
-            out
+            ind
         );
         let ser = rmp_serde::to_vec(&serialisable_population)?;
         Ok(file.write_all(&ser)?)
@@ -799,6 +992,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         > = rmp_serde::from_read_ref(&file_content)?;
         Ok(serialisable_population.into())
     }
@@ -817,6 +1012,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -834,7 +1031,15 @@ impl<
     pub fn append(
         &mut self,
         individuals: Vec<
-            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Individual<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
     ) {
         for ind in individuals.into_iter() {
@@ -892,8 +1097,17 @@ impl<
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn random_genome(
         &self,
-    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    {
+    ) -> Option<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    > {
         if self.individuals.len() == 0 {
             None
         } else {
@@ -931,6 +1145,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -970,6 +1186,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -1094,6 +1312,8 @@ impl<
                         InformationType,
                         InputElementType,
                         InputSensorType,
+                        OutputElementType,
+                        OutputSensorType,
                     >,
                 >,
             >,
@@ -1145,6 +1365,15 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     >
     From<
         SerialisablePopulation<
@@ -1153,8 +1382,19 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
-    > for Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    >
+    for Population<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     fn from(
         serial: SerialisablePopulation<
@@ -1163,6 +1403,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     ) -> Self {
         Self::new(serial.individuals, serial.resources)

@@ -82,8 +82,8 @@ fn test_has_substrate() {
             gene: 1,
             substrate: 1,
         };
-        assert!(NoOpGenome::has_substrate(&genome.genes, &positive));
-        assert!(!NoOpGenome::has_substrate(&genome.genes, &negative_a));
-        assert!(!NoOpGenome::has_substrate(&genome.genes, &negative_b));
+        assert!(has_substrate(&genome.genes, &positive));
+        assert!(!has_substrate(&genome.genes, &negative_a));
+        assert!(!has_substrate(&genome.genes, &negative_b));
     }
 }

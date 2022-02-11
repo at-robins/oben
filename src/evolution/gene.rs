@@ -6,7 +6,9 @@ extern crate serde;
 
 pub use sensor::GenomicInputSensor;
 
-use super::chemistry::{Information, Input, Reaction, State};
+use self::sensor::GenomicOutputSensor;
+
+use super::chemistry::{Information, Input, Output, Reaction, State};
 use super::helper::{a_or_b, do_a_or_b};
 use super::population::Organism;
 use super::protein::{CatalyticCentre, Receptor, Substrate, SubstrateType};
@@ -14,7 +16,7 @@ use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -28,12 +30,22 @@ use std::rc::Rc;
 ///
 /// [`Gene`]: ./struct.Gene.html
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+pub struct Genome<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+    OutputElementType,
+    OutputSensorType,
+> {
     phantom_reaction: PhantomData<ReactionType>,
     phantom_state: PhantomData<StateType>,
     phantom_information: PhantomData<InformationType>,
     phantom_input_element: PhantomData<InputElementType>,
     phantom_input_sensor: PhantomData<InputSensorType>,
+    phantom_output_element: PhantomData<InputElementType>,
+    phantom_output_sensor: PhantomData<InputSensorType>,
     input: GenomicInputSensor<
         ReactionType,
         StateType,
@@ -41,7 +53,13 @@ pub struct Genome<ReactionType, StateType, InformationType, InputElementType, In
         InputElementType,
         InputSensorType,
     >,
-    output: Vec<Option<GeneSubstrate>>,
+    output: GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    >,
     genes: Vec<Gene<ReactionType, StateType, InformationType>>,
     associations: Vec<GeneAssociation<InformationType>>,
 }
@@ -59,7 +77,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates a new `Genome` containing the specified inputs, outputs and [`Gene`]s.
     /// A `Genome` needs at least 1 [`Gene`].
@@ -81,7 +117,13 @@ impl<
             InputElementType,
             InputSensorType,
         >,
-        output: Vec<Option<GeneSubstrate>>,
+        output: GenomicOutputSensor<
+            ReactionType,
+            StateType,
+            InformationType,
+            OutputElementType,
+            OutputSensorType,
+        >,
         genes: Vec<Gene<ReactionType, StateType, InformationType>>,
     ) -> Self {
         if genes.is_empty() {
@@ -93,6 +135,8 @@ impl<
             phantom_information: PhantomData,
             phantom_input_element: PhantomData,
             phantom_input_sensor: PhantomData,
+            phantom_output_element: PhantomData,
+            phantom_output_sensor: PhantomData,
             input,
             output,
             genes,
@@ -107,20 +151,6 @@ impl<
     pub fn number_of_genes(&self) -> NonZeroUsize {
         NonZeroUsize::new(self.genes.len())
             .expect("No gene is encoded by this genome. This is forbidden by the contract.")
-    }
-
-    /// Get the number of associated outputs [`Substrate`]s in this `Genome`.
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn number_of_associated_outputs(&self) -> usize {
-        self.output.iter().filter(|i| i.is_some()).count()
-    }
-
-    /// Get the number of output [`Substrate`]s in this `Genome`.
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn number_of_outputs(&self) -> usize {
-        self.output.len()
     }
 
     /// Get the number of [`GeneAssociation`]s in this `Genome`.
@@ -156,9 +186,30 @@ impl<
         &mut self.input
     }
 
-    /// Returns the output at the specified index if any.
-    pub fn output(&self, output_index: usize) -> Option<Option<GeneSubstrate>> {
-        self.output.get(output_index).and_then(|inner| Some(*inner))
+    /// Returns the output.
+    pub fn output(
+        &self,
+    ) -> &GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    > {
+        &self.output
+    }
+
+    /// Returns the output as mutable.
+    pub fn output_mut(
+        &mut self,
+    ) -> &mut GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    > {
+        &mut self.output
     }
 
     /// Returns the association at the specified index if any.
@@ -175,44 +226,6 @@ impl<
         association_index: usize,
     ) -> Option<&mut GeneAssociation<InformationType>> {
         self.associations.get_mut(association_index)
-    }
-
-    /// Sets the output association at the specified index to the specified value
-    /// and returns the previous value.
-    ///
-    /// # Parameters
-    ///
-    /// * `output_index` - the index of the output association to changes
-    /// * `output_value` - the new value for the specified output association
-    ///
-    /// # Panics
-    ///
-    /// If the index is out of bounds.
-    pub fn set_output(
-        &mut self,
-        output_index: usize,
-        output_value: Option<GeneSubstrate>,
-    ) -> Option<GeneSubstrate> {
-        if output_index >= self.output.len() {
-            panic!("The output vector of this genome is of length {}, but insertion of element {:#?} at index {} was attempted.", self.number_of_outputs(), output_value, output_index);
-        }
-        let old_value = self.output[output_index];
-        self.output[output_index] = output_value;
-        old_value
-    }
-
-    /// Returns a copy of the output [`Substrate`]s.
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_output_values(&self) -> Vec<Option<InformationType>> {
-        self.output
-            .iter()
-            .map(|substrate| {
-                substrate
-                    .and_then(|a| self.get_substrate(a))
-                    .and_then(|inner| Some(inner.clone()))
-            })
-            .collect()
     }
 
     /// Returns the specified [`Substrate`] if contained within the `Genome`.
@@ -298,14 +311,7 @@ impl<
         // Remove all inputs pointing to the removed gene.
         self.input.adjust_after_gene_removal(gene);
         // Remove all outputs pointing to the removed gene.
-        for output_value in &mut self.output {
-            if output_value
-                .and_then(|output| Some(output.is_gene(gene)))
-                .unwrap_or(false)
-            {
-                *output_value = None;
-            }
-        }
+        self.output.adjust_after_gene_removal(gene);
         // Remove all substrate associations pointing to the removed gene.
         for association in &mut self.associations {
             association.remove_associated_gene(gene);
@@ -336,7 +342,8 @@ impl<
         let removed = self.genes[substrate.gene()].remove_substrate(substrate.substrate());
         self.input_mut()
             .adjust_after_gene_substrate_removal(substrate);
-        self.adjust_output_after_gene_substrate_removal(substrate);
+        self.output_mut()
+            .adjust_after_gene_substrate_removal(substrate);
         self.adjust_associations_after_gene_substrate_removal(substrate);
         self.validate_associations();
         removed
@@ -399,39 +406,6 @@ impl<
         &mut self.genes[gene]
     }
 
-    /// Checks if the [`Substrate`] is present in the `Genome`.
-    ///
-    /// # Parameters
-    ///
-    /// * `genes` - the [`Gene`]'s of the `Genome`
-    /// * `substrate` - the substrate to check for
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn has_substrate(
-        genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
-        substrate: &GeneSubstrate,
-    ) -> bool {
-        if let Some(gene) = genes.get(substrate.gene) {
-            gene.substrates.len() > substrate.substrate
-        } else {
-            false
-        }
-    }
-
-    /// Checks if the [`Substrate`] is an output to the `Genome`.
-    ///
-    /// # Parameters
-    /// * `substrate` - the substrate to check for
-    ///
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn has_output_substrate(&self, substrate: &GeneSubstrate) -> bool {
-        self.output
-            .iter()
-            .filter_map(|potential_output| potential_output.as_ref())
-            .any(|output| output == substrate)
-    }
-
     /// Returns all substrates of the specified [`Gene`] combined with their [`GeneSubstrate`] pointer.
     ///
     /// # Parameters
@@ -469,17 +443,6 @@ impl<
     /// [`Gene`]: ./struct.Gene.html
     pub fn get_random_gene(&self) -> usize {
         thread_rng().gen_range(0..self.number_of_genes().get())
-    }
-
-    /// Returns the index of a random output [`GeneSubstrate`] if there is any.
-    ///
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    pub fn get_random_output(&self) -> Option<usize> {
-        if self.number_of_outputs() > 0 {
-            Some(thread_rng().gen_range(0..self.number_of_outputs()))
-        } else {
-            None
-        }
     }
 
     /// Returns the index of a random [`GeneAssociation`] if there is any.
@@ -547,35 +510,6 @@ impl<
         self.associations.remove(association)
     }
 
-    /// Adjust the output [`GeneSubstrate`] references after the binary [`Substrate`] of a contained
-    /// [`Gene`] was removed.
-    ///
-    /// # Parameters
-    ///
-    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    /// [`Substrate`]: ../protein/struct.Substrate.html
-    fn adjust_output_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
-        for output_ref in &mut self.output {
-            if output_ref.is_some() {
-                let mut current_reference = output_ref.unwrap();
-                if current_reference == removed_substrate {
-                    // Remove the output association if it points to the removed substrate.
-                    *output_ref = None;
-                } else if current_reference.is_gene(removed_substrate.gene) {
-                    // Adjust the output association if it points to the gene from which the
-                    // substrate was removed.
-                    current_reference.substrate =
-                        adjust_index(current_reference.substrate, removed_substrate.substrate);
-                    *output_ref = Some(current_reference);
-                }
-                // Otherwise, leave the output untouched.
-            }
-        }
-    }
-
     /// Adjust the [`GeneAssociation`] references after the binary [`Substrate`] of a contained
     /// [`Gene`] was removed.
     ///
@@ -595,35 +529,6 @@ impl<
         }
     }
 
-    /// Validates the [`GeneSubstrate`] references of input and output after a recombination
-    /// event and removes invalid ones.
-    ///
-    /// # Parameters
-    ///
-    /// * `genes` - the [`Gene`]s of the [`Genome`]
-    /// * `io_substrates` - the input or output [`GeneSubstrate`]s
-    ///
-    /// [`Gene`]: ./struct.Gene.html
-    /// [`Genome`]: ./struct.Genome.html
-    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
-    fn validate_input_ouput_associations(
-        genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
-        io_substrates: &mut Vec<Option<GeneSubstrate>>,
-    ) {
-        let mut duplicate_checker = HashSet::new();
-        for io_substrate in io_substrates {
-            if let Some(current_substrate) = io_substrate {
-                if !duplicate_checker.insert(current_substrate.clone())
-                    || !Self::has_substrate(genes, current_substrate)
-                {
-                    // Remove the io association if it points to a duplicate or an invalid substrate.
-                    *io_substrate = None;
-                }
-                // Otherwise, leave it untouched.
-            }
-        }
-    }
-
     /// Validates the [`GeneAssociation`] references
     /// after a recombination event and removes invalid ones.
     ///
@@ -631,9 +536,7 @@ impl<
     fn validate_gene_substrate_associations(&mut self) {
         let genes = &self.genes;
         for association in &mut self.associations {
-            association
-                .associations
-                .retain(|a| Self::has_substrate(genes, a));
+            association.associations.retain(|a| has_substrate(genes, a));
         }
     }
 
@@ -644,7 +547,7 @@ impl<
     /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
     fn validate_associations(&mut self) {
         self.input.validate(&self.genes);
-        Self::validate_input_ouput_associations(&self.genes, &mut self.output);
+        self.output.validate(&self.genes);
         self.validate_gene_substrate_associations();
     }
 
@@ -694,7 +597,15 @@ impl<
 
     pub fn translate(
         &self,
-    ) -> Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> Organism<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         let mut gene_substrate_map: HashMap<
             GeneSubstrate,
             Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
@@ -729,18 +640,28 @@ impl<
         }
         let substrates = gene_substrate_map.values().map(|sub| sub.clone()).collect();
         let input = self.input.translate(&gene_substrate_map);
-        let output = self
-            .output
-            .iter()
-            .map(|substrate| {
-                substrate.and_then(|gene_substrate| {
-                    gene_substrate_map
-                        .get(&gene_substrate)
-                        .and_then(|inner| Some(inner.clone()))
-                })
-            })
-            .collect();
+        let output = self.output.translate(&gene_substrate_map);
         Organism::new(substrates, input, output)
+    }
+}
+
+/// Checks if the specified [`Substrate`] is present in the specified set of [`Gene`]s.
+///
+/// # Parameters
+///
+/// * `genes` - the [`Gene`] set
+/// * `substrate` - the substrate to check for
+///
+/// [`Gene`]: ./struct.Gene.html
+/// [`Substrate`]: ../protein/struct.Substrate.html
+pub fn has_substrate<ReactionType, StateType, InformationType>(
+    genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
+    substrate: &GeneSubstrate,
+) -> bool {
+    if let Some(gene) = genes.get(substrate.gene) {
+        gene.substrates.len() > substrate.substrate
+    } else {
+        false
     }
 }
 
@@ -757,8 +678,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType> + Default,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType> + Default,
     > Default
-    for Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    for Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     fn default() -> Self {
         Genome {
@@ -767,8 +705,10 @@ impl<
             phantom_information: PhantomData,
             phantom_input_element: PhantomData,
             phantom_input_sensor: PhantomData,
+            phantom_output_element: PhantomData,
+            phantom_output_sensor: PhantomData,
             input: GenomicInputSensor::default(),
-            output: Vec::default(),
+            output: GenomicOutputSensor::default(),
             genes: vec![Gene::<ReactionType, StateType, InformationType>::default()],
             associations: Vec::default(),
         }
@@ -788,11 +728,28 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     > CrossOver
-    for Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    for Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
-    fn is_similar(&self, other: &Self) -> bool {
-        self.number_of_outputs() == other.number_of_outputs()
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
     }
 
     fn cross_over(&self, other: &Self) -> Self {
@@ -807,6 +764,8 @@ impl<
                 phantom_information: PhantomData,
                 phantom_input_element: PhantomData,
                 phantom_input_sensor: PhantomData,
+                phantom_output_element: PhantomData,
+                phantom_output_sensor: PhantomData,
                 input,
                 output,
                 genes,

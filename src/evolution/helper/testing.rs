@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::evolution::{
-    chemistry::{Information, Input, Reaction, State},
+    chemistry::{Information, Input, Reaction, State, Output},
     gene::{CrossOver, Genome},
 };
 
-use super::noop::NoOpInputElement;
+use super::noop::{NoOpInputElement, NoOpOutputElement};
 
 /// A [`Genome`] for testing purposes.
-pub type TestGenome = Genome<TestReaction, TestState, TestInformation, NoOpInputElement, TestInput>;
+pub type TestGenome = Genome<TestReaction, TestState, TestInformation, NoOpInputElement, TestInput, NoOpOutputElement, TestOutput>;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// An [`Input`] for testing purposes.
@@ -64,6 +64,40 @@ impl Default for TestInput {
             last_set_input: Default::default(),
             mocked_output_vector: Default::default(),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+/// An [`Output`] for testing purposes.
+pub struct TestOutput {}
+
+impl Output<NoOpOutputElement, TestInformation> for TestOutput {
+    fn get_output(&self, _information: Vec<Option<TestInformation>>) -> NoOpOutputElement {
+        ()
+    }
+
+    fn is_finished(&self, _information: TestInformation) -> bool {
+        false
+    }
+
+    fn random() -> Self {
+        TestOutput {}
+    }
+}
+
+impl CrossOver for TestOutput {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, _other: &Self) -> Self {
+        Self::random()
+    }
+}
+
+impl Default for TestOutput {
+    fn default() -> Self {
+        Self {}
     }
 }
 

@@ -15,7 +15,7 @@ use super::super::helper::Iteration;
 /// [`Genome`](crate::evolution::gene::Genome)
 /// without any function.
 pub type NoOpGenome =
-    Genome<NoOpReaction, NoOpState, NoOpSubstrate, NoOpInputElement, NoOpInputSensor>;
+    Genome<NoOpReaction, NoOpState, NoOpSubstrate, NoOpInputElement, NoOpInputSensor, NoOpOutputElement, NoOpOutputSensor>;
 
 /// A type alias for the representation of an empty
 /// [`Gene`](crate::evolution::gene::Gene)
@@ -45,6 +45,15 @@ pub type NoOpInputElement = ();
 /// [`Input`](crate::evolution::chemistry::Input)
 /// containing no information or value and having no function.
 pub type NoOpInputSensor = ();
+
+/// A type alias for the underlying representation of an output
+/// containing no information or value and having no function.
+pub type NoOpOutputElement = ();
+
+/// A type alias for the underlying representation of an
+/// [`Output`](crate::evolution::chemistry::Output)
+/// containing no information or value and having no function.
+pub type NoOpOutputSensor = ();
 
 impl Information for NoOpSubstrate {
     fn update_value(&mut self, _time_passed: i32) {}

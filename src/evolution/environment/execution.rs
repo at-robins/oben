@@ -1,6 +1,6 @@
 //! The `execution` module contains the executive setup of the evolutionary network.
 
-use crate::evolution::chemistry::Input;
+use crate::evolution::chemistry::{Input, Output};
 use crate::evolution::gene::CrossOver;
 use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
@@ -29,6 +29,8 @@ pub struct EcologicalNiche<
     InformationType,
     InputElementType,
     InputSensorType,
+    OutputElementType,
+    OutputSensorType,
 > {
     inner: Arc<
         InnerEcologicalNiche<
@@ -38,6 +40,8 @@ pub struct EcologicalNiche<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     >,
 }
@@ -56,6 +60,15 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     >
     EcologicalNiche<
         SupplierResultInformationType,
@@ -64,6 +77,8 @@ impl<
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >
 {
     /// Creates a new `EcologicalNiche` executing the evolutionary network by repeated
@@ -88,13 +103,15 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
         supplier_function: Box<
             dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static,
         >,
         fitness_function: Box<
             dyn Fn(
-                    Vec<OrganismInformation<SupplierResultInformationType, InformationType>>,
+                    Vec<OrganismInformation<SupplierResultInformationType, OutputElementType>>,
                     ScalingFactor,
                 ) -> f64
                 + Send
@@ -107,6 +124,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     ) -> Self {
         EcologicalNiche {
@@ -190,6 +209,8 @@ impl<
                         InformationType,
                         InputElementType,
                         InputSensorType,
+                        OutputElementType,
+                        OutputSensorType,
                     >::get_accumulated_resources(a.clone())
                         + 1.0
                 })
@@ -245,6 +266,8 @@ impl<
                 InformationType,
                 InputElementType,
                 InputSensorType,
+                OutputElementType,
+                OutputSensorType,
             >,
         >,
         individual: Arc<
@@ -255,6 +278,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -290,6 +315,8 @@ impl<
                 InformationType,
                 InputElementType,
                 InputSensorType,
+                OutputElementType,
+                OutputSensorType,
             >,
         >,
         individual: Arc<
@@ -300,6 +327,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -328,6 +357,8 @@ impl<
                 InformationType,
                 InputElementType,
                 InputSensorType,
+                OutputElementType,
+                OutputSensorType,
             >,
         >,
         individual: Arc<
@@ -338,6 +369,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -388,6 +421,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -420,6 +455,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -431,10 +468,21 @@ impl<
                 InformationType,
                 InputElementType,
                 InputSensorType,
+                OutputElementType,
+                OutputSensorType,
             >,
         >,
-    ) -> Vec<Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    {
+    ) -> Vec<
+        Individual<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    > {
         let mut offspring = Vec::new();
         // Use the accumulated resources to produce offspring.
         let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
@@ -456,18 +504,28 @@ struct InnerEcologicalNiche<
     InformationType,
     InputElementType,
     InputSensorType,
+    OutputElementType,
+    OutputSensorType,
 > {
     environment: Arc<Environment>,
     population: Arc<
         Mutex<
-            Population<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Population<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
     >,
     supplier_function:
         Box<dyn Fn() -> (InputElementType, SupplierResultInformationType) + Send + Sync + 'static>,
     fitness_function: Box<
         dyn Fn(
-                Vec<OrganismInformation<SupplierResultInformationType, InformationType>>,
+                Vec<OrganismInformation<SupplierResultInformationType, OutputElementType>>,
                 ScalingFactor,
             ) -> f64
             + Send
@@ -480,6 +538,8 @@ struct InnerEcologicalNiche<
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >,
 }
 
@@ -497,6 +557,15 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     >
     InnerEcologicalNiche<
         SupplierResultInformationType,
@@ -505,6 +574,8 @@ impl<
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >
 {
     /// Checks if the specified [`Individual`] died of age.
@@ -528,6 +599,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -559,6 +632,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -592,6 +667,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -623,6 +700,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -651,6 +730,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -683,6 +764,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -716,6 +799,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -747,6 +832,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -778,6 +865,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -809,6 +898,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -829,7 +920,7 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     fn get_random_genome(
         &self,
-    ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType, OutputElementType, OutputSensorType> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .random_genome()
@@ -875,6 +966,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -982,6 +1075,8 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
@@ -1047,10 +1142,20 @@ impl<
                     InformationType,
                     InputElementType,
                     InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
                 >,
             >,
         >,
-    ) -> Organism<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> Organism<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         individual
             .lock()
             .expect("Another thread panicked while holding the individual lock.")
@@ -1073,7 +1178,15 @@ impl<
     fn append_population(
         &self,
         individuals: Vec<
-            Individual<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Individual<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
     ) {
         self.population

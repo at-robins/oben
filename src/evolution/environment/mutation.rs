@@ -6,7 +6,7 @@ use rand::{prelude::SliceRandom, thread_rng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::evolution::{
-    chemistry::{Information, Input, Reaction, State},
+    chemistry::{Information, Input, Output, Reaction, State},
     gene::{CrossOver, Genome},
     helper::Nlbf64,
 };
@@ -23,9 +23,20 @@ pub struct MutationCompendium<
     InformationType,
     InputElementType,
     InputSensorType,
+    OutputElementType,
+    OutputSensorType,
 > {
-    mutations:
-        Vec<Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>,
+    mutations: Vec<
+        Mutation<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    >,
 }
 
 impl<
@@ -41,8 +52,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
     >
-    MutationCompendium<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+    MutationCompendium<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates an empty `MutationCompendium`.
     pub fn new() -> MutationCompendium<
@@ -51,6 +79,8 @@ impl<
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     > {
         MutationCompendium {
             mutations: Vec::new(),
@@ -75,6 +105,8 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     ) {
         self.mutations.push(mutation);
@@ -96,11 +128,30 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
-    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    {
+    ) -> Option<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    > {
         let mut applied_mutations: Vec<
-            &Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            &Mutation<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         > = self
             .mutations
             .iter()
@@ -125,26 +176,64 @@ impl<
     }
 }
 
-impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
-    From<Vec<Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>>
+impl<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
+    From<
+        Vec<
+            Mutation<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
+        >,
+    >
     for MutationCompendium<
         ReactionType,
         StateType,
         InformationType,
         InputElementType,
         InputSensorType,
+        OutputElementType,
+        OutputSensorType,
     >
 {
     fn from(
         mutations: Vec<
-            Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+            Mutation<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
     ) -> Self {
         MutationCompendium { mutations }
     }
 }
 
-impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+impl<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
     From<
         MutationCompendium<
             ReactionType,
@@ -152,9 +241,21 @@ impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     >
-    for Vec<Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
+    for Vec<
+        Mutation<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    >
 {
     fn from(
         compendium: MutationCompendium<
@@ -163,6 +264,8 @@ impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
     ) -> Self {
         compendium.mutations
@@ -171,13 +274,37 @@ impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType
 
 /// A `Mutation` that occurs with a specified frequency druing
 /// [`Genome`] duplication.
-pub struct Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+pub struct Mutation<
+    ReactionType,
+    StateType,
+    InformationType,
+    InputElementType,
+    InputSensorType,
+    OutputElementType,
+    OutputSensorType,
+> {
     chance: Nlbf64,
     mutation: Box<
         dyn Fn(
-                &Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+                &Genome<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
+                >,
             ) -> Option<
-                Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+                Genome<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
+                >,
             > + Send
             + Sync
             + 'static,
@@ -197,7 +324,25 @@ impl<
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-    > Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    Mutation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     /// Creates a new `Mutation` which occurs with the specified frequency.
     ///
@@ -208,16 +353,40 @@ impl<
     pub fn new<
         N: Into<Nlbf64>,
         F: Fn(
-                &Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+                &Genome<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
+                >,
             ) -> Option<
-                Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>,
+                Genome<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
+                >,
             > + Send
             + Sync
             + 'static,
     >(
         mutation_chance: N,
         mutation: F,
-    ) -> Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType> {
+    ) -> Mutation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         Mutation {
             chance: mutation_chance.into(),
             mutation: Box::new(mutation),
@@ -244,9 +413,20 @@ impl<
             InformationType,
             InputElementType,
             InputSensorType,
+            OutputElementType,
+            OutputSensorType,
         >,
-    ) -> Option<Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType>>
-    {
+    ) -> Option<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    > {
         (self.mutation)(genome)
     }
 
@@ -276,8 +456,24 @@ impl<
     }
 }
 
-impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType> std::fmt::Debug
-    for Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+impl<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > std::fmt::Debug
+    for Mutation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Mutation")
@@ -287,16 +483,48 @@ impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType
     }
 }
 
-impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType> PartialEq
-    for Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+impl<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > PartialEq
+    for Mutation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
     fn eq(&self, other: &Self) -> bool {
         self.chance == other.chance && std::ptr::eq(&self.mutation, &other.mutation)
     }
 }
 
-impl<ReactionType, StateType, InformationType, InputElementType, InputSensorType> Eq
-    for Mutation<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
+impl<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > Eq
+    for Mutation<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >
 {
 }
 

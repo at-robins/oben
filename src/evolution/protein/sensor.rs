@@ -195,6 +195,19 @@ impl<
     pub fn get_output(&self, time: Iteration) -> OutputElementType {
         self.output.get_output(substrates_as_information(&self.output_substrates, time))
     }
+
+    /// Checks if the output signals being finished with the evalutation of the network.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `information` - the [`Information`] value of the finish substrate
+    pub fn is_finished(&self, information: Option<InformationType>) -> bool {
+        if let Some(info) = information {
+            self.output.is_finished(info)
+        } else {
+            false
+        }
+    }
 }
 
 /// Converts a vector of references to underlying [`Information`]s.

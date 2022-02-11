@@ -9,12 +9,12 @@ use std::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::evolution::{
-    chemistry::{Information, Input, Reaction, State},
+    chemistry::{Information, Input, Output, Reaction, State},
     helper::{a_or_b, do_a_or_b},
-    protein::{InputSensor, Substrate, SubstrateType},
+    protein::{InputSensor, OutputSensor, Substrate, SubstrateType},
 };
 
-use super::{adjust_index, CrossOver, Gene, GeneSubstrate, Genome};
+use super::{adjust_index, has_substrate, CrossOver, Gene, GeneSubstrate};
 
 /// A `GenomicInputSensor` represents the information of an actual
 /// [`InputSensor`](crate::evolution::protein::InputSensor)
@@ -167,18 +167,9 @@ impl<
             ReactionType,
             StateType,
             InformationType,
-            InputElementType,
-            InputSensorType,
         >(&mut self.input_substrates, genes);
-        self.feedback_substrates.retain(|_, substrate| {
-            Genome::<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-            >::has_substrate(genes, substrate)
-        });
+        self.feedback_substrates
+            .retain(|_, substrate| has_substrate(genes, substrate));
     }
 
     /// Translates the `GenomicInputSensor` into an [`InputSensor`](crate::evolution::protein::InputSensor).
@@ -305,6 +296,267 @@ impl<
                 input_substrates,
                 feedback_substrates,
                 input,
+            }
+        } else {
+            do_a_or_b(|| self.clone(), || other.clone())
+        }
+    }
+}
+
+/// A `GenomicOutputSensor` represents the information of an actual
+/// [`OutputSensor`](crate::evolution::protein::OutputSensor)
+/// that provides output
+/// [`Substrate`](crate::evolution::protein::Substrate)s.
+/// It is contained within a
+/// [`Gene`](crate::evolution::gene::Gene).
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct GenomicOutputSensor<
+    ReactionType,
+    StateType,
+    InformationType,
+    OutputElementType,
+    OutputSensorType,
+> {
+    phantom_reaction: PhantomData<ReactionType>,
+    phantom_state: PhantomData<StateType>,
+    phantom_information: PhantomData<InformationType>,
+    phantom_output_element: PhantomData<OutputElementType>,
+    output_substrates: Vec<Option<GeneSubstrate>>,
+    finish_substrate: Option<GeneSubstrate>,
+    output: OutputSensorType,
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    >
+    GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    >
+{
+    /// Creates a new `GenomicOutputSensor`.
+    ///
+    /// # Parameters
+    ///
+    /// * `output_substrates` - the output substrates if associated
+    /// * `output` - the underlying output implementation
+    pub fn new(
+        output_substrates: Vec<Option<GeneSubstrate>>,
+        finish_substrate: Option<GeneSubstrate>,
+        output: OutputSensorType,
+    ) -> Self {
+        Self {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_output_element: PhantomData,
+            output_substrates,
+            finish_substrate,
+            output,
+        }
+    }
+
+    /// Returns the output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
+    pub fn output_substrates(&self) -> &Vec<Option<GeneSubstrate>> {
+        &self.output_substrates
+    }
+
+    /// Returns the [`Substrate`](crate::evolution::protein::Substrate) signaling the termination of the network
+    /// referenced by this sensor.
+    pub fn finish_substrate(&self) -> &Option<GeneSubstrate> {
+        &self.finish_substrate
+    }
+
+    /// Returns the underlying [`Output`](crate::evolution::chemistry::Output) implementation.
+    pub fn output(&self) -> &OutputSensorType {
+        &self.output
+    }
+
+    /// Get the number of associated output [`Substrate`](crate::evolution::protein::Substrate)s.
+    pub fn number_of_associated_outputs(&self) -> usize {
+        self.output_substrates
+            .iter()
+            .filter(|i| i.is_some())
+            .count()
+    }
+
+    /// Adjust the output [`GeneSubstrate`] references after the [`Substrate`] of a contained
+    /// [`Gene`] was removed.
+    ///
+    /// # Parameters
+    ///
+    /// * `removed_substrate` - an index based pointer to the removed [`Substrate`]
+    ///
+    /// [`Gene`]: ./struct.Gene.html
+    /// [`GeneSubstrate`]: ./struct.GeneSubstrate.html
+    /// [`Substrate`]: ../protein/struct.Substrate.html
+    pub fn adjust_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
+        adjust_substrates(&mut self.output_substrates, removed_substrate);
+        self.finish_substrate = adjust_substrate(self.finish_substrate, removed_substrate);
+    }
+
+    /// Adjusts all internal
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)s
+    /// after removal of the [`Gene`](crate::evolution::gene::Gene)
+    /// with the specified index.
+    ///
+    /// # Parameters
+    ///
+    /// * `gene_index` - the index of the removed [`Gene`](crate::evolution::gene::Gene)
+    pub fn adjust_after_gene_removal(&mut self, gene_index: usize) {
+        adjust_after_gene_removal_from_substrates(&mut self.output_substrates, gene_index);
+        if let Some(finish_substrate) = self.finish_substrate {
+            self.finish_substrate = adjust_single_substrate_after_gene_removal_from_substrates(
+                finish_substrate,
+                gene_index,
+            );
+        }
+    }
+
+    /// Validates the internal
+    /// [`GeneSubstrate`](crate::evolution::gene::GeneSubstrate)
+    /// of the references after a recombination
+    /// event and removes invalid ones.
+    ///
+    /// # Parameters
+    ///
+    /// * `genes` - the [`Gene`](crate::evolution::gene::Gene)s
+    /// of the [`Genome`](crate::evolution::gene::Genome)
+    pub fn validate(&mut self, genes: &Vec<Gene<ReactionType, StateType, InformationType>>) {
+        validate_substrates::<
+            ReactionType,
+            StateType,
+            InformationType,
+        >(&mut self.output_substrates, genes);
+        if let Some(finish_substrate) = self.finish_substrate {
+            if !has_substrate(genes, &finish_substrate) {
+                self.finish_substrate = None;
+            }
+        }
+    }
+
+    /// Translates the `GenomicOutputSensor` into an [`OutputSensor`](crate::evolution::protein::OutputSensor).
+    ///
+    /// # Parameters
+    /// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](crate::evolution::protein::Substrate)s
+    /// of the containing [`Genome`](crate::evolution::gene::Genome)
+    ///
+    /// # Panics
+    ///
+    /// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](crate::evolution::protein::Substrate)s.
+    pub fn translate(
+        &self,
+        substrate_lookup: &HashMap<
+            GeneSubstrate,
+            Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+        >,
+    ) -> OutputSensor<ReactionType, StateType, InformationType, OutputElementType, OutputSensorType>
+    {
+        let output_substrates = translate_substrates(&self.output_substrates, substrate_lookup);
+        // Sets the finsih associations.
+        if let Some(finish_substrate) = self.finish_substrate {
+            substrate_lookup
+                .get(&finish_substrate)
+                .expect(&format!(
+                    "The substrate lookup map did not contain {:?}.",
+                    finish_substrate
+                ))
+                .borrow_mut()
+                .set_substrate_type(SubstrateType::OutputFinishSubstrate);
+        }
+        let output = self.output.clone();
+        OutputSensor::new(output, output_substrates)
+    }
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType> + Default,
+    > Default
+    for GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    >
+{
+    fn default() -> Self {
+        GenomicOutputSensor {
+            phantom_reaction: PhantomData,
+            phantom_state: PhantomData,
+            phantom_information: PhantomData,
+            phantom_output_element: PhantomData,
+            output_substrates: Vec::default(),
+            finish_substrate: None,
+            output: OutputSensorType::default(),
+        }
+    }
+}
+
+impl<
+        ReactionType: Reaction<InformationType>,
+        StateType: State<InformationType>,
+        InformationType: Information,
+        OutputElementType: Clone
+            + std::fmt::Debug
+            + PartialEq
+            + Send
+            + Sync
+            + CrossOver
+            + Serialize
+            + DeserializeOwned,
+        OutputSensorType: Output<OutputElementType, InformationType>,
+    > CrossOver
+    for GenomicOutputSensor<
+        ReactionType,
+        StateType,
+        InformationType,
+        OutputElementType,
+        OutputSensorType,
+    >
+{
+    fn is_similar(&self, other: &Self) -> bool {
+        self.output.is_similar(&other.output)
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        if self.is_similar(other) {
+            let output_substrates = self.output_substrates.cross_over(&other.output_substrates);
+            let finish_substrate = a_or_b(self.finish_substrate, other.finish_substrate);
+            let output = self.output.cross_over(&other.output);
+            GenomicOutputSensor {
+                phantom_reaction: PhantomData,
+                phantom_state: PhantomData,
+                phantom_information: PhantomData,
+                phantom_output_element: PhantomData,
+                output_substrates,
+                finish_substrate,
+                output,
             }
         } else {
             do_a_or_b(|| self.clone(), || other.clone())
@@ -441,8 +693,6 @@ fn validate_substrates<
     ReactionType: Reaction<InformationType>,
     StateType: State<InformationType>,
     InformationType: Information,
-    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
-    InputSensorType: Input<InputElementType, InformationType>,
 >(
     substrates: &mut Vec<Option<GeneSubstrate>>,
     genes: &Vec<Gene<ReactionType, StateType, InformationType>>,
@@ -451,15 +701,7 @@ fn validate_substrates<
     for substrate_option in substrates {
         if let Some(substrate) = substrate_option {
             // Remove the association if it points to a duplicate or an invalid substrate.
-            if !duplicate_checker.insert(*substrate)
-                || !Genome::<
-                    ReactionType,
-                    StateType,
-                    InformationType,
-                    InputElementType,
-                    InputSensorType,
-                >::has_substrate(genes, substrate)
-            {
+            if !duplicate_checker.insert(*substrate) || !has_substrate(genes, substrate) {
                 *substrate_option = None;
             }
             // Otherwise, leave it untouched.

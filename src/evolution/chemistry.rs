@@ -125,7 +125,7 @@ pub trait Output<
     /// # Parameters
     /// 
     /// * `information` - the [`Information`] representing the finished state
-    fn is_finished(&self, information: Option<InformationType>) -> bool;
+    fn is_finished(&self, information: InformationType) -> bool;
 
     /// Creates an random `OutputSensor`.
     fn random() -> Self;

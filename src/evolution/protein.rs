@@ -2,7 +2,7 @@
 extern crate bitvec;
 extern crate rmp_serde;
 
-pub use sensor::InputSensor;
+pub use sensor::{InputSensor, OutputSensor};
 
 use super::chemistry::{Information, Reaction, State};
 use super::helper::Iteration;
@@ -49,9 +49,9 @@ impl<
     }
 
     /// Changes the [`SubstrateType`] as specified.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `substrate_type` - the new [`SubstrateType`]
     pub fn set_substrate_type(&mut self, substrate_type: SubstrateType) {
         self.substrate_type = substrate_type;
@@ -119,7 +119,19 @@ impl<
         match &self.substrate_type {
             SubstrateType::InputFeedbackSubstrate(feedback_indices) => {
                 Some((feedback_indices.clone(), self.value(time).clone()))
-            }
+            },
+            _ => None,
+        }
+    }
+
+    /// Returns the the current value if of type [`SubstrateType::OutputFinishSubstrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * time - the timepoint the substrate is accessed
+    pub fn get_output_finish_value(&mut self, time: Iteration) -> Option<InformationType> {
+        match &self.substrate_type {
+            SubstrateType::OutputFinishSubstrate => Some(self.value(time).clone()),
             _ => None,
         }
     }
@@ -134,6 +146,8 @@ pub enum SubstrateType {
     ConventionalSubstrate,
     /// A [`Substrate`] that is associated with feedback to an [`InputSensor`].
     InputFeedbackSubstrate(Vec<usize>),
+    /// A [`Substrate`] signalling that the current process is finsihed to the [`OutputSensor`].
+    OutputFinishSubstrate,
 }
 
 /// A `Receptor` is a sensor for [`Substrate`] changes and a trigger
@@ -229,6 +243,7 @@ impl<
         CatalysisResult {
             cascading_receptors: self.enzyme.cascading_receptors(),
             input_feedback_associations: self.enzyme.input_feedback_associations(time_of_catalysis),
+            output_finish_substrate: self.enzyme.output_finish_substrate(time_of_catalysis),
         }
     }
 }
@@ -240,6 +255,7 @@ pub struct CatalysisResult<ReactionType, StateType, InformationType> {
     pub cascading_receptors: Vec<Rc<Receptor<ReactionType, StateType, InformationType>>>,
     /// The input feedback associations affected by this catalysis.
     pub input_feedback_associations: Vec<(Vec<usize>, InformationType)>,
+    pub output_finish_substrate: Option<InformationType>,
 }
 
 impl<R: Reaction<T>, S: State<T>, T: Information> PartialEq for Receptor<R, S, T> {
@@ -400,6 +416,25 @@ impl<
             .filter(Option::is_some)
             .map(Option::unwrap)
             .collect()
+    }
+
+    /// Returns the finish substrate value if the finish output substrate is 
+    /// altered by this catalytic centre.
+    ///
+    /// # Parameters
+    ///
+    /// * `time` - the timepoint at which the [`Substrate`] values are requested
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
+    pub fn output_finish_substrate(&self, time: Iteration) -> Option<InformationType> {
+        for product in &self.products {
+            let finish_value = (*product.upgrade().unwrap())
+                .borrow_mut()
+                .get_output_finish_value(time);
+            if finish_value.is_some() {
+                return finish_value;
+            }
+        }
+        None
     }
 }
 
