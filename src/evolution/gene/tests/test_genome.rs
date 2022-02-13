@@ -14,6 +14,8 @@ fn test_validate_associations() {
         };
         let input_sensor =
             GenomicInputSensor::new(vec![Some(invalid_gene_substrate)], HashMap::new(), ());
+        let output_sensor =
+            GenomicOutputSensor::new(vec![Some(invalid_gene_substrate)], Some(invalid_gene_substrate), ());
         let invalid_association = GeneAssociation {
             substrate: (),
             associations: vec![invalid_gene_substrate.clone()],
@@ -24,14 +26,17 @@ fn test_validate_associations() {
             phantom_information: PhantomData,
             phantom_input_element: PhantomData,
             phantom_input_sensor: PhantomData,
+            phantom_output_element: PhantomData,
+            phantom_output_sensor: PhantomData,
             input: input_sensor,
-            output: vec![Some(invalid_gene_substrate.clone())],
+            output: output_sensor,
             genes: vec![gene],
             associations: vec![invalid_association],
         };
         genome.validate_associations();
         assert_eq!(genome.input.input_substrates(), &vec!(None));
-        assert_eq!(genome.output, vec!(None));
+        assert_eq!(genome.output.output_substrates(), &vec!(None));
+        assert_eq!(genome.output.finish_substrate(), &None);
         assert_eq!(
             genome.associations,
             vec!(GeneAssociation {
@@ -52,14 +57,19 @@ fn test_validate_associations() {
             HashMap::new(),
             (),
         );
+        let output_sensor = GenomicOutputSensor::new(
+            vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())],
+            None,
+            (),
+        );
         let mut genome: NoOpGenome = Genome::new(
             input_sensor,
-            vec![Some(gene_substrate.clone()), Some(gene_substrate.clone())],
+            output_sensor,
             vec![gene],
         );
         genome.validate_associations();
         assert_eq!(genome.input.input_substrates(), &vec!(Some(gene_substrate.clone()), None));
-        assert_eq!(genome.output, vec!(Some(gene_substrate.clone()), None));
+        assert_eq!(genome.output.output_substrates(), &vec!(Some(gene_substrate.clone()), None));
     }
 }
 
@@ -69,7 +79,8 @@ fn test_has_substrate() {
     {
         let gene: NoOpGene = Gene::new(vec![()]);
         let input_sensor = GenomicInputSensor::new(Vec::new(), HashMap::new(), ());
-        let genome: NoOpGenome = Genome::new(input_sensor, Vec::new(), vec![gene]);
+        let output_sensor = GenomicOutputSensor::new(Vec::new(), None, ());
+        let genome: NoOpGenome = Genome::new(input_sensor, output_sensor, vec![gene]);
         let positive = GeneSubstrate {
             gene: 0,
             substrate: 0,

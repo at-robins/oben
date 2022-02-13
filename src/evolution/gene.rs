@@ -5,8 +5,7 @@ extern crate rmp_serde;
 extern crate serde;
 
 pub use sensor::GenomicInputSensor;
-
-use self::sensor::GenomicOutputSensor;
+pub use sensor::GenomicOutputSensor;
 
 use super::chemistry::{Information, Input, Output, Reaction, State};
 use super::helper::{a_or_b, do_a_or_b};

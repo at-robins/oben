@@ -1,8 +1,8 @@
 use crate::evolution::{
-    gene::{Gene, GeneSubstrate, GenomicInputSensor},
+    gene::{Gene, GeneSubstrate, GenomicInputSensor, GenomicOutputSensor},
     helper::{
-        noop::NoOpInputElement,
-        testing::{TestGenome, TestInformation, TestInput, TestReaction, TestState},
+        noop::{NoOpInputElement, NoOpOutputElement},
+        testing::{TestGenome, TestInformation, TestInput, TestReaction, TestState, TestOutput},
     },
 };
 
@@ -16,7 +16,7 @@ fn test_mutation_new() {
     assert_ulps_eq!(chance, mutation.mutation_chance().value());
     let unmutated_genome: TestGenome = Genome::new(
         GenomicInputSensor::default(),
-        Vec::new(),
+        GenomicOutputSensor::default(),
         vec![Gene::new(vec![TestInformation { value: 0 }])],
     );
     assert_eq!(mutation.mutate(&unmutated_genome), Some(unmutated_genome));
@@ -46,12 +46,12 @@ fn test_mutation_mutate() {
     });
     let unmutated_genome: TestGenome = Genome::new(
         GenomicInputSensor::default(),
-        Vec::new(),
+        GenomicOutputSensor::default(),
         vec![Gene::new(vec![TestInformation { value: 0 }])],
     );
     let expected_mutated_genome: TestGenome = Genome::new(
         GenomicInputSensor::default(),
-        Vec::new(),
+        GenomicOutputSensor::default(),
         vec![Gene::new(vec![TestInformation { value: 5 }])],
     );
     let mutated_genome = mutation.mutate(&unmutated_genome);
@@ -89,10 +89,12 @@ fn test_mutation_compendium_new() {
         TestInformation,
         NoOpInputElement,
         TestInput,
+        NoOpOutputElement,
+        TestOutput,
     > = MutationCompendium::new();
     let unmutated_genome: TestGenome = Genome::new(
         GenomicInputSensor::default(),
-        Vec::new(),
+        GenomicOutputSensor::default(),
         vec![Gene::new(vec![TestInformation { value: 0 }])],
     );
     assert_eq!(compendium.size(), 0);
@@ -108,6 +110,8 @@ fn test_mutation_compendium_add() {
         TestInformation,
         NoOpInputElement,
         TestInput,
+        NoOpOutputElement,
+        TestOutput,
     > = MutationCompendium::new();
     assert_eq!(compendium.size(), 0);
     compendium.add(Mutation::new(0.2, |genome: &TestGenome| Some(genome.duplicate())));
@@ -127,13 +131,15 @@ fn test_mutation_compendium_mutate() {
             TestInformation,
             NoOpInputElement,
             TestInput,
+            NoOpOutputElement,
+            TestOutput,
         > = vec![Mutation::new(0.0, |genome: &TestGenome| {
             Some(genome.duplicate())
         })]
         .into();
         let unmutated_genome: TestGenome = Genome::new(
             GenomicInputSensor::default(),
-            Vec::new(),
+            GenomicOutputSensor::default(),
             vec![Gene::new(vec![TestInformation { value: 0 }])],
         );
         assert_eq!(compendium.size(), 1);
@@ -157,15 +163,17 @@ fn test_mutation_compendium_mutate() {
             TestInformation,
             NoOpInputElement,
             TestInput,
+            NoOpOutputElement,
+            TestOutput,
         > = vec![mutation].into();
         let unmutated_genome: TestGenome = Genome::new(
             GenomicInputSensor::default(),
-            Vec::new(),
+            GenomicOutputSensor::default(),
             vec![Gene::new(vec![TestInformation { value: 0 }])],
         );
         let expected_mutated_genome: TestGenome = Genome::new(
             GenomicInputSensor::default(),
-            Vec::new(),
+            GenomicOutputSensor::default(),
             vec![Gene::new(vec![TestInformation {
                 value: MAX_MUTATION_EVENTS,
             }])],
@@ -217,10 +225,12 @@ fn test_mutation_compendium_mutate() {
             TestInformation,
             NoOpInputElement,
             TestInput,
+            NoOpOutputElement,
+            TestOutput,
         > = vec![mutation_a, mutation_b, mutation_c].into();
         let unmutated_genome: TestGenome = Genome::new(
             GenomicInputSensor::default(),
-            Vec::new(),
+            GenomicOutputSensor::default(),
             vec![Gene::new(vec![TestInformation { value: 0 }])],
         );
         assert_eq!(compendium.size(), 3);

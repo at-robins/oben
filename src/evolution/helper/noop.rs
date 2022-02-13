@@ -4,7 +4,7 @@ extern crate serde;
 
 use std::collections::HashMap;
 
-use crate::evolution::chemistry::Input;
+use crate::evolution::chemistry::{Input, Output};
 use crate::evolution::gene::Gene;
 
 use super::super::chemistry::{Information, Reaction, State};
@@ -14,8 +14,15 @@ use super::super::helper::Iteration;
 /// A type alias for the representation of an empty
 /// [`Genome`](crate::evolution::gene::Genome)
 /// without any function.
-pub type NoOpGenome =
-    Genome<NoOpReaction, NoOpState, NoOpSubstrate, NoOpInputElement, NoOpInputSensor, NoOpOutputElement, NoOpOutputSensor>;
+pub type NoOpGenome = Genome<
+    NoOpReaction,
+    NoOpState,
+    NoOpSubstrate,
+    NoOpInputElement,
+    NoOpInputSensor,
+    NoOpOutputElement,
+    NoOpOutputSensor,
+>;
 
 /// A type alias for the representation of an empty
 /// [`Gene`](crate::evolution::gene::Gene)
@@ -111,6 +118,20 @@ impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
         _changes: HashMap<usize, ()>,
     ) -> std::option::Option<Vec<()>> {
         None
+    }
+
+    fn random() -> Self {
+        ()
+    }
+}
+
+impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
+    fn get_output(&self, _information: Vec<Option<NoOpSubstrate>>) -> NoOpOutputElement {
+        ()
+    }
+
+    fn is_finished(&self, _information: NoOpSubstrate) -> bool {
+        false
     }
 
     fn random() -> Self {
