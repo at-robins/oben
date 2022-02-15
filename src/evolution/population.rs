@@ -198,7 +198,7 @@ impl<
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn get_result(&self) -> OutputElementType {
-        self.output.get_output(self.time_alive())
+        self.output.output_as_element(self.time_alive())
     }
 
     /// Returns the time the `Organism` is alive.

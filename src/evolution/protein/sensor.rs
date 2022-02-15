@@ -187,13 +187,25 @@ impl<
         }
     }
 
+    /// Returns the underlying [`Output`] implementation.
+    pub fn output(&self) -> &OutputSensorType {
+        &self.output
+    }
+
     /// Returns the output at the specified timepoint.
     /// 
     /// # Parameters
     ///
     /// * `time` - the time of the conversion
-    pub fn get_output(&self, time: Iteration) -> OutputElementType {
+    pub fn output_as_element(&self, time: Iteration) -> OutputElementType {
         self.output.get_output(substrates_as_information(&self.output_substrates, time))
+    }
+
+    /// Returns the output substrates.
+    pub fn output_substrates(
+        &self,
+    ) -> &Vec<Option<Weak<RefCell<Substrate<ReactionType, StateType, InformationType>>>>> {
+        &self.output_substrates
     }
 
     /// Checks if the output signals being finished with the evalutation of the network.
@@ -250,3 +262,4 @@ fn substrate_reference_to_information<
 
 #[cfg(test)]
 mod test_input;
+mod test_output;
