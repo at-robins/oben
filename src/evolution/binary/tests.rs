@@ -99,4 +99,14 @@ fn test_u64_as_binary() {
     assert_eq!(test_u64, as_u64(&test_substrate));
 }
 
+#[test]
+/// Tests if the function `flip_random_bit` correctly mutates a single bit.
+fn test_flip_random_bit() {
+    let test_u64: u64 = thread_rng().gen();
+    let original = u64_to_binary(test_u64);
+    let mutated = flip_random_bit(&original);
+    let difference = mutated ^ original;
+    assert_eq!(difference.count_ones(), 1);
+}
+
 mod test_binary_substrate;

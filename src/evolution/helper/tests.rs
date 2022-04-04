@@ -488,3 +488,13 @@ fn test_nlbf64_min() {
 fn test_nlbf64_max() {
     assert_ulps_eq!(Nlbf64::MAX.value(), 1.0);
 }
+
+#[test]
+/// Tests if the function `flip_random_bit` correctly mutates a single bit.
+fn test_nlbf64_flip_random_bit() {
+    let original_value = 49495049;
+    let original = Nlbf64 {value: original_value};
+    let mutated = Nlbf64::flip_random_bit(original);
+    let difference = u64_to_binary(mutated.value ^ original.value);
+    assert_eq!(difference.count_ones(), 1);
+}

@@ -3,6 +3,7 @@
 extern crate bitvec;
 
 pub use binary_chemistry::{BinaryReaction, BinaryState};
+use rand::{thread_rng, Rng};
 //pub use binary_mutation::BinaryMutation;
 
 use super::chemistry::Information;
@@ -91,6 +92,24 @@ pub fn as_u64(substrate: &BinarySubstrate) -> u64 {
 /// * `value` - the number to convert to its binary representation.
 pub fn u64_to_binary(value: u64) -> BinarySubstrate {
     BitBox::from_boxed_slice(Box::new(value.to_be_bytes()))
+}
+
+/// Returns a copy of the [`BinarySubstrate`] with a random bit flipped.
+///
+/// # Parameters
+///
+/// * `base` - the substrate to mutate
+pub fn flip_random_bit(base: &BinarySubstrate) -> BinarySubstrate {
+    let mut binary_base = base.clone();
+    if binary_base.len() > 0 {
+        let random_bit_index = thread_rng().gen_range(0..binary_base.len());
+        // The unwrap should always work, since the index being in range was checked for.
+        // The clone should be cheap as a bool primitive is cloned.
+        let random_bit = *binary_base.get(random_bit_index).unwrap();
+        // Flip the bit.
+        binary_base.set(random_bit_index, random_bit ^ true);
+    }
+    binary_base
 }
 
 impl CrossOver for BinarySubstrate {

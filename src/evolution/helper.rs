@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::{
-    binary::{as_u64, u64_to_binary},
+    binary::{as_u64, flip_random_bit, u64_to_binary},
     gene::CrossOver,
 };
 
@@ -256,6 +256,18 @@ impl Nlbf64 {
             1.0
         } else {
             (self.value as f64) / (u64::MAX as f64)
+        }
+    }
+
+    /// Flips a random bit of the [`Nlbf64`] and returns the result.
+    ///
+    /// # Parameters
+    ///
+    /// * `base` - the number to mutate
+    pub fn flip_random_bit(base: Self) -> Self {
+        let binary_base = u64_to_binary(base.value);
+        Self {
+            value: as_u64(&flip_random_bit(&binary_base)),
         }
     }
 }

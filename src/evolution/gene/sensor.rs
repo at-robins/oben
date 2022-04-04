@@ -757,4 +757,5 @@ fn adjust_substrate(
 
 #[cfg(test)]
 mod test_input;
+#[cfg(test)]
 mod test_output;

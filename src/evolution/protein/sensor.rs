@@ -262,4 +262,5 @@ fn substrate_reference_to_information<
 
 #[cfg(test)]
 mod test_input;
+#[cfg(test)]
 mod test_output;
