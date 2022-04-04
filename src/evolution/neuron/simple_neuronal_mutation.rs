@@ -326,5 +326,81 @@ pub fn mutate_dendrite_target<
         })
 }
 
+pub fn add_neuron<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let gene = mutated_genome.get_random_gene();
+    if mutated_genome
+        .get_gene_mut(gene)
+        .add_substrate(SimpleNeuron::random())
+        .is_some()
+    {
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
+pub fn remove_neuron<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let gene = mutated_genome.get_random_gene();
+    let random_gene = mutated_genome.get_gene_mut(gene);
+    if random_gene.number_of_substrates().get() > 1 {
+        random_gene.remove_substrate(random_gene.get_random_substrate());
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
 // #[cfg(test)]
 // mod tests;
