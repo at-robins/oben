@@ -71,7 +71,7 @@ fn test_cross_over() {
 #[test]
 /// Tests if the function `detect` correctly detects neuron states.
 fn test_detect() {
-    let neuron = SimpleNeuron::new(0.5);
+    let neuron = SimpleNeuron::new(0.5, 16.0);
     {
         // Test lower threshold.
         let dendrite = SimpleDendriteThreshold::new(0.4);

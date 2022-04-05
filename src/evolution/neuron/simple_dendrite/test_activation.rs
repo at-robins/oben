@@ -84,7 +84,7 @@ fn test_cross_over() {
 #[test]
 /// Tests if the function `react` correctly influences neurons when non inhibitory.
 fn test_react_non_inhibitory() {
-    let neuron = SimpleNeuron::new(0.5);
+    let neuron = SimpleNeuron::new(0.5, 16.0);
     {
         // No addition.
         let dendrite = SimpleDendriteActivationPotential::new(0.0, false);
@@ -120,7 +120,7 @@ fn test_react_non_inhibitory() {
 #[test]
 /// Tests if the function `react` correctly influences neurons when inhibitory.
 fn test_react_inhibitory() {
-    let neuron = SimpleNeuron::new(0.5);
+    let neuron = SimpleNeuron::new(0.5, 16.0);
     {
         // No subtraction.
         let dendrite = SimpleDendriteActivationPotential::new(0.0, true);

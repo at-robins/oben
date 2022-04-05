@@ -127,7 +127,10 @@ pub fn mutate_neuron_value<
     let mut mutated_genome = genome.duplicate();
     let neuron_position = mutated_genome.random_gene_substrate();
     let neuron = mutated_genome.get_substrate_mut(neuron_position).unwrap();
-    *neuron = SimpleNeuron::new(Nlbf64::flip_random_bit(neuron.base_potential()));
+    *neuron = SimpleNeuron::new(
+        Nlbf64::flip_random_bit(neuron.base_potential()),
+        neuron.potential_halflife_time(),
+    );
     Some(mutated_genome)
 }
 
