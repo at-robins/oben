@@ -83,6 +83,23 @@ impl<
         &self.input_substrates
     }
 
+    /// Returns the number of input [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
+    pub fn number_of_input_substrates(&self) -> usize {
+        self.input_substrates.len()
+    }
+
+    /// Sets the input [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
+    /// and returns the old value if any.
+    /// 
+    /// # Panics
+    /// 
+    /// If the specified index is out of bounds.
+    pub fn set_input_substrate(&mut self, index: usize, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+        let old_substrate = self.input_substrates[index];
+        self.input_substrates[index] = substrate;
+        old_substrate
+    }
+
     /// Returns the feedback [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
     pub fn feedback_substrates(&self) -> &HashMap<usize, GeneSubstrate> {
         &self.feedback_substrates
@@ -373,6 +390,23 @@ impl<
     /// Returns the output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
     pub fn output_substrates(&self) -> &Vec<Option<GeneSubstrate>> {
         &self.output_substrates
+    }
+
+    /// Returns the number of output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
+    pub fn number_of_output_substrates(&self) -> usize {
+        self.output_substrates.len()
+    }
+
+    /// Sets the output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
+    /// and returns the old value if any.
+    /// 
+    /// # Panics
+    /// 
+    /// If the specified index is out of bounds.
+    pub fn set_output_substrate(&mut self, index: usize, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+        let old_substrate = self.output_substrates[index];
+        self.output_substrates[index] = substrate;
+        old_substrate
     }
 
     /// Returns the [`Substrate`](crate::evolution::protein::Substrate) signaling the termination of the network

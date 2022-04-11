@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 
 use crate::evolution::chemistry::{Input, Output};
-use crate::evolution::gene::{CrossOver, Genome};
+use crate::evolution::gene::{CrossOver, GeneSubstrate, Genome};
 use crate::evolution::helper::Nlbf64;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -358,8 +358,7 @@ pub fn add_neuron<
     let mut mutated_genome = genome.duplicate();
     let gene = mutated_genome.get_random_gene();
     if mutated_genome
-        .get_gene_mut(gene)
-        .add_substrate(SimpleNeuron::random())
+        .add_substrate_to_gene(gene, SimpleNeuron::random())
         .is_some()
     {
         Some(mutated_genome)
@@ -396,9 +395,10 @@ pub fn remove_neuron<
 > {
     let mut mutated_genome = genome.duplicate();
     let gene = mutated_genome.get_random_gene();
-    let random_gene = mutated_genome.get_gene_mut(gene);
-    if random_gene.number_of_substrates().get() > 1 {
-        random_gene.remove_substrate(random_gene.get_random_substrate());
+    let substrates_in_gene = mutated_genome.get_gene(gene).number_of_substrates().get();
+    let substrate = mutated_genome.get_gene(gene).get_random_substrate();
+    if substrates_in_gene > 1 {
+        mutated_genome.remove_substrate(GeneSubstrate::new(gene, substrate));
         Some(mutated_genome)
     } else {
         None
