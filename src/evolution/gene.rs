@@ -509,7 +509,7 @@ impl<
         self.associations.remove(association)
     }
 
-    /// Adjust the [`GeneAssociation`] references after the binary [`Substrate`] of a contained
+    /// Adjust the [`GeneAssociation`] references after the [`Substrate`] of a contained
     /// [`Gene`] was removed.
     ///
     /// # Parameters

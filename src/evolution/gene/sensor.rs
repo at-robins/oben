@@ -400,12 +400,28 @@ impl<
     /// Sets the output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
     /// and returns the old value if any.
     /// 
+    /// # Parameters
+    /// * `index` - the index at which the new substrate should be set
+    /// * `substrate` - the new substrate to set
+    /// 
     /// # Panics
     /// 
     /// If the specified index is out of bounds.
     pub fn set_output_substrate(&mut self, index: usize, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
         let old_substrate = self.output_substrates[index];
         self.output_substrates[index] = substrate;
+        old_substrate
+    }
+
+    /// Sets the finish [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
+    /// and returns the old value if any.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `substrate` - the finish substrate to set
+    pub fn set_finish_substrate(&mut self, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+        let old_substrate = self.finish_substrate;
+        self.finish_substrate = substrate;
         old_substrate
     }
 

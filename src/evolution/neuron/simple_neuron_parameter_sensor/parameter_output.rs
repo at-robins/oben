@@ -113,3 +113,33 @@ pub fn mutation_disociate_output<
         None
     }
 }
+
+pub fn mutation_associate_finish_substrate<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        Vec<Nlbf64>,
+        SimpleNeuronParameterOutputSensor,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        Vec<Nlbf64>,
+        SimpleNeuronParameterOutputSensor,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let new_finish_substrate = Some(mutated_genome.random_gene_substrate());
+    mutated_genome.output_mut().set_finish_substrate(new_finish_substrate);
+    Some(mutated_genome)
+}
