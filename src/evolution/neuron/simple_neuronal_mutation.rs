@@ -43,7 +43,7 @@ pub fn add_dendrite<
     let source_neuron = mutated_genome.get_gene(gene).get_random_substrate();
     let target_neuron = mutated_genome.get_gene(gene).get_random_substrate();
     let dendrite_activation = GenomicCatalyticCentre::new(
-        vec![source_neuron, target_neuron],
+        vec![source_neuron],
         vec![target_neuron],
         SimpleDendriteActivationPotential::random(),
     );
@@ -320,7 +320,6 @@ pub fn mutate_dendrite_target<
                     .educts()
                     .get(0)
                     .expect("A dendrite must have a source and a target."),
-                target_neuron,
             ];
             let products = vec![target_neuron];
             let activation = dendrit.reaction().clone();

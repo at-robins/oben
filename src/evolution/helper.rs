@@ -211,8 +211,21 @@ impl ScalingFactor {
     /// # Parameters
     ///
     /// * `base` - the base to scale by
-    pub fn new(base: f64) -> ScalingFactor {
-        ScalingFactor { factor: 0, base }
+    pub fn new(base: f64) -> Self {
+        Self { factor: 0, base }
+    }
+
+    /// Creates a new `ScalingFactor` with the specified base value and exponent.
+    ///
+    /// # Parameters
+    ///
+    /// * `base` - the base to scale by
+    /// * `exponent` - the exponent to initialise scaling with
+    pub fn new_with_exponent(base: f64, exponent: i32) -> Self {
+        Self {
+            factor: exponent,
+            base,
+        }
     }
 
     /// Returns the scaling exponent.
