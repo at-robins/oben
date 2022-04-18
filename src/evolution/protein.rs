@@ -418,7 +418,7 @@ impl<
             .collect()
     }
 
-    /// Returns the finish substrate value if the finish output substrate is 
+    /// Returns the finish substrate value if the finish output substrate is
     /// altered by this catalytic centre.
     ///
     /// # Parameters

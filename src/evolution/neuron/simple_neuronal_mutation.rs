@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 
+use crate::evolution::binary::{flip_random_bit, as_f64, f64_to_binary};
 use crate::evolution::chemistry::{Input, Output};
 use crate::evolution::gene::{CrossOver, GeneSubstrate, Genome};
 use crate::evolution::helper::Nlbf64;
@@ -130,6 +131,43 @@ pub fn mutate_neuron_value<
     *neuron = SimpleNeuron::new(
         Nlbf64::flip_random_bit(neuron.base_potential()),
         neuron.potential_halflife_time(),
+    );
+    Some(mutated_genome)
+}
+
+pub fn mutate_neuron_potential_halflife_time<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let neuron_position = mutated_genome.random_gene_substrate();
+    let neuron = mutated_genome.get_substrate_mut(neuron_position).unwrap();
+    let mutated_halflife_time = as_f64(&flip_random_bit(&f64_to_binary(neuron.potential_halflife_time())));
+    *neuron = SimpleNeuron::new(
+        neuron.base_potential(),
+        mutated_halflife_time,
     );
     Some(mutated_genome)
 }
