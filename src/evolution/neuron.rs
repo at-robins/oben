@@ -11,9 +11,9 @@ pub use simple_neuron_parameter_sensor::parameter_output::{
 };
 pub use simple_neuron_parameter_sensor::random_genome;
 pub use simple_neuronal_mutation::{
-    add_dendrite, add_neuron, mutate_dendrite_inhibitory_state, mutate_dendrite_target,
-    mutate_dendrite_threshold, mutate_dendrite_weight, mutate_neuron_potential_halflife_time,
-    mutate_neuron_value, remove_dendrite, remove_neuron,
+    add_dendrite, add_neuron, mutate_dendrite_inhibitory_state, mutate_dendrite_source,
+    mutate_dendrite_target, mutate_dendrite_threshold, mutate_dendrite_weight,
+    mutate_neuron_potential_halflife_time, mutate_neuron_value, remove_dendrite, remove_neuron,
 };
 
 mod simple_dendrite;

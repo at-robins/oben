@@ -357,9 +357,63 @@ pub fn mutate_dendrite_target<
                 *dendrit
                     .educts()
                     .get(0)
-                    .expect("A dendrite must have a source and a target."),
+                    .expect("A dendrite must have a source."),
             ];
             let products = vec![target_neuron];
+            let activation = dendrit.reaction().clone();
+            *dendrit = GenomicCatalyticCentre::new(educts, products, activation);
+            Some(mutated_genome)
+        })
+}
+
+pub fn mutate_dendrite_source<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let neuron_position = mutated_genome.random_gene_substrate();
+    let source_neuron = mutated_genome
+        .get_gene(neuron_position.gene())
+        .get_random_substrate();
+    mutated_genome
+        .get_gene(neuron_position.gene())
+        .get_random_receptor()
+        .and_then(|dendrit_index| {
+            let dendrit = mutated_genome
+                .get_gene_mut(neuron_position.gene())
+                .receptor_mut(dendrit_index)
+                .unwrap()
+                .enzyme_mut();
+
+            let products = vec![
+                *dendrit
+                    .products()
+                    .get(0)
+                    .expect("A dendrite must have a target."),
+            ];
+            let educts = vec![source_neuron];
             let activation = dendrit.reaction().clone();
             *dendrit = GenomicCatalyticCentre::new(educts, products, activation);
             Some(mutated_genome)
