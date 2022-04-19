@@ -910,7 +910,9 @@ impl<
         ind.associated_outputs()
     }
 
-    /// Returns the copy of a [`Genome`] of a random [`Individual`].
+    /// Returns the copy of a [`Genome`] of a random [`Individual`]
+    /// where the chances for picking an individual correspond to its
+    /// respective fitness.
     ///
     /// # Panics
     ///
@@ -923,7 +925,7 @@ impl<
     ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType, OutputElementType, OutputSensorType> {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
-            .random_genome()
+            .random_genome_fitness_based()
             // Unwrapping is safe here since we cannot call this function on empty populations.
             .unwrap()
             .duplicate()

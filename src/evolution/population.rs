@@ -1127,6 +1127,83 @@ impl<
         }
     }
 
+    /// Returns a random [`Genome`] of a random [`Individual`] if there are any.
+    /// The chance of selecting an individual is based on its respective fitness.
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the individual's lock.
+    ///
+    /// [`Individual`]: ./struct.Individual.html
+    /// [`Genome`]: ../gene/struct.Genome.html
+    pub fn random_genome_fitness_based(
+        &self,
+    ) -> Option<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
+    > {
+        if self.individuals.len() == 0 {
+            None
+        } else {
+            let individuals: Vec<
+                Arc<
+                    Mutex<
+                        Individual<
+                            ReactionType,
+                            StateType,
+                            InformationType,
+                            InputElementType,
+                            InputSensorType,
+                            OutputElementType,
+                            OutputSensorType,
+                        >,
+                    >,
+                >,
+            > = self
+                .individuals
+                .values()
+                .map(|arc| Arc::clone(arc))
+                .collect();
+            let fitness_values: Vec<f64> = individuals
+                .iter()
+                .map(|ind| {
+                    ind.lock()
+                        .expect("A thread paniced while holding the individual's lock.")
+                        .fitness()
+                        .unwrap_or(0.0f64)
+                })
+                .collect();
+            let random_fitness_sum: f64 = thread_rng().gen_range(0.0..=fitness_values.iter().sum());
+            let mut random_population_index: usize = 0;
+            let mut fitness_sum: f64 = 0.0;
+            for fitness in fitness_values {
+                fitness_sum += fitness;
+                if random_fitness_sum <= fitness_sum {
+                    break;
+                } else {
+                    random_population_index += 1;
+                }
+            }
+
+            individuals.get(random_population_index).and_then(|value| {
+                Some(
+                    value
+                        .lock()
+                        .expect("A thread paniced while holding the individual's lock.")
+                        .genome()
+                        .duplicate(),
+                )
+            })
+        }
+    }
+
     /// Returns a random [`Individual`] if there is any.
     ///
     /// # Panics
