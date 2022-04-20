@@ -1239,6 +1239,71 @@ impl<
         }
     }
 
+    /// Returns the fittest [`Individual`] of the population that has a minimum age as specified.
+    /// If the population is empty or no [`Individual`] meets the age criterium, `None` is returned.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `minimum_age` - the minimum age to take the [`Individual`] into account
+    pub fn fittest_individual(
+        &self,
+        minimum_age: u32,
+    ) -> Option<
+        Arc<
+            Mutex<
+                Individual<
+                    ReactionType,
+                    StateType,
+                    InformationType,
+                    InputElementType,
+                    InputSensorType,
+                    OutputElementType,
+                    OutputSensorType,
+                >,
+            >,
+        >,
+    > {
+        let individuals_of_age: Vec<
+            Arc<
+                Mutex<
+                    Individual<
+                        ReactionType,
+                        StateType,
+                        InformationType,
+                        InputElementType,
+                        InputSensorType,
+                        OutputElementType,
+                        OutputSensorType,
+                    >,
+                >,
+            >,
+        > = self
+            .individuals
+            .values()
+            .filter(|ind| {
+                ind.lock()
+                    .expect("A thread paniced while holding the individual's lock.")
+                    .age()
+                    >= minimum_age
+            })
+            .map(|arc| Arc::clone(arc))
+            .collect();
+        let mut fittest_individual = None;
+        let mut max_fitness: f64 = 0.0;
+        for individual in individuals_of_age.into_iter() {
+            let current_fitness: f64 = individual
+                .lock()
+                .expect("A thread paniced while holding the individual's lock.")
+                .fitness()
+                .unwrap_or(0.0);
+            if fittest_individual.is_none() || current_fitness > max_fitness {
+                max_fitness = current_fitness;
+                fittest_individual = Some(individual);
+            }
+        }
+        fittest_individual
+    }
+
     /// Remove the [`Individual`] from the `Population`.
     /// An error will be returned if there is no [`Individual`] with the specified UUID or
     /// if the correspondig [`Genome`] file could not be moved to the extinct sub-folder.
