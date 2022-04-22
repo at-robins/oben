@@ -45,7 +45,7 @@ impl CrossOver for SimpleNeuronParameterInputSensor {
 }
 
 pub fn mutation_associate_input<
-    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -83,7 +83,7 @@ pub fn mutation_associate_input<
 }
 
 pub fn mutation_disociate_input<
-    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -109,10 +109,9 @@ pub fn mutation_disociate_input<
     let mut mutated_genome = genome.duplicate();
     let number_of_input_substrates = mutated_genome.input().number_of_input_substrates();
     if number_of_input_substrates > 0 {
-        mutated_genome.input_mut().set_input_substrate(
-            thread_rng().gen_range(0..number_of_input_substrates),
-            None,
-        );
+        mutated_genome
+            .input_mut()
+            .set_input_substrate(thread_rng().gen_range(0..number_of_input_substrates), None);
         Some(mutated_genome)
     } else {
         None

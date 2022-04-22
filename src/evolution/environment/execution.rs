@@ -1,7 +1,6 @@
 //! The `execution` module contains the executive setup of the evolutionary network.
 
 use crate::evolution::chemistry::{Input, Output};
-use crate::evolution::gene::CrossOver;
 use crate::evolution::helper::ScalingFactor;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
@@ -56,7 +55,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
@@ -65,7 +63,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
@@ -553,7 +550,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
@@ -562,7 +558,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,

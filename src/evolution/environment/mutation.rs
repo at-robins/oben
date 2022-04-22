@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::evolution::{
     chemistry::{Information, Input, Output, Reaction, State},
-    gene::{CrossOver, Genome},
+    gene::Genome,
     helper::Nlbf64,
 };
 
@@ -43,23 +43,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + CrossOver
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + CrossOver
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     MutationCompendium<
@@ -315,23 +301,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + CrossOver
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + CrossOver
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     Mutation<

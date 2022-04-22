@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::evolution::{
     chemistry::{Information, Input, Reaction, State, Output},
-    gene::CrossOver, helper::Iteration,
+    helper::Iteration,
 };
 
 use super::{substrate_reference_to_receptors, Receptor, Substrate};
@@ -36,7 +36,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
@@ -160,7 +159,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,

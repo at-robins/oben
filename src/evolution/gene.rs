@@ -72,7 +72,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
@@ -81,7 +80,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
@@ -673,7 +671,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType> + Default,
@@ -682,7 +679,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType> + Default,
@@ -723,7 +719,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
@@ -732,7 +727,6 @@ impl<
             + PartialEq
             + Send
             + Sync
-            + CrossOver
             + Serialize
             + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,

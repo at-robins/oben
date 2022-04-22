@@ -2,9 +2,9 @@
 
 use std::fmt::Debug;
 
-use crate::evolution::binary::{flip_random_bit, as_f64, f64_to_binary};
+use crate::evolution::binary::{as_f64, f64_to_binary, flip_random_bit};
 use crate::evolution::chemistry::{Input, Output};
-use crate::evolution::gene::{CrossOver, GeneSubstrate, Genome};
+use crate::evolution::gene::{GeneSubstrate, Genome};
 use crate::evolution::helper::Nlbf64;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -14,9 +14,9 @@ use super::super::gene::{GenomicCatalyticCentre, GenomicReceptor};
 use super::{SimpleDendriteActivationPotential, SimpleDendriteThreshold, SimpleNeuron};
 
 pub fn add_dendrite<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -61,9 +61,9 @@ pub fn add_dendrite<
 }
 
 pub fn remove_dendrite<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -100,9 +100,9 @@ pub fn remove_dendrite<
 }
 
 pub fn mutate_neuron_value<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -136,9 +136,9 @@ pub fn mutate_neuron_value<
 }
 
 pub fn mutate_neuron_potential_halflife_time<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -164,18 +164,16 @@ pub fn mutate_neuron_potential_halflife_time<
     let mut mutated_genome = genome.duplicate();
     let neuron_position = mutated_genome.random_gene_substrate();
     let neuron = mutated_genome.get_substrate_mut(neuron_position).unwrap();
-    let mutated_halflife_time = as_f64(&flip_random_bit(&f64_to_binary(neuron.potential_halflife_time())));
-    *neuron = SimpleNeuron::new(
-        neuron.base_potential(),
-        mutated_halflife_time,
-    );
+    let mutated_halflife_time =
+        as_f64(&flip_random_bit(&f64_to_binary(neuron.potential_halflife_time())));
+    *neuron = SimpleNeuron::new(neuron.base_potential(), mutated_halflife_time);
     Some(mutated_genome)
 }
 
 pub fn mutate_dendrite_threshold<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -217,9 +215,9 @@ pub fn mutate_dendrite_threshold<
 }
 
 pub fn mutate_dendrite_weight<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -265,9 +263,9 @@ pub fn mutate_dendrite_weight<
 }
 
 pub fn mutate_dendrite_inhibitory_state<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -313,9 +311,9 @@ pub fn mutate_dendrite_inhibitory_state<
 }
 
 pub fn mutate_dendrite_target<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -353,12 +351,10 @@ pub fn mutate_dendrite_target<
                 .unwrap()
                 .enzyme_mut();
 
-            let educts = vec![
-                *dendrit
-                    .educts()
-                    .get(0)
-                    .expect("A dendrite must have a source."),
-            ];
+            let educts = vec![*dendrit
+                .educts()
+                .get(0)
+                .expect("A dendrite must have a source.")];
             let products = vec![target_neuron];
             let activation = dendrit.reaction().clone();
             *dendrit = GenomicCatalyticCentre::new(educts, products, activation);
@@ -367,9 +363,9 @@ pub fn mutate_dendrite_target<
 }
 
 pub fn mutate_dendrite_source<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -407,12 +403,10 @@ pub fn mutate_dendrite_source<
                 .unwrap()
                 .enzyme_mut();
 
-            let products = vec![
-                *dendrit
-                    .products()
-                    .get(0)
-                    .expect("A dendrite must have a target."),
-            ];
+            let products = vec![*dendrit
+                .products()
+                .get(0)
+                .expect("A dendrite must have a target.")];
             let educts = vec![source_neuron];
             let activation = dendrit.reaction().clone();
             *dendrit = GenomicCatalyticCentre::new(educts, products, activation);
@@ -421,9 +415,9 @@ pub fn mutate_dendrite_source<
 }
 
 pub fn add_neuron<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -459,9 +453,9 @@ pub fn add_neuron<
 }
 
 pub fn remove_neuron<
-    InputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
-    OutputElementType: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     OutputSensorType: Output<OutputElementType, SimpleNeuron>,
 >(
     genome: &Genome<

@@ -74,7 +74,7 @@ pub trait Reaction<T: Information>:
 /// An `Input` represents an element that can convert external stimuli to
 /// [`Substrate`](crate::evolution::protein::Substrate)s.
 pub trait Input<
-    InputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElement: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InformationType: Information,
 >: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
 {
@@ -108,7 +108,7 @@ pub trait Input<
 /// [`Substrate`](crate::evolution::protein::Substrate)s.
 /// to an external representation.
 pub trait Output<
-    OutputElement: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    OutputElement: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InformationType: Information,
 >: Clone + Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned
 {

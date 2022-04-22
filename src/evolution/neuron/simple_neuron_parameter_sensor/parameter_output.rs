@@ -41,7 +41,7 @@ impl CrossOver for SimpleNeuronParameterOutputSensor {
 }
 
 pub fn mutation_associate_output<
-    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -79,7 +79,7 @@ pub fn mutation_associate_output<
 }
 
 pub fn mutation_disociate_output<
-    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -115,7 +115,7 @@ pub fn mutation_disociate_output<
 }
 
 pub fn mutation_associate_finish_substrate<
-    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + CrossOver + Serialize + DeserializeOwned,
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
 >(
     genome: &Genome<
@@ -140,6 +140,8 @@ pub fn mutation_associate_finish_substrate<
 > {
     let mut mutated_genome = genome.duplicate();
     let new_finish_substrate = Some(mutated_genome.random_gene_substrate());
-    mutated_genome.output_mut().set_finish_substrate(new_finish_substrate);
+    mutated_genome
+        .output_mut()
+        .set_finish_substrate(new_finish_substrate);
     Some(mutated_genome)
 }
