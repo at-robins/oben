@@ -6,6 +6,7 @@ use crate::evolution::binary::{as_f64, f64_to_binary, flip_random_bit};
 use crate::evolution::chemistry::{Input, Output};
 use crate::evolution::gene::{GeneSubstrate, Genome};
 use crate::evolution::helper::Nlbf64;
+use rand::{thread_rng, Rng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -488,6 +489,196 @@ pub fn remove_neuron<
     } else {
         None
     }
+}
+
+pub fn mutate_associate_input<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let new_input_substrate = Some(mutated_genome.random_gene_substrate());
+    let number_of_input_substrates = mutated_genome.input().number_of_input_substrates();
+    if number_of_input_substrates > 0 {
+        mutated_genome.input_mut().set_input_substrate(
+            thread_rng().gen_range(0..number_of_input_substrates),
+            new_input_substrate,
+        );
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
+pub fn mutate_disociate_input<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let number_of_input_substrates = mutated_genome.input().number_of_input_substrates();
+    if number_of_input_substrates > 0 {
+        mutated_genome
+            .input_mut()
+            .set_input_substrate(thread_rng().gen_range(0..number_of_input_substrates), None);
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
+pub fn mutate_associate_output<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let new_output_substrate = Some(mutated_genome.random_gene_substrate());
+    let number_of_output_substrates = mutated_genome.output().number_of_output_substrates();
+    if number_of_output_substrates > 0 {
+        mutated_genome.output_mut().set_output_substrate(
+            thread_rng().gen_range(0..number_of_output_substrates),
+            new_output_substrate,
+        );
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
+pub fn mutation_disociate_output<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let number_of_output_substrates = mutated_genome.output().number_of_output_substrates();
+    if number_of_output_substrates > 0 {
+        mutated_genome
+            .output_mut()
+            .set_output_substrate(thread_rng().gen_range(0..number_of_output_substrates), None);
+        Some(mutated_genome)
+    } else {
+        None
+    }
+}
+
+pub fn mutation_associate_finish_substrate<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let new_finish_substrate = Some(mutated_genome.random_gene_substrate());
+    mutated_genome
+        .output_mut()
+        .set_finish_substrate(new_finish_substrate);
+    Some(mutated_genome)
 }
 
 // #[cfg(test)]
