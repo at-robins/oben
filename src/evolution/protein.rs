@@ -124,6 +124,23 @@ impl<
         }
     }
 
+    /// Returns the output feedback associations an the current value if of type [`SubstrateType::OutputFeedbackSubstrate`].
+    ///
+    /// # Parameters
+    ///
+    /// * time - the timepoint the substrate is accessed
+    pub fn get_output_feedback_associations(
+        &mut self,
+        time: Iteration,
+    ) -> Option<(Vec<usize>, InformationType)> {
+        match &self.substrate_type {
+            SubstrateType::OutputFeedbackSubstrate(feedback_indices) => {
+                Some((feedback_indices.clone(), self.value(time).clone()))
+            },
+            _ => None,
+        }
+    }
+
     /// Returns the the current value if of type [`SubstrateType::OutputFinishSubstrate`].
     ///
     /// # Parameters
@@ -146,6 +163,8 @@ pub enum SubstrateType {
     ConventionalSubstrate,
     /// A [`Substrate`] that is associated with feedback to an [`InputSensor`].
     InputFeedbackSubstrate(Vec<usize>),
+    /// A [`Substrate`] that is associated with feedback to an [`OutputSensor`].
+    OutputFeedbackSubstrate(Vec<usize>),
     /// A [`Substrate`] signalling that the current process is finsihed to the [`OutputSensor`].
     OutputFinishSubstrate,
 }
@@ -243,6 +262,7 @@ impl<
         CatalysisResult {
             cascading_receptors: self.enzyme.cascading_receptors(),
             input_feedback_associations: self.enzyme.input_feedback_associations(time_of_catalysis),
+            output_feedback_associations: self.enzyme.output_feedback_associations(time_of_catalysis),
             output_finish_substrate: self.enzyme.output_finish_substrate(time_of_catalysis),
         }
     }
@@ -255,6 +275,9 @@ pub struct CatalysisResult<ReactionType, StateType, InformationType> {
     pub cascading_receptors: Vec<Rc<Receptor<ReactionType, StateType, InformationType>>>,
     /// The input feedback associations affected by this catalysis.
     pub input_feedback_associations: Vec<(Vec<usize>, InformationType)>,
+    /// The input feedback associations affected by this catalysis.
+    pub output_feedback_associations: Vec<(Vec<usize>, InformationType)>,
+    /// The substrate indicating the network finished its task.
     pub output_finish_substrate: Option<InformationType>,
 }
 
@@ -412,6 +435,28 @@ impl<
                 (*product.upgrade().unwrap())
                     .borrow_mut()
                     .get_input_feedback_associations(time)
+            })
+            .filter(Option::is_some)
+            .map(Option::unwrap)
+            .collect()
+    }
+
+    /// Returns all output feedback associations and values.
+    ///
+    /// # Parameters
+    ///
+    /// * `time` - the timepoint at which the [`Substrate`] values are requested
+    /// as [`Iteration`](crate::evolution::helper::Iteration)
+    pub fn output_feedback_associations(
+        &self,
+        time: Iteration,
+    ) -> Vec<(Vec<usize>, InformationType)> {
+        self.products
+            .iter()
+            .map(|product| {
+                (*product.upgrade().unwrap())
+                    .borrow_mut()
+                    .get_output_feedback_associations(time)
             })
             .filter(Option::is_some)
             .map(Option::unwrap)

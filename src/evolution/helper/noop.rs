@@ -137,4 +137,11 @@ impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
     fn random() -> Self {
         ()
     }
+
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        _changes: HashMap<usize, NoOpSubstrate>,
+    ) -> Option<Vec<NoOpSubstrate>> {
+        None
+    }
 }

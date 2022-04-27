@@ -348,6 +348,7 @@ pub struct GenomicOutputSensor<
     phantom_information: PhantomData<InformationType>,
     phantom_output_element: PhantomData<OutputElementType>,
     output_substrates: Vec<Option<GeneSubstrate>>,
+    feedback_substrates: HashMap<usize, GeneSubstrate>,
     finish_substrate: Option<GeneSubstrate>,
     output: OutputSensorType,
 }
@@ -372,9 +373,12 @@ impl<
     /// # Parameters
     ///
     /// * `output_substrates` - the output substrates if associated
+    /// * `feedback_substrates` - the feedback substrates if associated
+    /// * `finish_substrate` - the substrate signalling the end of the network execution
     /// * `output` - the underlying output implementation
     pub fn new(
         output_substrates: Vec<Option<GeneSubstrate>>,
+        feedback_substrates: HashMap<usize, GeneSubstrate>,
         finish_substrate: Option<GeneSubstrate>,
         output: OutputSensorType,
     ) -> Self {
@@ -384,6 +388,7 @@ impl<
             phantom_information: PhantomData,
             phantom_output_element: PhantomData,
             output_substrates,
+            feedback_substrates,
             finish_substrate,
             output,
         }
@@ -417,6 +422,38 @@ impl<
         let old_substrate = self.output_substrates[index];
         self.output_substrates[index] = substrate;
         old_substrate
+    }
+
+    /// Adds a feedback substrate and returns the old substrate that was associated with the specified identifier if any.
+    ///
+    /// # Parameters
+    ///
+    /// * `feedback_identifier` - the feedback identifier that should be associated with the feedback substrate
+    /// * `feedback_substrate` - the feedback substrate that should be associated with the feedback identifier
+    pub fn add_feedback_substrate(
+        &mut self,
+        feedback_identifier: usize,
+        feedback_substrate: GeneSubstrate,
+    ) -> Option<GeneSubstrate> {
+        self.feedback_substrates
+            .insert(feedback_identifier, feedback_substrate)
+    }
+
+    /// Removes a feedback substrate and returns the old substrate that was associated with the specified identifier if any.
+    ///
+    /// # Parameters
+    ///
+    /// * `feedback_identifier` - the feedback identifier of the association that should be removed
+    pub fn remove_feedback_substrate(
+        &mut self,
+        feedback_identifier: usize,
+    ) -> Option<GeneSubstrate> {
+        self.feedback_substrates.remove(&feedback_identifier)
+    }
+
+    /// Returns the feedback [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
+    pub fn feedback_substrates(&self) -> &HashMap<usize, GeneSubstrate> {
+        &self.feedback_substrates
     }
 
     /// Sets the finish [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
@@ -465,6 +502,20 @@ impl<
     /// [`Substrate`]: ../protein/struct.Substrate.html
     pub fn adjust_after_gene_substrate_removal(&mut self, removed_substrate: GeneSubstrate) {
         adjust_substrates(&mut self.output_substrates, removed_substrate);
+        self.feedback_substrates = self
+            .feedback_substrates
+            .iter()
+            .map(|(association, substrate)| {
+                (association, adjust_substrate(Some(*substrate), removed_substrate))
+            })
+            .filter_map(|(association, substrate_option)| {
+                if let Some(substrate) = substrate_option {
+                    Some((*association, substrate))
+                } else {
+                    None
+                }
+            })
+            .collect();
         self.finish_substrate = adjust_substrate(self.finish_substrate, removed_substrate);
     }
 
@@ -478,6 +529,21 @@ impl<
     /// * `gene_index` - the index of the removed [`Gene`](crate::evolution::gene::Gene)
     pub fn adjust_after_gene_removal(&mut self, gene_index: usize) {
         adjust_after_gene_removal_from_substrates(&mut self.output_substrates, gene_index);
+        self.feedback_substrates = self
+            .feedback_substrates
+            .iter()
+            .filter_map(|(association, substrate)| {
+                if let Some(new_substrate) =
+                    adjust_single_substrate_after_gene_removal_from_substrates(
+                        *substrate, gene_index,
+                    )
+                {
+                    Some((*association, new_substrate))
+                } else {
+                    None
+                }
+            })
+            .collect();
         if let Some(finish_substrate) = self.finish_substrate {
             self.finish_substrate = adjust_single_substrate_after_gene_removal_from_substrates(
                 finish_substrate,
@@ -500,6 +566,8 @@ impl<
             &mut self.output_substrates,
             genes,
         );
+        self.feedback_substrates
+            .retain(|_, substrate| has_substrate(genes, substrate));
         if let Some(finish_substrate) = self.finish_substrate {
             if !has_substrate(genes, &finish_substrate) {
                 self.finish_substrate = None;
@@ -525,6 +593,18 @@ impl<
     ) -> OutputSensor<ReactionType, StateType, InformationType, OutputElementType, OutputSensorType>
     {
         let output_substrates = translate_substrates(&self.output_substrates, substrate_lookup);
+        // Transforms the output feedback associations into a form that is translatable.
+        let transformed_output_associations: HashMap<GeneSubstrate, Vec<usize>> = self
+            .feedback_substrates()
+            .iter()
+            .fold(HashMap::new(), |mut map, (association, substrate)| {
+                map.entry(*substrate)
+                    .or_insert(Vec::new())
+                    .push(*association);
+                map
+            });
+        // Sets the feedback associations.
+        set_output_substrate_type(transformed_output_associations, substrate_lookup);
         // Sets the finsih associations.
         if let Some(finish_substrate) = self.finish_substrate {
             substrate_lookup
@@ -563,6 +643,7 @@ impl<
             phantom_information: PhantomData,
             phantom_output_element: PhantomData,
             output_substrates: Vec::default(),
+            feedback_substrates: HashMap::new(),
             finish_substrate: None,
             output: OutputSensorType::default(),
         }
@@ -591,6 +672,22 @@ impl<
     fn cross_over(&self, other: &Self) -> Self {
         if self.is_similar(other) {
             let output_substrates = self.output_substrates.cross_over(&other.output_substrates);
+            let associations: HashSet<usize> = self
+                .feedback_substrates()
+                .keys()
+                .chain(other.feedback_substrates().keys())
+                .map(|association| *association)
+                .collect();
+            let feedback_substrates: HashMap<usize, GeneSubstrate> = associations
+                .into_iter()
+                .flat_map(|association| {
+                    a_or_b(
+                        self.feedback_substrates().get(&association),
+                        other.feedback_substrates().get(&association),
+                    )
+                    .map(|substrate| (association, *substrate))
+                })
+                .collect();
             let finish_substrate = a_or_b(self.finish_substrate, other.finish_substrate);
             let output = self.output.cross_over(&other.output);
             GenomicOutputSensor {
@@ -599,6 +696,7 @@ impl<
                 phantom_information: PhantomData,
                 phantom_output_element: PhantomData,
                 output_substrates,
+                feedback_substrates,
                 finish_substrate,
                 output,
             }
@@ -720,6 +818,38 @@ fn set_input_substrate_type<
         substrate
             .borrow_mut()
             .set_substrate_type(SubstrateType::InputFeedbackSubstrate(associations));
+    }
+}
+
+/// Sets the specified output associations for the substrate lookup map.
+///
+/// # Parameters
+///
+/// * `output_feedback_associations` - the [`Substrate`](crate::evolution::protein::Substrate)s associated with specific output feedback functions
+/// * `substrate_lookup` - a map for lookup of all the translated [`Substrate`](crate::evolution::protein::Substrate)s
+/// of the containing [`Genome`](crate::evolution::gene::Genome)
+///
+/// # Panics
+///
+/// If the `substrate_lookup` map does not contain one of the requested [`Substrate`](crate::evolution::protein::Substrate)s.
+fn set_output_substrate_type<
+    ReactionType: Reaction<InformationType>,
+    StateType: State<InformationType>,
+    InformationType: Information,
+>(
+    output_feedback_associations: HashMap<GeneSubstrate, Vec<usize>>,
+    substrate_lookup: &HashMap<
+        GeneSubstrate,
+        Rc<RefCell<Substrate<ReactionType, StateType, InformationType>>>,
+    >,
+) {
+    for (gene_substrate, associations) in output_feedback_associations.into_iter() {
+        let substrate = substrate_lookup
+            .get(&gene_substrate)
+            .expect(&format!("The substrate lookup map did not contain {:?}.", gene_substrate));
+        substrate
+            .borrow_mut()
+            .set_substrate_type(SubstrateType::OutputFeedbackSubstrate(associations));
     }
 }
 

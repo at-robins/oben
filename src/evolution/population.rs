@@ -140,6 +140,7 @@ impl<
         {
             let time = actions.current_iteration();
             let mut input_feedback_changes: HashMap<usize, InformationType> = HashMap::new();
+            let mut output_feedback_changes: HashMap<usize, InformationType> = HashMap::new();
             actions
                 .pop_actions()
                 .iter()
@@ -152,6 +153,12 @@ impl<
                             input_feedback_changes.insert(association, value.clone());
                         }
                     }
+                    // Fill the output feedback association map.
+                    for (associations, value) in result.output_feedback_associations.into_iter() {
+                        for association in associations {
+                            output_feedback_changes.insert(association, value.clone());
+                        }
+                    }
                     // Set the finished flag if necessary.
                     finished = finished || self.output.is_finished(result.output_finish_substrate);
                     // Return the receptors to be processed in the subsequent step.
@@ -160,8 +167,12 @@ impl<
                 .for_each(|cascading_receptor| {
                     actions.push_action(cascading_receptor);
                 });
-            // Update feedback substrates and add all receptors if changes to the input were detected.
+            // Update input feedback substrates and add all receptors if changes to the input were detected.
             for receptor in self.input.feedback_update(input_feedback_changes) {
+                actions.push_action(receptor);
+            }
+            // Update output feedback substrates and add all receptors if changes to the input were detected.
+            for receptor in self.output.feedback_update(output_feedback_changes) {
                 actions.push_action(receptor);
             }
         }

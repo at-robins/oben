@@ -83,6 +83,13 @@ impl Output<NoOpOutputElement, TestInformation> for TestOutput {
     fn random() -> Self {
         TestOutput {}
     }
+
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        _changes: HashMap<usize, TestInformation>,
+    ) -> Option<Vec<TestInformation>> {
+        None
+    }
 }
 
 impl CrossOver for TestOutput {

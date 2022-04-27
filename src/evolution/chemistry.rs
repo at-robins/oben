@@ -120,6 +120,19 @@ pub trait Output<
     /// * `information` - the [`Information`] representation of the output
     fn get_output(&self, information: Vec<Option<InformationType>>) -> OutputElement;
 
+    /// Handles changes in the feedback substrates and returns the internal corresponding [`Information`] representation
+    /// if any change occured.
+    ///
+    /// # Parameters
+    ///
+    /// *`changes` - the changed feedback
+    /// [`Substrate`](crate::evolution::protein::Substrate)
+    /// values if a change occurred
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        changes: HashMap<usize, InformationType>,
+    ) -> Option<Vec<InformationType>>;
+
     /// Checks if the network signaled that the result is ready.
     /// 
     /// # Parameters

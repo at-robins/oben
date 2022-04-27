@@ -76,6 +76,7 @@ pub fn random_genome(
         Some(GeneSubstrate::new(0, thread_rng().gen_range(0..number_of_substrates)));
     let output = GenomicOutputSensor::new(
         output_substrates,
+        HashMap::new(),
         finish_substrate,
         SimpleNeuronParameterOutputSensor {},
     );

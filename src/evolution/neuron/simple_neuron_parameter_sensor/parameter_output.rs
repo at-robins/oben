@@ -22,6 +22,13 @@ impl Output<Vec<Nlbf64>, SimpleNeuron> for SimpleNeuronParameterOutputSensor {
     fn is_finished(&self, information: SimpleNeuron) -> bool {
         information.current_potential() >= 0.9.into()
     }
+
+    fn handle_feedback_substrate_changes(
+        &mut self,
+        _changes: std::collections::HashMap<usize, SimpleNeuron>,
+    ) -> Option<Vec<SimpleNeuron>> {
+        None
+    }
 }
 
 impl CrossOver for SimpleNeuronParameterOutputSensor {

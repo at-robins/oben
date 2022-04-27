@@ -218,6 +218,61 @@ impl<
             false
         }
     }
+
+    /// Updates the output [´Substrate´]s based on the supplied information.
+    /// 
+    /// # Parameters
+    /// 
+    /// * ´output_representation´ - the internal information representation to update
+    /// 
+    /// # Panics
+    /// 
+    /// If the specified representation is not of the same length as the internal output substrate vector.
+    fn set_output_substrates(&mut self, output_representation: Vec<InformationType>) {
+        if output_representation.len() != self.output_substrates.len() {
+            panic!("{} output substrates were specified, but the output was transformed into {} substrates: {:?}", 
+                self.output_substrates.len(), 
+                output_representation.len(), 
+                output_representation
+        );
+        }
+        for (i, info) in output_representation.into_iter().enumerate() {
+            if let Some(substrate) = (&self.output_substrates[i]).as_ref() {
+                substrate.upgrade().unwrap().borrow_mut().set_value(info);
+            }
+        }
+    }
+
+    /// Checks all feedback [`Substrate`]s for changens and passes the changes on to the underlying output sensor representation.
+    /// Updates the output [`Substrate`]s if necessary and returns if changes were detected.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `changes` - the changed output [`Substrate`] values
+    pub fn feedback_update(&mut self, changes: HashMap<usize, InformationType>) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
+        if !changes.is_empty() {
+            if let Some(changed_input_substrates) = self.output.handle_feedback_substrate_changes(changes) {
+                self.set_output_substrates(changed_input_substrates);
+                return self.cascading_receptors();
+            }
+        }
+        Vec::new()
+    }
+
+    /// Returns all [`Receptor`]s affected by output changes.
+    pub fn cascading_receptors(
+        &self,
+    ) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
+        // This unwrap must succeed as the containing structure will always be dropped first
+        // and no substrate references are leaked.
+        self.output_substrates
+            .iter()
+            .filter(|i| i.is_some())
+            .map(|i| i.as_ref())
+            .map(|i| i.unwrap())
+            .flat_map(substrate_reference_to_receptors)
+            .collect()
+    }
 }
 
 /// Converts a vector of references to underlying [`Information`]s.
