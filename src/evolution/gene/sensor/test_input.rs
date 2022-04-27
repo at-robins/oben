@@ -53,6 +53,58 @@ fn test_number_of_associated_inputs() {
 }
 
 #[test]
+/// Tests if the function `add_feedback_substrate` correctly adds an input feedback substrate.
+fn test_add_feedback_substrate() {
+    let input_substrates = vec![
+        Some(GeneSubstrate::new(0, 0)),
+        Some(GeneSubstrate::new(1, 0)),
+        None,
+    ];
+    let feedback_substrates = HashMap::new();
+    let input: NoOpInputSensor = ();
+    let mut input_sensor: GenomicInputSensor<
+        NoOpReaction,
+        NoOpState,
+        NoOpSubstrate,
+        NoOpInputElement,
+        NoOpInputSensor,
+    > = GenomicInputSensor::new(input_substrates, feedback_substrates, input);
+    let identifier: usize = 4;
+    let feedback_substrate = GeneSubstrate::new(5, 6);
+    let replacement_feedback_substrate = GeneSubstrate::new(5, 6);
+    assert_eq!(input_sensor.feedback_substrates().get(&identifier), None);
+    assert_eq!(input_sensor.add_feedback_substrate(identifier, feedback_substrate), None);
+    assert_eq!(input_sensor.feedback_substrates().get(&identifier), Some(&feedback_substrate));
+    assert_eq!(input_sensor.add_feedback_substrate(identifier, replacement_feedback_substrate), Some(feedback_substrate));
+    assert_eq!(input_sensor.feedback_substrates().get(&identifier), Some(&replacement_feedback_substrate)); 
+}
+
+#[test]
+/// Tests if the function `remove_feedback_substrate` correctly removes an input feedback substrate.
+fn test_remove_feedback_substrate() {
+    let input_substrates = vec![
+        Some(GeneSubstrate::new(0, 0)),
+        Some(GeneSubstrate::new(1, 0)),
+        None,
+    ];
+    let identifier: usize = 4;
+    let feedback_substrate = GeneSubstrate::new(5, 6);
+    let mut feedback_substrates = HashMap::new();
+    feedback_substrates.insert(identifier, feedback_substrate);
+    let input: NoOpInputSensor = ();
+    let mut input_sensor: GenomicInputSensor<
+        NoOpReaction,
+        NoOpState,
+        NoOpSubstrate,
+        NoOpInputElement,
+        NoOpInputSensor,
+    > = GenomicInputSensor::new(input_substrates, feedback_substrates, input);
+    assert_eq!(input_sensor.feedback_substrates().get(&identifier), Some(&feedback_substrate));
+    assert_eq!(input_sensor.remove_feedback_substrate(identifier), Some(feedback_substrate));
+    assert_eq!(input_sensor.feedback_substrates().get(&identifier), None);
+}
+
+#[test]
 /// Tests if the function `adjust_after_gene_removal` correctly adjusts the gene indices.
 fn test_adjust_after_gene_removal() {
     let input_substrates = vec![
