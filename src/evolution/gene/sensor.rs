@@ -43,13 +43,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     >
     GenomicInputSensor<ReactionType, StateType, InformationType, InputElementType, InputSensorType>
@@ -89,14 +83,45 @@ impl<
 
     /// Sets the input [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
     /// and returns the old value if any.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If the specified index is out of bounds.
-    pub fn set_input_substrate(&mut self, index: usize, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+    pub fn set_input_substrate(
+        &mut self,
+        index: usize,
+        substrate: Option<GeneSubstrate>,
+    ) -> Option<GeneSubstrate> {
         let old_substrate = self.input_substrates[index];
         self.input_substrates[index] = substrate;
         old_substrate
+    }
+
+    /// Adds a feedback substrate and returns the old substrate that was associated with the specified identifier if any.
+    ///
+    /// # Parameters
+    ///
+    /// * `feedback_identifier` - the feedback identifier that should be associated with the feedback substrate
+    /// * `feedback_substrate` - the feedback substrate that should be associated with the feedback identifier
+    pub fn add_feedback_substrate(
+        &mut self,
+        feedback_identifier: usize,
+        feedback_substrate: GeneSubstrate,
+    ) -> Option<GeneSubstrate> {
+        self.feedback_substrates
+            .insert(feedback_identifier, feedback_substrate)
+    }
+
+    /// Removes a feedback substrate and returns the old substrate that was associated with the specified identifier if any.
+    ///
+    /// # Parameters
+    ///
+    /// * `feedback_identifier` - the feedback identifier of the association that should be removed
+    pub fn remove_feedback_substrate(
+        &mut self,
+        feedback_identifier: usize,
+    ) -> Option<GeneSubstrate> {
+        self.feedback_substrates.remove(&feedback_identifier)
     }
 
     /// Returns the feedback [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor.
@@ -179,11 +204,10 @@ impl<
     /// * `genes` - the [`Gene`](crate::evolution::gene::Gene)s
     /// of the [`Genome`](crate::evolution::gene::Genome)
     pub fn validate(&mut self, genes: &Vec<Gene<ReactionType, StateType, InformationType>>) {
-        validate_substrates::<
-            ReactionType,
-            StateType,
-            InformationType,
-        >(&mut self.input_substrates, genes);
+        validate_substrates::<ReactionType, StateType, InformationType>(
+            &mut self.input_substrates,
+            genes,
+        );
         self.feedback_substrates
             .retain(|_, substrate| has_substrate(genes, substrate));
     }
@@ -227,13 +251,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType> + Default,
     > Default
     for GenomicInputSensor<
@@ -261,13 +279,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
     > CrossOver
     for GenomicInputSensor<
@@ -344,13 +356,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     GenomicOutputSensor<
@@ -395,15 +401,19 @@ impl<
 
     /// Sets the output [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
     /// and returns the old value if any.
-    /// 
+    ///
     /// # Parameters
     /// * `index` - the index at which the new substrate should be set
     /// * `substrate` - the new substrate to set
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If the specified index is out of bounds.
-    pub fn set_output_substrate(&mut self, index: usize, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+    pub fn set_output_substrate(
+        &mut self,
+        index: usize,
+        substrate: Option<GeneSubstrate>,
+    ) -> Option<GeneSubstrate> {
         let old_substrate = self.output_substrates[index];
         self.output_substrates[index] = substrate;
         old_substrate
@@ -411,11 +421,14 @@ impl<
 
     /// Sets the finish [`Substrate`](crate::evolution::protein::Substrate)s referenced by this sensor
     /// and returns the old value if any.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `substrate` - the finish substrate to set
-    pub fn set_finish_substrate(&mut self, substrate: Option<GeneSubstrate>) -> Option<GeneSubstrate> {
+    pub fn set_finish_substrate(
+        &mut self,
+        substrate: Option<GeneSubstrate>,
+    ) -> Option<GeneSubstrate> {
         let old_substrate = self.finish_substrate;
         self.finish_substrate = substrate;
         old_substrate
@@ -483,11 +496,10 @@ impl<
     /// * `genes` - the [`Gene`](crate::evolution::gene::Gene)s
     /// of the [`Genome`](crate::evolution::gene::Genome)
     pub fn validate(&mut self, genes: &Vec<Gene<ReactionType, StateType, InformationType>>) {
-        validate_substrates::<
-            ReactionType,
-            StateType,
-            InformationType,
-        >(&mut self.output_substrates, genes);
+        validate_substrates::<ReactionType, StateType, InformationType>(
+            &mut self.output_substrates,
+            genes,
+        );
         if let Some(finish_substrate) = self.finish_substrate {
             if !has_substrate(genes, &finish_substrate) {
                 self.finish_substrate = None;
@@ -533,13 +545,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType> + Default,
     > Default
     for GenomicOutputSensor<
@@ -567,13 +573,7 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     > CrossOver
     for GenomicOutputSensor<
