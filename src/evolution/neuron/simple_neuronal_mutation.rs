@@ -221,6 +221,91 @@ pub fn mutate_neuron_remove_input_feedback<
     }
 }
 
+pub fn mutate_neuron_add_output_feedback<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+    const FEEDBACK_SIZE: usize,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    if FEEDBACK_SIZE == 0 {
+        return None;
+    }
+    let mut mutated_genome = genome.duplicate();
+    let new_feedback_substrate = mutated_genome.random_gene_substrate();
+    let feedback_identifier: usize = thread_rng().gen_range(0..FEEDBACK_SIZE);
+    mutated_genome
+        .output_mut()
+        .add_feedback_substrate(feedback_identifier, new_feedback_substrate);
+    Some(mutated_genome)
+}
+
+pub fn mutate_neuron_remove_output_feedback<
+    InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+    OutputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    OutputSensorType: Output<OutputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    >,
+> {
+    let identifiers: Vec<usize> = genome
+        .output()
+        .feedback_substrates()
+        .keys()
+        .map(|key| *key)
+        .collect();
+    if identifiers.is_empty() {
+        None
+    } else {
+        let mut mutated_genome = genome.duplicate();
+        let random_index: usize = thread_rng().gen_range(0..identifiers.len());
+        mutated_genome.output_mut().remove_feedback_substrate(
+            *identifiers
+                .get(random_index)
+                .expect("The random index must be within bounds."),
+        );
+        Some(mutated_genome)
+    }
+}
+
 pub fn mutate_neuron_potential_halflife_time<
     InputElementType: Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
     InputSensorType: Input<InputElementType, SimpleNeuron>,
