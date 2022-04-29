@@ -67,7 +67,7 @@ impl SimpleNeuronAudioSixteenOutputSensor {
 
     /// Returns the index of the end of the current window.
     fn current_end_index(&self) -> usize {
-        self.current_start_index() + OUTPUT_WINDOW
+        self.current_start_index() + OUTPUT_WINDOW - 1
     }
 
     /// Returns the currently selected read.

@@ -66,9 +66,7 @@ impl SimpleNeuronTextInputSensor {
 
     /// Returns the index of the end of the current read window.
     fn current_end_index(&self) -> usize {
-        // The relative read length minus one is the index difference between first and last read index.
-        let relative_length: Nlbf64 = (((READ_LENGTH - 1) as f64) / (MAX_POSITION as f64)).into();
-        Self::position_as_index(self.position + relative_length)
+        self.current_start_index() + READ_LENGTH - 1
     }
 
     /// Returns the currently selected read.
