@@ -2,9 +2,12 @@
 
 pub use simple_dendrite::{SimpleDendriteActivationPotential, SimpleDendriteThreshold};
 pub use simple_neuron::SimpleNeuron;
+pub use simple_neuron_audio_sensor::audio_output_sixteen_bit::SimpleNeuronAudioSixteenOutputSensor;
+pub use simple_neuron_audio_sensor::random_genome_tts_sixteen;
 pub use simple_neuron_parameter_sensor::parameter_input::SimpleNeuronParameterInputSensor;
 pub use simple_neuron_parameter_sensor::parameter_output::SimpleNeuronParameterOutputSensor;
 pub use simple_neuron_parameter_sensor::random_genome;
+pub use simple_neuron_text_sensor::text_input::SimpleNeuronTextInputSensor;
 pub use simple_neuronal_mutation::{
     add_dendrite, add_neuron, mutate_associate_input, mutate_associate_output,
     mutate_dendrite_inhibitory_state, mutate_dendrite_source, mutate_dendrite_target,
