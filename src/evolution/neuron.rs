@@ -17,6 +17,7 @@ pub use simple_neuronal_mutation::{
 
 mod simple_dendrite;
 mod simple_neuron;
+mod simple_neuron_audio_sensor;
 mod simple_neuron_parameter_sensor;
 mod simple_neuron_text_sensor;
 mod simple_neuronal_mutation;
