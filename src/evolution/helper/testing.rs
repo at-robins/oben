@@ -72,7 +72,7 @@ impl Default for TestInput {
 pub struct TestOutput {}
 
 impl Output<NoOpOutputElement, TestInformation> for TestOutput {
-    fn get_output(&self, _information: Vec<Option<TestInformation>>) -> NoOpOutputElement {
+    fn get_output(&mut self, _information: Vec<Option<TestInformation>>) -> NoOpOutputElement {
         ()
     }
 
@@ -87,6 +87,7 @@ impl Output<NoOpOutputElement, TestInformation> for TestOutput {
     fn handle_feedback_substrate_changes(
         &mut self,
         _changes: HashMap<usize, TestInformation>,
+        _current_output_information: Vec<Option<TestInformation>>,
     ) -> Option<Vec<TestInformation>> {
         None
     }

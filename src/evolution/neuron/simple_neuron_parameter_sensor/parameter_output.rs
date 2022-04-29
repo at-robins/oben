@@ -10,7 +10,7 @@ impl Output<Vec<Nlbf64>, SimpleNeuron> for SimpleNeuronParameterOutputSensor {
         SimpleNeuronParameterOutputSensor {}
     }
 
-    fn get_output(&self, information: Vec<Option<SimpleNeuron>>) -> Vec<Nlbf64> {
+    fn get_output(&mut self, information: Vec<Option<SimpleNeuron>>) -> Vec<Nlbf64> {
         information
             .iter()
             .map(|neuron_option| {
@@ -26,6 +26,7 @@ impl Output<Vec<Nlbf64>, SimpleNeuron> for SimpleNeuronParameterOutputSensor {
     fn handle_feedback_substrate_changes(
         &mut self,
         _changes: std::collections::HashMap<usize, SimpleNeuron>,
+        _current_output_information: Vec<Option<SimpleNeuron>>,
     ) -> Option<Vec<SimpleNeuron>> {
         None
     }

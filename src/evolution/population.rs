@@ -171,8 +171,8 @@ impl<
             for receptor in self.input.feedback_update(input_feedback_changes) {
                 actions.push_action(receptor);
             }
-            // Update output feedback substrates and add all receptors if changes to the input were detected.
-            for receptor in self.output.feedback_update(output_feedback_changes) {
+            // Update output feedback substrates and add all receptors if changes to the output were detected.
+            for receptor in self.output.feedback_update(output_feedback_changes, time) {
                 actions.push_action(receptor);
             }
         }
@@ -206,7 +206,7 @@ impl<
     /// Returns the values of output [`Substrate`]s if any.
     ///
     /// [`Substrate`]: ../protein/struct.Substrate.html
-    pub fn get_result(&self) -> OutputElementType {
+    pub fn get_result(&mut self) -> OutputElementType {
         self.output.output_as_element(self.time_alive())
     }
 

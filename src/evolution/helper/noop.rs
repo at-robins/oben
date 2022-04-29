@@ -126,7 +126,7 @@ impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
 }
 
 impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
-    fn get_output(&self, _information: Vec<Option<NoOpSubstrate>>) -> NoOpOutputElement {
+    fn get_output(&mut self, _information: Vec<Option<NoOpSubstrate>>) -> NoOpOutputElement {
         ()
     }
 
@@ -141,6 +141,7 @@ impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
     fn handle_feedback_substrate_changes(
         &mut self,
         _changes: HashMap<usize, NoOpSubstrate>,
+        _current_output_information: Vec<Option<NoOpSubstrate>>,
     ) -> Option<Vec<NoOpSubstrate>> {
         None
     }

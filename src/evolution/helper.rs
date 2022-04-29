@@ -272,6 +272,11 @@ impl Nlbf64 {
         }
     }
 
+    /// Retruns the value as internal u64 representation.
+    pub fn value_as_u64(&self) -> u64 {
+        self.value
+    }
+
     /// Flips a random bit of the [`Nlbf64`] and returns the result.
     ///
     /// # Parameters

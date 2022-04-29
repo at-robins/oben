@@ -195,8 +195,17 @@ impl<
     /// # Parameters
     ///
     /// * `time` - the time of the conversion
-    pub fn output_as_element(&self, time: Iteration) -> OutputElementType {
+    pub fn output_as_element(&mut self, time: Iteration) -> OutputElementType {
         self.output.get_output(substrates_as_information(&self.output_substrates, time))
+    }
+
+    /// Returns the output substrates at the specified timepoint as owned.
+    /// 
+    /// # Parameters
+    ///
+    /// * `time` - the time of the query
+    pub fn output_substrates_as_owned(&self, time: Iteration) -> Vec<Option<InformationType>> {
+        substrates_as_information(&self.output_substrates, time)
     }
 
     /// Returns the output substrates.
@@ -249,9 +258,10 @@ impl<
     /// # Parameters
     /// 
     /// * `changes` - the changed output [`Substrate`] values
-    pub fn feedback_update(&mut self, changes: HashMap<usize, InformationType>) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
+    /// * `time` - the timepoint of the update
+    pub fn feedback_update(&mut self, changes: HashMap<usize, InformationType>, time: Iteration) -> Vec<Rc<Receptor<ReactionType, StateType, InformationType>>> {
         if !changes.is_empty() {
-            if let Some(changed_input_substrates) = self.output.handle_feedback_substrate_changes(changes) {
+            if let Some(changed_input_substrates) = self.output.handle_feedback_substrate_changes(changes, self.output_substrates_as_owned(time)) {
                 self.set_output_substrates(changed_input_substrates);
                 return self.cascading_receptors();
             }
