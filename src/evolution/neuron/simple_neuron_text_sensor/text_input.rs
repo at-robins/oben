@@ -90,7 +90,7 @@ impl SimpleNeuronTextInputSensor {
         let mut current_read = self.current_read();
         // Pads the vector with unknown values if the end of the input is reached.
         if current_read.len() < READ_LENGTH {
-            let difference = current_read.len() - READ_LENGTH;
+            let difference = READ_LENGTH - current_read.len();
             let mut padding: Vec<char> = (0..difference).map(|_| UNKNOWN_CHAR).collect();
             current_read.append(&mut padding);
         }
