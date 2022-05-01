@@ -214,10 +214,11 @@ impl<
                 .sum();
             res += self.inner.resources().total();
             let mean_fitness: f64 = self.inner.population_mean_fitness();
-            println!("Size: {} : Bytes: {} ; Fitness: {} ; Fitness Scaling: {} ; Total Resources: {} ; Resources: {:?}",
+            println!("Size: {} : Bytes: {} ; Mean Fitness: {} ; Maximum Fitness: {:?} ; Fitness Scaling: {} ; Total Resources: {} ; Resources: {:?}",
                 self.inner.population_size(),
                 self.inner.population_mean_genome_size(),
                 mean_fitness,
+                self.inner.population_maximum_fitness(1),
                 fitness_scaling.exponent(),
                 res,
                 self.inner.resources());

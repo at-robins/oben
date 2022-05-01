@@ -46,21 +46,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     Organism<
@@ -396,21 +384,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     Individual<
@@ -693,21 +669,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     SerialisablePopulation<
@@ -769,21 +733,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     From<
@@ -881,21 +833,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     Population<
@@ -1242,9 +1182,9 @@ impl<
 
     /// Returns the fittest [`Individual`] of the population that has a minimum age as specified.
     /// If the population is empty or no [`Individual`] meets the age criterium, `None` is returned.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `minimum_age` - the minimum age to take the [`Individual`] into account
     pub fn fittest_individual(
         &self,
@@ -1394,6 +1334,22 @@ impl<
         }
     }
 
+    /// Returns the fitness of the fittest [`Individual`] in the population that has a minimum age as specified.
+    /// If the population is empty or no [`Individual`] meets the age criterium, `None` is returned.
+    ///
+    /// # Parameters
+    ///
+    /// * `minimum_age` - the minimum age to take the [`Individual`] into account
+    pub fn maximum_fitness(&self, minimum_age: u32) -> Option<f64> {
+        let fittest = self.fittest_individual(minimum_age);
+        fittest.and_then(|individual| {
+            individual
+                .lock()
+                .expect("A thread paniced while holding the individual's lock.")
+                .fitness()
+        })
+    }
+
     /// Calculates the mean genome size in bytes of the [`Individual`]s
     /// that are part of this `Population`.
     pub fn mean_genome_size(&self) -> f64 {
@@ -1499,21 +1455,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     From<
