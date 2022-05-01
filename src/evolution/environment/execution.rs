@@ -50,21 +50,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     EcologicalNiche<
@@ -546,21 +534,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     InnerEcologicalNiche<
@@ -918,7 +894,15 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     fn get_random_genome(
         &self,
-    ) -> Genome<ReactionType, StateType, InformationType, InputElementType, InputSensorType, OutputElementType, OutputSensorType> {
+    ) -> Genome<
+        ReactionType,
+        StateType,
+        InformationType,
+        InputElementType,
+        InputSensorType,
+        OutputElementType,
+        OutputSensorType,
+    > {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .random_genome_fitness_based()
@@ -1032,6 +1016,26 @@ impl<
             .lock()
             .expect("A thread paniced while holding the population lock.")
             .mean_fitness()
+    }
+
+    /// Returns the fitness of the fittest [`Individual`] in the [`Population`] that has a minimum age as specified.
+    /// If the population is empty or no [`Individual`] meets the age criterium, `None` is returned.
+    ///
+    /// # Parameters
+    ///
+    /// * `minimum_age` - the minimum age to take the [`Individual`] into account
+    ///
+    /// # Panics
+    ///
+    /// If another thread paniced while holding the population lock.
+    ///
+    /// [`Individual`]: ../population/struct.Individual.html
+    /// [`Population`]: ../population/struct.Population.html
+    fn population_maximum_fitness(&self, minimum_age: u32) -> Option<f64> {
+        self.population
+            .lock()
+            .expect("A thread paniced while holding the population lock.")
+            .maximum_fitness(minimum_age)
     }
 
     /// Returns the mean [`Genome`] size in byte of all [`Individual`]s in the [`Population`].
