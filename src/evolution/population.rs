@@ -364,14 +364,16 @@ pub struct Individual<
     phantom_output_element: PhantomData<OutputElementType>,
     phantom_output_sensor: PhantomData<OutputSensorType>,
     source: Uuid,
-    genome: Genome<
-        ReactionType,
-        StateType,
-        InformationType,
-        InputElementType,
-        InputSensorType,
-        OutputElementType,
-        OutputSensorType,
+    genome: Arc<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     >,
     fitness: Option<f64>,
     bytes: usize,
@@ -429,7 +431,7 @@ impl<
             phantom_output_element: PhantomData,
             phantom_output_sensor: PhantomData,
             source: uuid,
-            genome,
+            genome: Arc::new(genome),
             fitness: None,
             bytes,
             age: 0,
@@ -554,15 +556,27 @@ impl<
     /// [`Environment`]: ../environment/struct.Environment.html
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn mate_and_mutate(
-        &self,
-        partner: Genome<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-            OutputElementType,
-            OutputSensorType,
+        own_genome: Arc<
+            Genome<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
+        >,
+        partner: Arc<
+            Genome<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
         mutations: &MutationCompendium<
             ReactionType,
@@ -583,7 +597,7 @@ impl<
         OutputElementType,
         OutputSensorType,
     > {
-        let offspring_genome = self.mate(partner);
+        let offspring_genome = own_genome.cross_over(&partner);
         if let Some(mutated_offspring_genome) = mutations.mutate(&offspring_genome) {
             // If the mutation was successful, return the mutated individual.
             Individual::new(environment.generate_uuid(), mutated_offspring_genome)
@@ -603,16 +617,18 @@ impl<
     /// [`Genome`]: ../gene/struct.Genome.html
     pub fn genome(
         &self,
-    ) -> &Genome<
-        ReactionType,
-        StateType,
-        InformationType,
-        InputElementType,
-        InputSensorType,
-        OutputElementType,
-        OutputSensorType,
+    ) -> Arc<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     > {
-        &self.genome
+        Arc::clone(&self.genome)
     }
 
     /// Spends the maximum amount of [`Resource`]s possible to generate offspring and returns the
@@ -1080,14 +1096,16 @@ impl<
     pub fn random_genome_fitness_based(
         &self,
     ) -> Option<
-        Genome<
-            ReactionType,
-            StateType,
-            InformationType,
-            InputElementType,
-            InputSensorType,
-            OutputElementType,
-            OutputSensorType,
+        Arc<
+            Genome<
+                ReactionType,
+                StateType,
+                InformationType,
+                InputElementType,
+                InputSensorType,
+                OutputElementType,
+                OutputSensorType,
+            >,
         >,
     > {
         if self.individuals.len() == 0 {
@@ -1138,8 +1156,7 @@ impl<
                     value
                         .lock()
                         .expect("A thread paniced while holding the individual's lock.")
-                        .genome()
-                        .duplicate(),
+                        .genome(),
                 )
             })
         }

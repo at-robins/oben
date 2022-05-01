@@ -319,7 +319,7 @@ impl<
             >,
         >,
     ) {
-        let offspring = Self::get_offspring(individual.clone(), inner.clone());
+        let offspring = Self::get_offspring(individual, inner.clone());
         // Add the mutated offspring to the population.
         inner.append_population(offspring);
     }
@@ -471,13 +471,22 @@ impl<
     > {
         let mut offspring = Vec::new();
         // Use the accumulated resources to produce offspring.
+        let own_genome = {
+            individual
+                .lock()
+                .expect("A thread paniced while holding the individual's lock.")
+                .genome()
+        };
         let number_of_offspring = inner.spend_resources_for_mating(individual.clone());
         for _ in 0..number_of_offspring {
             let partner = inner.get_random_genome();
-            let ind = individual
-                .lock()
-                .expect("A thread paniced while holding the individual's lock.");
-            offspring.push(ind.mate_and_mutate(partner, &inner.mutations, &inner.environment));
+
+            offspring.push(Individual::mate_and_mutate(
+                Arc::clone(&own_genome),
+                partner,
+                &inner.mutations,
+                &inner.environment,
+            ));
         }
         offspring
     }
@@ -577,10 +586,11 @@ impl<
             >,
         >,
     ) -> bool {
-        let ind = individual
+        let individual_age = individual
             .lock()
-            .expect("A thread paniced while holding the individual's lock.");
-        self.environment.death_chance(ind.age()) >= thread_rng().gen_range(0.0..=1.0)
+            .expect("A thread paniced while holding the individual's lock.")
+            .age();
+        self.environment.death_chance(individual_age) >= thread_rng().gen_range(0.0..=1.0)
     }
 
     /// Checks if the specified [`Individual`] is juvenil and still needs testing.
@@ -610,12 +620,13 @@ impl<
             >,
         >,
     ) -> bool {
-        let ind = individual
+        let individual_age = individual
             .lock()
-            .expect("A thread paniced while holding the individual's lock.");
+            .expect("A thread paniced while holding the individual's lock.")
+            .age();
         self.environment
             .max_testing_age()
-            .map_or(true, |max_age| ind.age() < max_age)
+            .map_or(true, |max_age| individual_age < max_age)
     }
 
     /// Checks if the specified [`Individual`] should be testedby chance.
@@ -711,7 +722,7 @@ impl<
         let ind = individual
             .lock()
             .expect("A thread paniced while holding the individual's lock.");
-        *ind.uuid()
+        *(ind.uuid())
     }
 
     /// Returns the [`Resource`]s accumulated by the specified [`Individual`] that can be
@@ -742,10 +753,10 @@ impl<
             >,
         >,
     ) -> f64 {
-        let ind = individual
+        individual
             .lock()
-            .expect("A thread paniced while holding the individual's lock.");
-        ind.resources()
+            .expect("A thread paniced while holding the individual's lock.")
+            .resources()
     }
 
     /// Spends the maximum amount of [`Resource`]s possible to generate offspring and returns the
@@ -894,21 +905,22 @@ impl<
     /// [`Individual`]: ./struct.Individual.html
     fn get_random_genome(
         &self,
-    ) -> Genome<
-        ReactionType,
-        StateType,
-        InformationType,
-        InputElementType,
-        InputSensorType,
-        OutputElementType,
-        OutputSensorType,
+    ) -> Arc<
+        Genome<
+            ReactionType,
+            StateType,
+            InformationType,
+            InputElementType,
+            InputSensorType,
+            OutputElementType,
+            OutputSensorType,
+        >,
     > {
         self.population.lock()
             .expect("A thread paniced while holding the population lock.")
             .random_genome_fitness_based()
             // Unwrapping is safe here since we cannot call this function on empty populations.
             .unwrap()
-            .duplicate()
     }
 
     /// Write a snapshot of the current [`Population`] to a JSON file.

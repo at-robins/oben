@@ -9,7 +9,7 @@ approx = "0.5"
 bitvec = {version = "0.22.3", features = ["serde"]}
 rand = "0.8.4"
 rand_distr = "0.4.2"
-serde = {version = "1.0.131", features = ["derive"]}
+serde = {version = "1.0.131", features = ["derive", "rc"]}
 uuid = {version = "0.8.2", features = ["serde", "v1"]}
 rayon = "1.5.1"
 rmp-serde = "0.15.5"
