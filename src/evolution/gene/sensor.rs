@@ -482,6 +482,11 @@ impl<
         &self.output
     }
 
+    /// Returns the underlying [`Output`](crate::evolution::chemistry::Output) implementation as mutable.
+    pub fn output_mut(&mut self) -> &mut OutputSensorType {
+        &mut self.output
+    }
+
     /// Get the number of associated output [`Substrate`](crate::evolution::protein::Substrate)s.
     pub fn number_of_associated_outputs(&self) -> usize {
         self.output_substrates

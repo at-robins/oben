@@ -2,12 +2,15 @@ use std::{collections::HashMap, num::NonZeroU32};
 
 use rand::{thread_rng, Rng};
 
-use crate::evolution::gene::{
-    Gene, GeneSubstrate, Genome, GenomicCatalyticCentre, GenomicInputSensor, GenomicOutputSensor,
-    GenomicReceptor,
+use crate::evolution::{
+    chemistry::Output,
+    gene::{
+        Gene, GeneSubstrate, Genome, GenomicCatalyticCentre, GenomicInputSensor,
+        GenomicOutputSensor, GenomicReceptor,
+    },
 };
 
-use self::audio_output_sixteen_bit::{SimpleNeuronAudioSixteenOutputSensor, OUTPUT_WINDOW};
+use self::audio_output_sixteen_bit::SimpleNeuronAudioSixteenOutputSensor;
 
 use super::{
     simple_neuron_text_sensor::text_input::{SimpleNeuronTextInputSensor, READ_LENGTH},
@@ -68,7 +71,7 @@ pub fn random_genome_tts_sixteen(
         input_feedback,
         SimpleNeuronTextInputSensor::new(),
     );
-    let output_substrates = (0..OUTPUT_WINDOW)
+    let output_substrates = (0..2)
         .map(|_| Some(GeneSubstrate::new(0, thread_rng().gen_range(0..number_of_substrates))))
         .collect();
     let mut output_feedback = HashMap::new();
@@ -80,7 +83,7 @@ pub fn random_genome_tts_sixteen(
         output_substrates,
         output_feedback,
         finish_substrate,
-        SimpleNeuronAudioSixteenOutputSensor::new(),
+        SimpleNeuronAudioSixteenOutputSensor::random(),
     );
     Genome::new(input, output, genes)
 }

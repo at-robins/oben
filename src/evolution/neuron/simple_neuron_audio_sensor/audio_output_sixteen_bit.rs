@@ -1,16 +1,12 @@
-use serde::{Deserialize, Serialize};
+use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::evolution::{
-    chemistry::Output,
-    gene::CrossOver,
-    helper::Nlbf64,
-    neuron::{simple_neuron::POTENTIAL_HALFLIFE_TIME_MAXIMUM, SimpleNeuron},
-};
+use crate::evolution::{chemistry::{Output, Input}, gene::{CrossOver, Genome}, helper::Nlbf64, neuron::{SimpleNeuron, SimpleDendriteActivationPotential, SimpleDendriteThreshold}};
 
-/// The length of the read window of [`SimpleNeuronAudioSixteenOutputSensor`].
-pub const OUTPUT_WINDOW: usize = 100;
+const NUMBER_OF_PHONEMES: usize = 60;
+const MAXIMUM_PHONEME_LENGTH: usize = 2000;
 /// The maximum position that can be accessed by an [`SimpleNeuronAudioSixteenOutputSensor`].
-pub const MAX_POSITION: usize = 10_000_000 - OUTPUT_WINDOW;
+pub const MAX_POSITION: usize = 10_000_000;
 
 /// Converts a [`Nlbf64`] to a [`i16`] where the numeric value represents its relative position in the alphabet.
 ///  
@@ -27,14 +23,20 @@ pub fn nlbf64_to_audio_sixteen(value: Nlbf64) -> i16 {
 /// An sixteen bit audio output sensor which utilises a fixed size window to convert neuron values to an audio signal,
 /// which can be controlled via a single feedback substrate.
 pub struct SimpleNeuronAudioSixteenOutputSensor {
+    phonemes: Vec<Vec<Nlbf64>>,
     audio: Vec<Nlbf64>,
     position: Nlbf64,
 }
 
 impl SimpleNeuronAudioSixteenOutputSensor {
     /// Creates a new `SimpleNeuronAudioSixteenOutputSensor`.
-    pub fn new() -> Self {
+    ///
+    /// # Parameters
+    ///
+    /// * `phonemes` - the audio building blocks
+    pub fn new(phonemes: Vec<Vec<Nlbf64>>) -> Self {
         Self {
+            phonemes,
             audio: Vec::new(),
             position: 0.0.into(),
         }
@@ -49,10 +51,41 @@ impl SimpleNeuronAudioSixteenOutputSensor {
         (position.value() * (MAX_POSITION as f64)) as usize
     }
 
+    /// Returns the specified phoneme as index of the available phonemes.
+    ///
+    /// # Parameters
+    ///
+    /// * `phoneme_information` - the phoneme information to convert
+    fn phoneme_as_index(&self, phoneme_information: Nlbf64) -> usize {
+        let calculated_index =
+            (phoneme_information.value() * (self.phonemes.len() as f64)).floor() as usize;
+        // This fixes the fact that a value of exactly 1.0 corresponds to `self.phonemes.len()`.
+        if calculated_index >= self.phonemes.len() {
+            self.phonemes.len() - 1
+        } else {
+            calculated_index
+        }
+    }
+
+    /// Returns the specifed phoneme.
+    ///
+    /// # Parameters
+    ///
+    /// * `phoneme_information` - the phoneme information to convert
+    fn phoneme(&self, phoneme_information: Nlbf64) -> &Vec<Nlbf64> {
+        self.phonemes
+            .get(self.phoneme_as_index(phoneme_information))
+            .expect("The phoneme bounds were checked.")
+    }
+
     /// Checks if the audio vector is sufficient to handle the current window and
     /// expands the vector if necessary.
-    fn check_audio_vector(&mut self) {
-        let end = self.current_end_index();
+    ///
+    /// # Parameters
+    ///
+    /// * `current_phoneme` - the currently selected phoneme
+    fn check_audio_vector(&mut self, current_phoneme: Nlbf64) {
+        let end = self.current_end_index(current_phoneme);
         let difference: i128 = (end as i128) - ((self.audio.len() as i128) - 1);
         if difference > 0 {
             self.audio
@@ -66,19 +99,12 @@ impl SimpleNeuronAudioSixteenOutputSensor {
     }
 
     /// Returns the index of the end of the current window.
-    fn current_end_index(&self) -> usize {
-        self.current_start_index() + OUTPUT_WINDOW - 1
-    }
-
-    /// Returns the currently selected read.
-    pub fn current_read(&mut self) -> Vec<Nlbf64> {
-        self.check_audio_vector();
-        let start_index = self.current_start_index();
-        let end_index = self.current_end_index();
-        (&self.audio[start_index..=end_index])
-            .iter()
-            .map(|value| *value)
-            .collect()
+    ///
+    /// # Parameters
+    ///
+    /// * `current_phoneme` - the currently selected phoneme
+    fn current_end_index(&self, current_phoneme: Nlbf64) -> usize {
+        self.current_start_index() + self.phoneme(current_phoneme).len() - 1
     }
 
     /// Writes the current output window to the underlying audio vector.
@@ -86,12 +112,42 @@ impl SimpleNeuronAudioSixteenOutputSensor {
     /// # Parameters
     ///
     /// * `information` - the information vector to write to the current output window
-    fn set_current_output_window(&mut self, information: Vec<Option<SimpleNeuron>>) {
-        self.check_audio_vector();
-        let start = self.current_start_index();
-        for (index, info_option) in information.into_iter().enumerate() {
-            if let Some(info) = info_option {
-                self.audio[start + index] = info.current_potential();
+    fn write_current_phoneme(&mut self, information: Vec<Option<SimpleNeuron>>) {
+        let phoneme_index = information
+            .get(0)
+            .expect("There must be a phoneme output substrate.")
+            .as_ref();
+        // Mode of the phoneme interaction with the audio signal, e.g. addition or substraction.
+        let mode = information
+            .get(0)
+            .expect("There must be a mode output substrate.")
+            .as_ref();
+        if phoneme_index.is_some() && mode.is_some() {
+            let phoneme_index = phoneme_index.unwrap().current_potential();
+            let mode = mode.unwrap().current_potential();
+            self.check_audio_vector(phoneme_index);
+            let start = self.current_start_index();
+            let end = self.current_end_index(phoneme_index);
+            for audio_index in start..=end {
+                // The bounds were checked before, so the unwrap is fine.
+                let new_value = if mode.value() < 0.5 {
+                    (self.audio[audio_index].value()
+                        + self
+                            .phoneme(phoneme_index)
+                            .get(audio_index - start)
+                            .unwrap()
+                            .value())
+                        / 2.0
+                } else {
+                    (self.audio[audio_index].value() + 1.0
+                        - self
+                            .phoneme(phoneme_index)
+                            .get(audio_index - start)
+                            .unwrap()
+                            .value())
+                        / 2.0
+                };
+                self.audio[audio_index] = new_value.into();
             }
         }
     }
@@ -99,7 +155,7 @@ impl SimpleNeuronAudioSixteenOutputSensor {
 
 impl Output<Vec<i16>, SimpleNeuron> for SimpleNeuronAudioSixteenOutputSensor {
     fn get_output(&mut self, information: Vec<Option<SimpleNeuron>>) -> Vec<i16> {
-        self.set_current_output_window(information);
+        self.write_current_phoneme(information);
         self.audio
             .iter()
             .map(|value| nlbf64_to_audio_sixteen(*value))
@@ -111,22 +167,10 @@ impl Output<Vec<i16>, SimpleNeuron> for SimpleNeuronAudioSixteenOutputSensor {
         changes: std::collections::HashMap<usize, SimpleNeuron>,
         current_output_information: Vec<Option<SimpleNeuron>>,
     ) -> Option<Vec<SimpleNeuron>> {
-        let halflifes: Vec<f64> = current_output_information
-            .iter()
-            .map(|opt| opt.as_ref())
-            .map(|neuron_option| {
-                neuron_option
-                    .map_or(POTENTIAL_HALFLIFE_TIME_MAXIMUM, SimpleNeuron::potential_halflife_time)
-            })
-            .collect();
-        self.set_current_output_window(current_output_information);
-        changes.get(&0).map(|position_neuron| {
+        self.write_current_phoneme(current_output_information);
+        changes.get(&0).and_then(|position_neuron| {
             self.position = position_neuron.current_potential();
-            self.current_read()
-                .into_iter()
-                .zip(halflifes.into_iter())
-                .map(|(potential, halflife)| SimpleNeuron::new(potential, halflife))
-                .collect()
+            None
         })
     }
 
@@ -135,7 +179,13 @@ impl Output<Vec<i16>, SimpleNeuron> for SimpleNeuronAudioSixteenOutputSensor {
     }
 
     fn random() -> Self {
-        Self::new()
+        let phonemes = (0..NUMBER_OF_PHONEMES)
+            .map(|_| {
+                let phoneme_length = thread_rng().gen_range(1..MAXIMUM_PHONEME_LENGTH);
+                (0..phoneme_length).map(|_| thread_rng().gen()).collect()
+            })
+            .collect();
+        Self::new(phonemes)
     }
 }
 
@@ -144,7 +194,51 @@ impl CrossOver for SimpleNeuronAudioSixteenOutputSensor {
         true
     }
 
-    fn cross_over(&self, _other: &Self) -> Self {
-        Self::new()
+    fn cross_over(&self, other: &Self) -> Self {
+        let crossover_phonemes = self
+            .phonemes
+            .iter()
+            .zip(other.phonemes.iter())
+            .map(|(a, b)| a.cross_over(b))
+            .collect();
+
+        Self::new(crossover_phonemes)
     }
+}
+
+
+pub fn mutate_phoneme<
+    InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
+    InputSensorType: Input<InputElementType, SimpleNeuron>,
+>(
+    genome: &Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,
+        Vec<i16>,
+        SimpleNeuronAudioSixteenOutputSensor,
+    >,
+) -> Option<
+    Genome<
+        SimpleDendriteActivationPotential,
+        SimpleDendriteThreshold,
+        SimpleNeuron,
+        InputElementType,
+        InputSensorType,Vec<i16>,
+        SimpleNeuronAudioSixteenOutputSensor,
+    >,
+> {
+    let mut mutated_genome = genome.duplicate();
+    let phoneme = mutated_genome
+        .output_mut()
+        .output_mut()
+        .phonemes
+        .get_mut(thread_rng().gen_range(0..NUMBER_OF_PHONEMES))
+        .unwrap();
+    let mutation_index: usize = thread_rng().gen_range(0..phoneme.len()); 
+    let mutated_phoneme_value = Nlbf64::flip_random_bit(*(phoneme.get(mutation_index).unwrap()));
+    phoneme[mutation_index] = mutated_phoneme_value;
+    Some(mutated_genome)
 }
