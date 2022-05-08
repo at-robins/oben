@@ -24,7 +24,9 @@ impl Dendrite {
     /// * `target` - the neuron targeted by this `Dendrite`
     /// * `weight` - the strenght of the dendrite influence on the target neuron  
     pub fn new(target: Arc<Neuron>, weight: f64) -> Self {
-        let normalised_weight = if weight <= -1.0 {
+        let normalised_weight = if weight.is_nan() {
+            0.0
+        } else if weight <= -1.0 {
             -1.0
         } else if weight >= 1.0 {
             1.0
@@ -49,7 +51,9 @@ impl Dendrite {
     ///
     /// * `weight` - the new weight value to set
     pub fn set_weight(&self, weight: f64) {
-        let normalised_weight = if weight <= -1.0 {
+        let normalised_weight = if weight.is_nan() {
+            0.0
+        } else if weight <= -1.0 {
             -1.0
         } else if weight >= 1.0 {
             1.0
@@ -57,6 +61,11 @@ impl Dendrite {
             weight
         };
         *self.weight.lock() = normalised_weight;
+    }
+
+    /// Returns the target [`Neuron`].
+    pub fn target(&self) -> Arc<Neuron> {
+        Arc::clone(&self.target)
     }
 
     /// Returns how often the dendrite was activated.

@@ -1,22 +1,19 @@
 use std::{collections::VecDeque, num::NonZeroUsize, sync::Arc};
 
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::evolution::{helper::Iteration, neuron};
+use crate::{abnn::dendrite::ACTIVATION_POTENTIAL_REINFORCEMENT, evolution::helper::Iteration};
 
-use super::{
-    dendrite::Dendrite,
-    interactor::{self, Interactor},
-    neuron::Neuron,
-};
+use super::{dendrite::Dendrite, interactor::Interactor, neuron::Neuron};
 
 /// The maximum number of prediction errors that is remembered for
 /// performance evaluation.
 pub const NUMBER_OF_REMEMBERED_PREDICTION_ERRORS: usize = 100;
 
 pub struct AssociationBasedNeuralNetwork {
-    interactors: Vec<Arc<dyn Interactor + Send + Sync>>,
+    interactors: Vec<Arc<Mutex<dyn Interactor + Send + Sync>>>,
     neurons: Vec<Arc<Neuron>>,
     current_time: Iteration,
     prediction_errors: VecDeque<f64>,
@@ -26,7 +23,7 @@ impl AssociationBasedNeuralNetwork {
     pub fn new(
         number_of_neurons: NonZeroUsize,
         dendrites_per_neuron: NonZeroUsize,
-        interactors: Vec<Arc<dyn Interactor + Send + Sync>>,
+        interactors: Vec<Arc<Mutex<dyn Interactor + Send + Sync>>>,
     ) -> Self {
         if dendrites_per_neuron >= number_of_neurons {
             panic!("The number of dendrites per neuron exceeds the total number of targetable neurons.");
@@ -37,18 +34,18 @@ impl AssociationBasedNeuralNetwork {
             .collect();
         // Sets the input and output neurons at random.
         let mut available_neurons = neurons.clone();
-        for interactor in interactors {
-            let n_input = interactor.number_of_input_neurons();
-            let n_output = interactor.number_of_output_neurons();
+        for interactor in interactors.iter() {
+            let n_input = interactor.lock().number_of_input_neurons();
+            let n_output = interactor.lock().number_of_output_neurons();
             if n_input > 0 {
-                interactor.set_input_neurons(
+                interactor.lock().set_input_neurons(
                     (0..n_input)
                         .map(|_| remove_random(&mut available_neurons))
                         .collect(),
                 );
             }
             if n_output > 0 {
-                interactor.set_output_neurons(
+                interactor.lock().set_output_neurons(
                     (0..n_output)
                         .map(|_| remove_random(&mut available_neurons))
                         .collect(),
@@ -60,7 +57,7 @@ impl AssociationBasedNeuralNetwork {
             let mut available_targets: Vec<Arc<Neuron>> = neurons
                 .iter()
                 .filter(|target| Arc::ptr_eq(neuron, target))
-                .map(|target| *target)
+                .map(|target| Arc::clone(target))
                 .collect();
             for _ in 0..dendrites_per_neuron.get() {
                 neuron.add_dendrite(Arc::new(Dendrite::new(
@@ -81,27 +78,41 @@ impl AssociationBasedNeuralNetwork {
     pub fn run_until_evaluation(&mut self) {
         let mut dendrites_activated_since_last_evaluation: u64 = 0;
         let mut request_evaluation = false;
+        let mut last_activated_dendrites: Vec<Arc<Dendrite>> = Vec::new();
         while !request_evaluation {
             self.interactors
                 .par_iter()
-                .for_each(|interactor| interactor.update_iteration(self.current_time));
+                .for_each(|interactor| interactor.lock().update_iteration(self.current_time));
             let activated_dendrites: Vec<Arc<Dendrite>> = self
                 .neurons
                 .par_iter()
-                .map(|neuron| neuron.try_trigger_action_potential(self.current_time))
-                .flat_map(|dendrites| {
-                    for dendrite in dendrites {
+                .map(|neuron| (neuron, neuron.try_trigger_action_potential(self.current_time)))
+                .flat_map(|(neuron, dendrites)| {
+                    // Cross-reference learning and reinforcment of dendrite weights
+                    // when an action potential is triggered.
+                    if dendrites.len() > 0 {
+                        for last_activated_dendrite in last_activated_dendrites.iter() {
+                            if Arc::ptr_eq(&last_activated_dendrite.target(), neuron) {
+                                last_activated_dendrite.set_weight(
+                                    last_activated_dendrite.weight()
+                                        + ACTIVATION_POTENTIAL_REINFORCEMENT,
+                                );
+                            }
+                        }
+                    }
+                    for dendrite in dendrites.iter() {
                         dendrite.trigger(self.current_time);
                     }
                     dendrites
                 })
                 .collect();
             dendrites_activated_since_last_evaluation += activated_dendrites.len() as u64;
+            last_activated_dendrites = activated_dendrites;
             self.current_time.increment();
             request_evaluation = self
                 .interactors
                 .iter()
-                .any(|interactor| interactor.request_evaluation());
+                .any(|interactor| interactor.lock().request_evaluation());
         }
 
         todo!(); // Generate an prediction error.
@@ -133,7 +144,7 @@ impl AssociationBasedNeuralNetwork {
     }
 
     pub fn mean_prediction_error(&self) -> f64 {
-        self.prediction_errors.into_iter().sum::<f64>() / (self.prediction_errors.len() as f64)
+        self.prediction_errors.iter().sum::<f64>() / (self.prediction_errors.len() as f64)
     }
 }
 

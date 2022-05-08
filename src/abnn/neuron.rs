@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 
@@ -19,7 +19,6 @@ pub struct Neuron {
     value: Mutex<f64>,
     last_value_update: Mutex<Iteration>,
     dendrites: Mutex<Vec<Arc<Dendrite>>>,
-    last_stimulations: Mutex<Vec<Dendrite>>,
 }
 
 impl Neuron {
@@ -29,7 +28,6 @@ impl Neuron {
             value: Mutex::new(NEURON_BASE_VALUE),
             last_value_update: Mutex::new(Iteration::new()),
             dendrites: Mutex::new(Vec::new()),
-            last_stimulations: Mutex::new(Vec::new()),
         }
     }
 
@@ -85,11 +83,6 @@ impl Neuron {
     /// Returns the timepoint when the value of the `Neuron` was last updated.
     pub fn last_value_update(&self) -> Iteration {
         *self.last_value_update.lock()
-    }
-
-    /// Returns the [`Dendrite`]s that last stimulated the `Neuron`.
-    pub fn last_stimulations(&self) -> Vec<Arc<Dendrite>> {
-        self.last_stimulations.lock().clone()
     }
 
     /// Sets the [`Neuron`]'s value as specified without updating the time.
