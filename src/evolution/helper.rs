@@ -118,14 +118,6 @@ impl Sub for &Iteration {
     }
 }
 
-impl Iterator for Iteration {
-    type Item = Iteration;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(self.increment())
-    }
-}
-
 impl Default for Iteration {
     fn default() -> Self {
         Iteration::new()
