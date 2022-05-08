@@ -16,4 +16,8 @@ pub trait Interactor {
     fn update_iteration(&mut self, time: Iteration);
 
     fn request_evaluation(&self) -> bool;
+
+    fn evalute_results(&mut self) -> Option<f64>;
+
+    fn initialise_new_evaluation(&mut self);
 }

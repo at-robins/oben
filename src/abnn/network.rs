@@ -76,6 +76,9 @@ impl AssociationBasedNeuralNetwork {
     }
 
     pub fn run_until_evaluation(&mut self) {
+        self.interactors
+            .par_iter()
+            .for_each(|interactor| interactor.lock().initialise_new_evaluation());
         let mut dendrites_activated_since_last_evaluation: u64 = 0;
         let mut request_evaluation = false;
         let mut last_activated_dendrites: Vec<Arc<Dendrite>> = Vec::new();
@@ -115,11 +118,21 @@ impl AssociationBasedNeuralNetwork {
                 .any(|interactor| interactor.lock().request_evaluation());
         }
 
-        todo!(); // Generate an prediction error.
-        let prediction_error = 1.0;
+        let interactor_prediction_errors: Vec<f64> = self
+            .interactors
+            .iter()
+            .filter_map(|interactor| interactor.lock().evalute_results())
+            .collect();
+        let prediction_error = interactor_prediction_errors.iter().sum::<f64>()
+            / (interactor_prediction_errors.len() as f64);
         self.update_prediction_errors(prediction_error);
 
-        let normalized_prediction_error = prediction_error - self.mean_prediction_error();
+        let normalized_prediction_error =
+            if let Some(mean_prediction_error) = self.mean_prediction_error() {
+                prediction_error - mean_prediction_error
+            } else {
+                0.0
+            };
 
         if dendrites_activated_since_last_evaluation > 0 {
             // Resets the amount of times the dendrite was acitvated.
@@ -143,8 +156,12 @@ impl AssociationBasedNeuralNetwork {
         }
     }
 
-    pub fn mean_prediction_error(&self) -> f64 {
-        self.prediction_errors.iter().sum::<f64>() / (self.prediction_errors.len() as f64)
+    pub fn mean_prediction_error(&self) -> Option<f64> {
+        if self.prediction_errors.is_empty() {
+            None
+        } else {
+            Some(self.prediction_errors.iter().sum::<f64>() / (self.prediction_errors.len() as f64))
+        }
     }
 }
 
