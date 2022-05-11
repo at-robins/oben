@@ -10,12 +10,13 @@ use super::{dendrite::Dendrite, interactor::Interactor, neuron::Neuron};
 
 /// The maximum number of prediction errors that is remembered for
 /// performance evaluation.
-pub const NUMBER_OF_REMEMBERED_PREDICTION_ERRORS: usize = 100;
+pub const NUMBER_OF_REMEMBERED_PREDICTION_ERRORS: usize = 10000;
 
 pub struct AssociationBasedNeuralNetwork {
     interactors: Vec<Arc<Mutex<dyn Interactor + Send + Sync>>>,
     neurons: Vec<Arc<Neuron>>,
     current_time: Iteration,
+    last_evaluation_time: Iteration,
     prediction_errors: VecDeque<f64>,
 }
 
@@ -56,7 +57,7 @@ impl AssociationBasedNeuralNetwork {
         for neuron in neurons.iter() {
             let mut available_targets: Vec<Arc<Neuron>> = neurons
                 .iter()
-                .filter(|target| Arc::ptr_eq(neuron, target))
+                .filter(|target| !Arc::ptr_eq(neuron, target))
                 .map(|target| Arc::clone(target))
                 .collect();
             for _ in 0..dendrites_per_neuron.get() {
@@ -71,6 +72,7 @@ impl AssociationBasedNeuralNetwork {
             interactors,
             neurons,
             current_time: Iteration::new(),
+            last_evaluation_time: Iteration::new(),
             prediction_errors: VecDeque::with_capacity(NUMBER_OF_REMEMBERED_PREDICTION_ERRORS),
         }
     }
@@ -82,15 +84,15 @@ impl AssociationBasedNeuralNetwork {
         let mut dendrites_activated_since_last_evaluation: u64 = 0;
         let mut request_evaluation = false;
         let mut last_activated_dendrites: Vec<Arc<Dendrite>> = Vec::new();
-        while !request_evaluation {
+        while !request_evaluation && self.current_time - self.last_evaluation_time < 10000 {
             self.interactors
                 .par_iter()
                 .for_each(|interactor| interactor.lock().update_iteration(self.current_time));
             let activated_dendrites: Vec<Arc<Dendrite>> = self
                 .neurons
                 .par_iter()
-                .map(|neuron| (neuron, neuron.try_trigger_action_potential(self.current_time)))
-                .flat_map(|(neuron, dendrites)| {
+                .map(|neuron| (neuron, neuron.value_at_timepoint(self.current_time), neuron.try_trigger_action_potential(self.current_time)))
+                .flat_map(|(neuron, source_value, dendrites)| {
                     // Cross-reference learning and reinforcment of dendrite weights
                     // when an action potential is triggered.
                     if dendrites.len() > 0 {
@@ -104,49 +106,54 @@ impl AssociationBasedNeuralNetwork {
                         }
                     }
                     for dendrite in dendrites.iter() {
-                        dendrite.trigger(self.current_time);
+                        dendrite.trigger(source_value, self.current_time);
                     }
                     dendrites
                 })
                 .collect();
             dendrites_activated_since_last_evaluation += activated_dendrites.len() as u64;
             last_activated_dendrites = activated_dendrites;
-            self.current_time.increment();
+            self.current_time = self.current_time.increment();
             request_evaluation = self
                 .interactors
                 .iter()
                 .any(|interactor| interactor.lock().request_evaluation());
-        }
-
-        let interactor_prediction_errors: Vec<f64> = self
+            }
+            
+            let interactor_prediction_errors: Vec<f64> = self
             .interactors
             .iter()
             .filter_map(|interactor| interactor.lock().evalute_results())
             .collect();
-        let prediction_error = interactor_prediction_errors.iter().sum::<f64>()
+            let prediction_error = interactor_prediction_errors.iter().sum::<f64>()
             / (interactor_prediction_errors.len() as f64);
         self.update_prediction_errors(prediction_error);
-
-        let normalized_prediction_error =
-            if let Some(mean_prediction_error) = self.mean_prediction_error() {
+        
+        let normalised_prediction_error =
+        if let Some(mean_prediction_error) = self.mean_prediction_error() {
                 prediction_error - mean_prediction_error
             } else {
                 0.0
             };
-
         if dendrites_activated_since_last_evaluation > 0 {
             // Resets the amount of times the dendrite was acitvated.
             self.neurons.par_iter().for_each(|neuron| {
                 neuron.dendrites().into_iter().for_each(|dendrite| {
                     let scaling_factor = dendrite.times_activated() as f64
                         / dendrites_activated_since_last_evaluation as f64;
-                    let updated_weight =
-                        dendrite.weight() - scaling_factor * normalized_prediction_error;
-                    dendrite.set_weight(updated_weight);
-                    dendrite.set_times_activated(0)
+                        let original_weight = dendrite.weight();
+                        let updated_weight = if original_weight >= 0.0 {
+                            - scaling_factor * normalised_prediction_error
+                        } else {
+                            scaling_factor * normalised_prediction_error
+                        };
+                        dendrite.add_weight_after_evaluation(updated_weight);
+                        dendrite.set_times_activated(0)
+                    });
                 });
-            });
-        }
+            }
+            println!("{}", self.current_time - self.last_evaluation_time);
+            self.last_evaluation_time = self.current_time;
     }
 
     fn update_prediction_errors(&mut self, prediction_error: f64) {

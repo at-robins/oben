@@ -8,12 +8,13 @@ use super::neuron::Neuron;
 
 /// The value that the connection weight is reinforced if an activation coincides with
 /// an action potential in the [`Neuron`].
-pub const ACTIVATION_POTENTIAL_REINFORCEMENT: f64 = 0.01;
+pub const ACTIVATION_POTENTIAL_REINFORCEMENT: f64 = 0.00001;
 
 pub struct Dendrite {
     weight: Mutex<f64>,
     target: Arc<Neuron>,
     times_activated: Mutex<u64>,
+    weight_modifier: Mutex<f64>,
 }
 
 impl Dendrite {
@@ -24,19 +25,12 @@ impl Dendrite {
     /// * `target` - the neuron targeted by this `Dendrite`
     /// * `weight` - the strenght of the dendrite influence on the target neuron  
     pub fn new(target: Arc<Neuron>, weight: f64) -> Self {
-        let normalised_weight = if weight.is_nan() {
-            0.0
-        } else if weight <= -1.0 {
-            -1.0
-        } else if weight >= 1.0 {
-            1.0
-        } else {
-            weight
-        };
+        let normalised_weight = Self::normalise_weight(weight);
         Self {
             weight: Mutex::new(normalised_weight),
             target,
             times_activated: Mutex::new(0),
+            weight_modifier: Mutex::new(0.0),
         }
     }
 
@@ -51,16 +45,32 @@ impl Dendrite {
     ///
     /// * `weight` - the new weight value to set
     pub fn set_weight(&self, weight: f64) {
-        let normalised_weight = if weight.is_nan() {
-            0.0
-        } else if weight <= -1.0 {
-            -1.0
-        } else if weight >= 1.0 {
-            1.0
-        } else {
-            weight
-        };
-        *self.weight.lock() = normalised_weight;
+        *self.weight.lock() = Self::normalise_weight(weight);
+    }
+
+    /// Returns the current weight modifier of the dendrite connection.
+    pub fn weight_modifier(&self) -> f64 {
+        *self.weight_modifier.lock()
+    }
+
+    /// Sets the weight modifier of the `Dendrite` to the specified value.
+    ///
+    /// # Parameters
+    ///
+    /// * `weight_modifier` - the new weight modifier value to set
+    pub fn set_weight_modifier(&self, weight_modifier: f64) {
+        *self.weight_modifier.lock() = Self::normalise_weight(weight_modifier);
+    }
+
+    /// Sets the weight of the `Dendrite` to the specified value
+    /// and includes some normalisation based on the previous corrections.
+    ///
+    /// # Parameters
+    ///
+    /// * `weight` - the value to add to the weight
+    pub fn add_weight_after_evaluation(&self, weight: f64) {
+        self.set_weight_modifier(self.weight_modifier() * 0.9 + weight * 0.1);
+        self.set_weight(self.weight() + self.weight_modifier());
     }
 
     /// Returns the target [`Neuron`].
@@ -91,9 +101,23 @@ impl Dendrite {
     /// # Panics
     ///
     /// If the specified timepoint is earlier than the last update.
-    pub fn trigger(&self, time: Iteration) {
-        self.target.add_value(self.weight(), time);
+    pub fn trigger(&self, source_value: f64, time: Iteration) {
+        if !self.target.add_value(self.weight() * source_value, time) {
+            self.set_weight(self.weight() - ACTIVATION_POTENTIAL_REINFORCEMENT);
+        }
         self.set_times_activated(self.times_activated() + 1);
+    }
+
+    fn normalise_weight(weight: f64) -> f64 {
+        if weight.is_nan() {
+            0.0
+        } else if weight <= -1.0 {
+            -1.0
+        } else if weight >= 1.0 {
+            1.0
+        } else {
+            weight
+        }
     }
 }
 

@@ -9,10 +9,15 @@ use super::dendrite::Dendrite;
 /// The base value / potential of a [`Neuron`].
 pub const NEURON_BASE_VALUE: f64 = 0.2;
 /// The threshold for triggering and activation potential.
-pub const NEURON_ACTIVATION_POTENTIAL_THRESHOLD: f64 = 0.95;
+pub const NEURON_ACTIVATION_POTENTIAL_THRESHOLD: f64 = 0.8;
 /// The halflife time of the value / potential change of a [`Neuron`]
-/// from the base level in [`Iteration`]s.
-pub const NEURON_VALUE_HALFLIFE: f64 = 16.0;
+/// from the base level in [`Iteration`]s when above the base level.
+pub const NEURON_VALUE_HALFLIFE: f64 = 64.0;
+/// The halflife time of the value / potential change of a [`Neuron`]
+/// from the base level in [`Iteration`]s when below the base level.
+pub const NEURON_VALUE_HALFLIFE_REFRACTORY: f64 = 4.0;
+/// The limit below which no value alterations can occur.
+pub const NEURON_REFRACTORY_LIMIT: f64 = NEURON_BASE_VALUE * 0.75;
 
 /// A neuron.
 pub struct Neuron {
@@ -56,9 +61,14 @@ impl Neuron {
             );
         } else if time_difference > 0 {
             if current_value != NEURON_BASE_VALUE {
+                let halflife = if current_value < NEURON_BASE_VALUE {
+                    NEURON_VALUE_HALFLIFE_REFRACTORY
+                } else {
+                    NEURON_VALUE_HALFLIFE
+                };
                 let value_difference: f64 = current_value - NEURON_BASE_VALUE;
                 let change: f64 =
-                    value_difference * 0.5f64.powf(time_difference as f64 / NEURON_VALUE_HALFLIFE);
+                    value_difference * 0.5f64.powf(time_difference as f64 / halflife);
                 self.set_value(NEURON_BASE_VALUE + change);
             }
             self.set_time(time);
@@ -90,7 +100,7 @@ impl Neuron {
     /// # Parameters
     ///
     /// * `value` - the new value
-    fn set_value(&self, value: f64) {
+    pub fn set_value(&self, value: f64) {
         let new_value = if value <= 0.0 || value.is_nan() {
             0.0
         } else if value >= 1.0 {
@@ -151,11 +161,12 @@ impl Neuron {
     /// # Parameters
     ///
     /// * `time` - the timepoint to set
-    fn set_time(&self, time: Iteration) {
+    pub fn set_time(&self, time: Iteration) {
         *self.last_value_update.lock() = time;
     }
 
-    /// Adds the specified value at the specified timepoint.
+    /// Adds the specified value at the specified timepoint and returns 
+    /// `true` if the addition was successfull or `false` if the `Neuron` was hyperpolarised.
     ///
     /// # Parameters
     ///
@@ -165,9 +176,14 @@ impl Neuron {
     /// # Panics
     ///
     /// If the specified timepoint is earlier than the last update.
-    pub fn add_value(&self, value: f64, time: Iteration) {
+    pub fn add_value(&self, value: f64, time: Iteration) -> bool {
         let current_value = self.value_at_timepoint(time);
-        self.set_value(current_value + value);
+        if current_value > NEURON_REFRACTORY_LIMIT {
+            self.set_value(current_value + value);
+            false
+        } else {
+            true
+        }
     }
 }
 
