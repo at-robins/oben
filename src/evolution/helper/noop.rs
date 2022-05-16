@@ -4,6 +4,9 @@ extern crate serde;
 
 use std::collections::HashMap;
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
 use crate::evolution::chemistry::{Input, Output};
 use crate::evolution::gene::Gene;
 
@@ -76,8 +79,11 @@ impl CrossOver for NoOpSubstrate {
     }
 }
 
-impl Reaction<NoOpSubstrate> for NoOpReaction {
-    fn react(&self, _educts: &[&NoOpSubstrate], _reaction_time: Iteration) -> Vec<NoOpSubstrate> {
+impl<T> Reaction<T> for NoOpReaction
+where
+    T: Information,
+{
+    fn react(&self, _educts: &[&T], _reaction_time: Iteration) -> Vec<T> {
         Vec::new()
     }
 
@@ -94,8 +100,11 @@ impl Reaction<NoOpSubstrate> for NoOpReaction {
     }
 }
 
-impl State<NoOpSubstrate> for NoOpState {
-    fn detect(&self, _substrates: &[&NoOpSubstrate], _detection_time: Iteration) -> bool {
+impl<T> State<T> for NoOpState
+where
+    T: Information,
+{
+    fn detect(&self, _substrates: &[&T], _detection_time: Iteration) -> bool {
         false
     }
 
@@ -108,15 +117,19 @@ impl State<NoOpSubstrate> for NoOpState {
     }
 }
 
-impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
-    fn set_input(&mut self, _input: NoOpInputElement) -> Vec<()> {
+impl<T, S> Input<T, S> for NoOpInputSensor
+where
+    T: Clone + Serialize + DeserializeOwned + Send + Sync + std::fmt::Debug + PartialEq,
+    S: Information,
+{
+    fn set_input(&mut self, _input: T) -> Vec<S> {
         Vec::new()
     }
 
     fn handle_feedback_substrate_changes(
         &mut self,
-        _changes: HashMap<usize, ()>,
-    ) -> std::option::Option<Vec<()>> {
+        _changes: HashMap<usize, S>,
+    ) -> std::option::Option<Vec<S>> {
         None
     }
 
@@ -125,12 +138,16 @@ impl Input<NoOpInputElement, NoOpSubstrate> for NoOpInputSensor {
     }
 }
 
-impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
-    fn get_output(&mut self, _information: Vec<Option<NoOpSubstrate>>) -> NoOpOutputElement {
-        ()
+impl<T, S> Output<T, S> for NoOpOutputSensor
+where
+    T: Clone + Serialize + DeserializeOwned + Send + Sync + std::fmt::Debug + PartialEq + Default,
+    S: Information,
+{
+    fn get_output(&mut self, _information: Vec<Option<S>>) -> T {
+        T::default()
     }
 
-    fn is_finished(&self, _information: NoOpSubstrate) -> bool {
+    fn is_finished(&self, _information: S) -> bool {
         false
     }
 
@@ -140,9 +157,9 @@ impl Output<NoOpOutputElement, NoOpSubstrate> for NoOpOutputSensor {
 
     fn handle_feedback_substrate_changes(
         &mut self,
-        _changes: HashMap<usize, NoOpSubstrate>,
-        _current_output_information: Vec<Option<NoOpSubstrate>>,
-    ) -> Option<Vec<NoOpSubstrate>> {
+        _changes: HashMap<usize, S>,
+        _current_output_information: Vec<Option<S>>,
+    ) -> Option<Vec<S>> {
         None
     }
 }

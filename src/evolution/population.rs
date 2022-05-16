@@ -1137,6 +1137,11 @@ impl<
                         .expect("A thread paniced while holding the individual's lock.")
                         .fitness()
                         .unwrap_or(0.0f64)
+                        // Add a very tiny amount of fitness so that individuals with a fitness of 
+                        // zero also have a chance of being selected. This also prevents the first
+                        // individual being constantly choosen when the mean fitness is zero,
+                        // and thereby degenerating the population.
+                        + 0.0000000001
                 })
                 .collect();
             let random_fitness_sum: f64 = thread_rng().gen_range(0.0..=fitness_values.iter().sum());
