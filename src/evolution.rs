@@ -1,6 +1,7 @@
 pub mod binary;
 pub mod chemistry;
 pub mod environment;
+pub mod function;
 pub mod gene;
 pub mod helper;
 pub mod neuron;
