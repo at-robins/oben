@@ -41,24 +41,26 @@ impl MathematicalFunction {
     /// # Parameters
     ///
     /// * `external_parameters` - the specified external parameters to use during evaluation
-    pub fn evaluate(&self, external_parameters: Option<Vec<f64>>) -> f64 {
+    pub fn evaluate<V: Borrow<Vec<f64>>>(&self, external_parameters: V) -> f64 {
         match &self {
-            MathematicalFunction::Absolute(value) => value.evaluate(None).abs(),
+            MathematicalFunction::Absolute(value) => value.evaluate(external_parameters).abs(),
             MathematicalFunction::Add(param_a, param_b) => {
-                param_a.evaluate(None) + param_b.evaluate(None)
+                param_a.evaluate(external_parameters.borrow())
+                    + param_b.evaluate(external_parameters.borrow())
             },
             MathematicalFunction::Constant(value) => *value,
-            MathematicalFunction::Cosinus(value) => value.evaluate(None).cos(),
-            MathematicalFunction::CosinusH(value) => value.evaluate(None).cosh(),
+            MathematicalFunction::Cosinus(value) => value.evaluate(external_parameters).cos(),
+            MathematicalFunction::CosinusH(value) => value.evaluate(external_parameters).cosh(),
             MathematicalFunction::Divide(param_a, param_b) => {
-                param_a.evaluate(None) / param_b.evaluate(None)
+                param_a.evaluate(external_parameters.borrow())
+                    / param_b.evaluate(external_parameters.borrow())
             },
             MathematicalFunction::ExternalParameter(identifier) => {
-                Self::identifier_to_external_parameter(*identifier, &external_parameters)
+                Self::identifier_to_external_parameter(*identifier, external_parameters)
             },
             MathematicalFunction::LimitLowerBound(value, lower_bound) => {
-                let val = value.evaluate(None);
-                let bound = lower_bound.evaluate(None);
+                let val = value.evaluate(external_parameters.borrow());
+                let bound = lower_bound.evaluate(external_parameters.borrow());
                 if val < bound {
                     bound
                 } else {
@@ -66,20 +68,20 @@ impl MathematicalFunction {
                 }
             },
             MathematicalFunction::LimitUpperBound(value, upper_bound) => {
-                let val = value.evaluate(None);
-                let bound = upper_bound.evaluate(None);
+                let val = value.evaluate(external_parameters.borrow());
+                let bound = upper_bound.evaluate(external_parameters.borrow());
                 if val > bound {
                     bound
                 } else {
                     val
                 }
             },
-            MathematicalFunction::Logarithm(value, base) => {
-                value.evaluate(None).log(base.evaluate(None))
-            },
+            MathematicalFunction::Logarithm(value, base) => value
+                .evaluate(external_parameters.borrow())
+                .log(base.evaluate(external_parameters.borrow())),
             MathematicalFunction::Maximum(param_a, param_b) => {
-                let a = param_a.evaluate(None);
-                let b = param_b.evaluate(None);
+                let a = param_a.evaluate(external_parameters.borrow());
+                let b = param_b.evaluate(external_parameters.borrow());
                 if a >= b {
                     a
                 } else {
@@ -87,8 +89,8 @@ impl MathematicalFunction {
                 }
             },
             MathematicalFunction::Minimum(param_a, param_b) => {
-                let a = param_a.evaluate(None);
-                let b = param_b.evaluate(None);
+                let a = param_a.evaluate(external_parameters.borrow());
+                let b = param_b.evaluate(external_parameters.borrow());
                 if a <= b {
                     a
                 } else {
@@ -96,18 +98,20 @@ impl MathematicalFunction {
                 }
             },
             MathematicalFunction::Multiply(param_a, param_b) => {
-                param_a.evaluate(None) * param_b.evaluate(None)
+                param_a.evaluate(external_parameters.borrow())
+                    * param_b.evaluate(external_parameters.borrow())
             },
-            MathematicalFunction::Power(value, exponent) => {
-                value.evaluate(None).powf(exponent.evaluate(None))
-            },
-            MathematicalFunction::Sinus(value) => value.evaluate(None).sin(),
-            MathematicalFunction::SinusH(value) => value.evaluate(None).sinh(),
+            MathematicalFunction::Power(value, exponent) => value
+                .evaluate(external_parameters.borrow())
+                .powf(exponent.evaluate(external_parameters.borrow())),
+            MathematicalFunction::Sinus(value) => value.evaluate(external_parameters).sin(),
+            MathematicalFunction::SinusH(value) => value.evaluate(external_parameters).sinh(),
             MathematicalFunction::Subtract(param_a, param_b) => {
-                param_a.evaluate(None) - param_b.evaluate(None)
+                param_a.evaluate(external_parameters.borrow())
+                    - param_b.evaluate(external_parameters.borrow())
             },
-            MathematicalFunction::Tangens(value) => value.evaluate(None).tan(),
-            MathematicalFunction::TangensH(value) => value.evaluate(None).tanh(),
+            MathematicalFunction::Tangens(value) => value.evaluate(external_parameters).tan(),
+            MathematicalFunction::TangensH(value) => value.evaluate(external_parameters).tanh(),
         }
     }
 
@@ -118,20 +122,20 @@ impl MathematicalFunction {
     ///
     /// * `identifier` - the identifier to perform the lookup for
     /// * `external_parameters` - the list to use for the lookup
-    fn identifier_to_external_parameter(
+    fn identifier_to_external_parameter<V: Borrow<Vec<f64>>>(
         identifier: usize,
-        external_parameters: &Option<Vec<f64>>,
+        external_parameters: V,
     ) -> f64 {
         *(external_parameters
-            .as_ref()
-            .and_then(|params| params.get(identifier))
+            .borrow()
+            .get(identifier)
             .unwrap_or(&EXTERNAL_PARAMETER_DEFAULT))
     }
 
     /// Samples a mathematical function with a maximum depth as specified.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `rng` - the random number generator to use for sampling
     /// * `max_depth` - the maximum number of function evaluation layers
     /// * `parameters` - the external parameter identifiers that can be used
