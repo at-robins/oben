@@ -15,7 +15,7 @@ use std::cell::RefCell;
 /// A type alias for the underlying binary representation of [`Substrate`]s.
 ///
 /// [`Substrate`]: ../protein/struct.Substrate.html
-pub type BinarySubstrate = BitBox<Msb0, u8>;
+pub type BinarySubstrate = BitBox<u8, Msb0>;
 /*
 /// A type alias for the representation of a binary [`Genome`].
 ///
@@ -39,7 +39,7 @@ pub fn as_64(substrate: &BinarySubstrate) -> [u8; 8] {
         panic!("64 bits are required for conversion, but {} were passed.", substrate.len());
     }
     let mut array = [0; 8];
-    let bytes = &substrate.as_slice()[..array.len()];
+    let bytes = &substrate.as_raw_slice()[..array.len()];
     array.copy_from_slice(bytes);
     array
 }

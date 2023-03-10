@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::path::Path;
@@ -67,21 +67,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     >
     Genome<
@@ -558,10 +546,8 @@ impl<
     where
         P: AsRef<Path>,
     {
-        let mut file = File::open(&path_to_file)?;
-        let mut file_content = Vec::new();
-        file.read_to_end(&mut file_content)?;
-        let genome = rmp_serde::from_read_ref(&file_content)?;
+        let file = File::open(&path_to_file)?;
+        let genome = rmp_serde::from_read(&file)?;
         Ok(genome)
     }
 
@@ -666,21 +652,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information + Default,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType> + Default,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType> + Default,
     > Default
     for Genome<
@@ -714,21 +688,9 @@ impl<
         ReactionType: Reaction<InformationType>,
         StateType: State<InformationType>,
         InformationType: Information,
-        InputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        InputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         InputSensorType: Input<InputElementType, InformationType>,
-        OutputElementType: Clone
-            + std::fmt::Debug
-            + PartialEq
-            + Send
-            + Sync
-            + Serialize
-            + DeserializeOwned,
+        OutputElementType: Clone + std::fmt::Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned,
         OutputSensorType: Output<OutputElementType, InformationType>,
     > CrossOver
     for Genome<

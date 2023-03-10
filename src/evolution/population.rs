@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::rc::Rc;
@@ -940,9 +940,7 @@ impl<
     where
         P: AsRef<Path>,
     {
-        let mut file = File::open(&path_to_file)?;
-        let mut file_content = Vec::new();
-        file.read_to_end(&mut file_content)?;
+        let file = File::open(&path_to_file)?;
         let serialisable_population: SerialisablePopulation<
             ReactionType,
             StateType,
@@ -951,7 +949,7 @@ impl<
             InputSensorType,
             OutputElementType,
             OutputSensorType,
-        > = rmp_serde::from_read_ref(&file_content)?;
+        > = rmp_serde::from_read(&file)?;
         Ok(serialisable_population.into())
     }
 
