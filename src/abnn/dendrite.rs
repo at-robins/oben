@@ -4,17 +4,15 @@ use parking_lot::Mutex;
 
 use crate::evolution::helper::Iteration;
 
-use super::neuron::Neuron;
-
-/// The value that the connection weight is reinforced if an activation coincides with
-/// an action potential in the [`Neuron`].
-pub const ACTIVATION_POTENTIAL_REINFORCEMENT: f64 = 0.00001;
+use super::{neuron::Neuron, parameters::ConfigurableParameters};
 
 pub struct Dendrite {
     weight: Mutex<f64>,
     target: Arc<Neuron>,
     times_activated: Mutex<u64>,
     weight_modifier: Mutex<f64>,
+    inhibitory: bool,
+    configuration: Arc<ConfigurableParameters>,
 }
 
 impl Dendrite {
@@ -24,14 +22,28 @@ impl Dendrite {
     ///
     /// * `target` - the neuron targeted by this `Dendrite`
     /// * `weight` - the strenght of the dendrite influence on the target neuron  
-    pub fn new(target: Arc<Neuron>, weight: f64) -> Self {
+    /// * `inhibitory` - if the `Dendrite` is inhibitory
+    /// * `configuration` - a set of configuration parameters
+    pub fn new(
+        target: Arc<Neuron>,
+        weight: f64,
+        inhibitory: bool,
+        configuration: Arc<ConfigurableParameters>,
+    ) -> Self {
         let normalised_weight = Self::normalise_weight(weight);
         Self {
             weight: Mutex::new(normalised_weight),
             target,
             times_activated: Mutex::new(0),
             weight_modifier: Mutex::new(0.0),
+            inhibitory,
+            configuration,
         }
+    }
+
+    /// Checks if the `Dendrite` is inhibitory.
+    pub fn is_inhibitory(&self) -> bool {
+        self.inhibitory
     }
 
     /// Returns the weight of the dendrite connection.
@@ -101,9 +113,40 @@ impl Dendrite {
     /// # Panics
     ///
     /// If the specified timepoint is earlier than the last update.
-    pub fn trigger(&self, source_value: f64, time: Iteration) {
-        if !self.target.add_value(self.weight() * source_value, time) {
-            self.set_weight(self.weight() - ACTIVATION_POTENTIAL_REINFORCEMENT);
+    pub fn trigger(&self, source_value: f64, network_activity: f64, time: Iteration) {
+        let current_weight = self.weight();
+        let scaling_factor = (self
+            .configuration
+            .dendrite_global_activity_regulation_midpoint()
+            .exp()
+            / network_activity.exp())
+        .powf(
+            self.configuration
+                .dendrite_global_activity_regulation_exponent(),
+        );
+        // println!("activity: {} ; scaling factor: {}", network_activity, scaling_factor);
+        let scaled_weight = if current_weight == 0.0 {
+            0.0
+        } else if !self.is_inhibitory() {
+            current_weight
+                * self
+                    .configuration
+                    .dendrite_global_activity_regulation_scaling_reinforcment()
+                * scaling_factor
+        } else {
+            -current_weight
+                * self
+                    .configuration
+                    .dendrite_global_activity_regulation_scaling_depression()
+                / scaling_factor
+        };
+        if !self.target.add_value(scaled_weight, time) {
+            self.set_weight(
+                self.weight()
+                    - self
+                        .configuration
+                        .dendrite_activation_potential_depression(),
+            );
         }
         self.set_times_activated(self.times_activated() + 1);
     }
@@ -111,8 +154,8 @@ impl Dendrite {
     fn normalise_weight(weight: f64) -> f64 {
         if weight.is_nan() {
             0.0
-        } else if weight <= -1.0 {
-            -1.0
+        } else if weight <= 0.0 {
+            0.0
         } else if weight >= 1.0 {
             1.0
         } else {

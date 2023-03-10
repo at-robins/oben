@@ -4,7 +4,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    binary::{as_f64, f64_to_binary},
+    binary::{as_f64, f64_to_binary, flip_random_bit},
+    chemistry::Information,
     gene::CrossOver,
     helper::do_a_or_b,
 };
@@ -272,6 +273,220 @@ impl MathematicalFunction {
             Self::ExternalParameter(*parameters.get(rng.gen_range(0..parameters.len())).unwrap())
         }
     }
+
+    /// Returns a mutated version of the `MathematicalFunction`.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `rng` - the pseudorandom number generator to use
+    /// * `external_parameters` - the parameter identifiers supplied by external sources 
+    /// * `mutation_chance` - the chance of a mutation at an given branch of the function
+    pub fn mutate<R: Rng + ?Sized, V: Borrow<Vec<usize>>>(
+        &self,
+        rng: &mut R,
+        external_parameters: V,
+        mutation_chance: f64,
+    ) -> Self {
+        if mutation_chance < 0.0 || mutation_chance > 1.0 {
+            panic!("The chance {} is out of bounds.", mutation_chance);
+        }
+        if rng.gen_range(0.0..=1.0f64) <= mutation_chance {
+            match rng.gen_range(0..2) {
+                0 => self.mutate_unwrap_function_or_change_value(rng, external_parameters),
+                1 => self.mutate_wrap_function(rng, external_parameters),
+                _ => panic!("Sampling out of bounds."),
+            }
+        } else {
+            match &self {
+                MathematicalFunction::Absolute(value) => Self::Absolute(Box::new(value.mutate(
+                    rng,
+                    external_parameters,
+                    mutation_chance,
+                ))),
+                MathematicalFunction::Add(augend, addend) => Self::Add(
+                    Box::new(augend.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(addend.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Constant(_) => self.clone(),
+                MathematicalFunction::Cosinus(value) => {
+                    Self::Cosinus(Box::new(value.mutate(rng, external_parameters, mutation_chance)))
+                },
+                MathematicalFunction::CosinusH(value) => Self::CosinusH(Box::new(value.mutate(
+                    rng,
+                    external_parameters,
+                    mutation_chance,
+                ))),
+                MathematicalFunction::Divide(dividend, divisor) => Self::Divide(
+                    Box::new(dividend.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(divisor.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::ExternalParameter(_) => self.clone(),
+                MathematicalFunction::LimitLowerBound(value, lower_bound) => Self::LimitLowerBound(
+                    Box::new(value.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(lower_bound.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::LimitUpperBound(value, upper_bound) => Self::LimitUpperBound(
+                    Box::new(value.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(upper_bound.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Logarithm(value, base) => Self::Logarithm(
+                    Box::new(value.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(base.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Maximum(a, b) => Self::Maximum(
+                    Box::new(a.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(b.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Minimum(a, b) => Self::Minimum(
+                    Box::new(a.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(b.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Multiply(multiplier, multiplicand) => Self::Multiply(
+                    Box::new(multiplier.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(multiplicand.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Power(value, exponent) => Self::Power(
+                    Box::new(value.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(exponent.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Sinus(value) => {
+                    Self::Sinus(Box::new(value.mutate(rng, external_parameters, mutation_chance)))
+                },
+                MathematicalFunction::SinusH(value) => {
+                    Self::SinusH(Box::new(value.mutate(rng, external_parameters, mutation_chance)))
+                },
+                MathematicalFunction::Subtract(minuend, subtrahend) => Self::Subtract(
+                    Box::new(minuend.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                    Box::new(subtrahend.mutate(rng, external_parameters.borrow(), mutation_chance)),
+                ),
+                MathematicalFunction::Tangens(value) => {
+                    Self::Tangens(Box::new(value.mutate(rng, external_parameters, mutation_chance)))
+                },
+                MathematicalFunction::TangensH(value) => Self::TangensH(Box::new(value.mutate(
+                    rng,
+                    external_parameters,
+                    mutation_chance,
+                ))),
+            }
+        }
+    }
+
+    fn mutate_unwrap_function_or_change_value<R: Rng + ?Sized, V: Borrow<Vec<usize>>>(
+        &self,
+        rng: &mut R,
+        external_parameters: V,
+    ) -> Self {
+        match &self {
+            MathematicalFunction::Absolute(value) => *value.clone(),
+            MathematicalFunction::Add(augend, addend) => {
+                do_a_or_b(|| *augend.clone(), || *addend.clone())
+            },
+            MathematicalFunction::Constant(value) => {
+                MathematicalFunction::Constant(as_f64(&flip_random_bit(&f64_to_binary(*value))))
+            },
+            MathematicalFunction::Cosinus(value) => *value.clone(),
+            MathematicalFunction::CosinusH(value) => *value.clone(),
+            MathematicalFunction::Divide(dividend, divisor) => {
+                do_a_or_b(|| *dividend.clone(), || *divisor.clone())
+            },
+            MathematicalFunction::ExternalParameter(_) => {
+                MathematicalFunction::sample_external_parameter(rng, external_parameters)
+            },
+            MathematicalFunction::LimitLowerBound(value, lower_bound) => {
+                do_a_or_b(|| *value.clone(), || *lower_bound.clone())
+            },
+            MathematicalFunction::LimitUpperBound(value, upper_bound) => {
+                do_a_or_b(|| *value.clone(), || *upper_bound.clone())
+            },
+            MathematicalFunction::Logarithm(value, base) => {
+                do_a_or_b(|| *value.clone(), || *base.clone())
+            },
+            MathematicalFunction::Maximum(a, b) => do_a_or_b(|| *a.clone(), || *b.clone()),
+            MathematicalFunction::Minimum(a, b) => do_a_or_b(|| *a.clone(), || *b.clone()),
+            MathematicalFunction::Multiply(multiplier, multiplicand) => {
+                do_a_or_b(|| *multiplier.clone(), || *multiplicand.clone())
+            },
+            MathematicalFunction::Power(value, exponent) => {
+                do_a_or_b(|| *value.clone(), || *exponent.clone())
+            },
+            MathematicalFunction::Sinus(value) => *value.clone(),
+            MathematicalFunction::SinusH(value) => *value.clone(),
+            MathematicalFunction::Subtract(minuend, subtrahend) => {
+                do_a_or_b(|| *minuend.clone(), || *subtrahend.clone())
+            },
+            MathematicalFunction::Tangens(value) => *value.clone(),
+            MathematicalFunction::TangensH(value) => *value.clone(),
+        }
+    }
+
+    fn mutate_wrap_function<R: Rng + ?Sized, V: Borrow<Vec<usize>>>(
+        &self,
+        rng: &mut R,
+        parameters: V,
+    ) -> Self {
+        match rng.gen_range(0usize..17) {
+            0 => Self::Absolute(Box::new(self.clone())),
+            1 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Add(left, right)
+            },
+            2 => Self::Cosinus(Box::new(self.clone())),
+            3 => Self::CosinusH(Box::new(self.clone())),
+            4 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Divide(left, right)
+            },
+            5 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::LimitLowerBound(left, right)
+            },
+            6 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::LimitUpperBound(left, right)
+            },
+            7 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Logarithm(left, right)
+            },
+            8 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Maximum(left, right)
+            },
+            9 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Minimum(left, right)
+            },
+            10 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Multiply(left, right)
+            },
+            11 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Power(left, right)
+            },
+            12 => Self::Sinus(Box::new(self.clone())),
+            13 => Self::SinusH(Box::new(self.clone())),
+            14 => {
+                let (left, right) = self.wrap_two_arguments(rng, parameters);
+                Self::Subtract(left, right)
+            },
+            15 => Self::Tangens(Box::new(self.clone())),
+            16 => Self::TangensH(Box::new(self.clone())),
+            _ => panic!("Sampling out of bounds."),
+        }
+    }
+
+    fn wrap_two_arguments<R: Rng + ?Sized, V: Borrow<Vec<usize>>>(
+        &self,
+        rng: &mut R,
+        parameters: V,
+    ) -> (Box<MathematicalFunction>, Box<MathematicalFunction>) {
+        if rng.gen() {
+            (Box::new(self.clone()), Self::sample_boxed(rng, 0, parameters.borrow(), 0))
+        } else {
+            (Self::sample_boxed(rng, 0, parameters.borrow(), 0), Box::new(self.clone()))
+        }
+    }
 }
 
 impl CrossOver for MathematicalFunction {
@@ -443,8 +658,8 @@ impl Display for MathematicalFunction {
             MathematicalFunction::Minimum(a, b) => {
                 write!(f, "min({}, {})", a, b)
             },
-            MathematicalFunction::Multiply(multiplier, mutiplicand) => {
-                write!(f, "({}) * ({})", multiplier, mutiplicand)
+            MathematicalFunction::Multiply(multiplier, multiplicand) => {
+                write!(f, "({}) * ({})", multiplier, multiplicand)
             },
             MathematicalFunction::Power(value, exponent) => {
                 write!(f, "({})^({})", value, exponent)
@@ -466,6 +681,12 @@ impl Default for MathematicalFunction {
     }
 }
 
+impl Information for MathematicalFunction {
+    fn update_value(&mut self, _time_passed: i32) {}
+}
+
 unsafe impl Send for MathematicalFunction {}
 
 unsafe impl Sync for MathematicalFunction {}
+
+pub mod function_mutation;

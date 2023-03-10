@@ -1,0 +1,148 @@
+//! The `parameter` module contains aliases and helper functions for working with mathematical
+//! parameters.
+extern crate serde;
+
+use super::binary::{as_f64, f64_to_binary};
+use super::chemistry::{Information, Reaction, State};
+use super::gene::{CrossOver, Gene, GeneSubstrate, Genome, GenomeMutation};
+use super::helper::{do_a_or_b, Iteration};
+use serde::{Deserialize, Serialize};
+use rand::{thread_rng, Rng};
+
+/// A type alias for the underlying representation of [`Substrate`]s.
+///
+/// [`Substrate`]: ../protein/struct.Substrate.html
+pub type ParameterSubstrate = f64;
+/// A type alias for the representation of a parameter [`Genome`].
+///
+/// [`Genome`]: ../gene/struct.Genome.html
+pub type ParameterGenome = Genome<ParameterReaction, ParameterState, ParameterSubstrate>;
+
+impl CrossOver for ParameterSubstrate {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        as_f64(&f64_to_binary(*self).cross_over(&f64_to_binary(*other)))
+    }
+}
+
+impl Information for ParameterSubstrate {
+    fn update_value(&mut self, _time_passed: i32) {
+        // Does nothing as no update of the internal value is required.
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct ParameterReaction {}
+
+impl Reaction<ParameterSubstrate> for ParameterReaction {
+    fn react(&self, _educts: &[&ParameterSubstrate], _reaction_time: Iteration) -> Vec<ParameterSubstrate> {
+        Vec::new()
+    }
+
+    fn get_educt_number(&self) -> usize {
+        0
+    }
+
+    fn get_product_number(&self) -> usize {
+        0
+    }
+
+    fn random() -> Self {
+        ParameterReaction{}
+    }
+}
+
+impl CrossOver for ParameterReaction {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        do_a_or_b(|| self.clone(), || other.clone())
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct ParameterState {}
+
+impl State<ParameterSubstrate> for ParameterState {
+
+    fn detect(&self, _substrates: &[&ParameterSubstrate], _detection_time: Iteration) -> bool {
+        false
+    }
+
+    fn get_substrate_number(&self) -> usize {
+        0
+    }
+
+    fn random() -> Self {
+        ParameterState{}
+    }
+}
+
+impl CrossOver for ParameterState {
+    fn is_similar(&self, _other: &Self) -> bool {
+        true
+    }
+
+    fn cross_over(&self, other: &Self) -> Self {
+        do_a_or_b(|| self.clone(), || other.clone())
+    }
+}
+
+pub fn new_genome(output: usize) -> ParameterGenome {
+    if output == 0 {
+        panic!("Zero parameters cannot be optimised.");
+    }
+    let mut subs: Vec<ParameterSubstrate> = Vec::new();
+    for _ in 0..output {
+        //subs.push(f64::from_le_bytes(thread_rng().gen()));
+        subs.push(thread_rng().gen_range(-5.24, 5.24));
+    }
+    let gene = Gene::new(subs);
+    Genome::new(
+        Vec::new(),
+        (0..output).map(|o| Some(GeneSubstrate::new(0, o))).collect(),
+        vec!(gene)
+    )
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum ParameterMutation {
+    FLIP,
+}
+
+impl ParameterMutation {
+    fn flip(genome: &ParameterGenome) -> Option<ParameterGenome> {
+        let mut mutated_genome = genome.duplicate();
+        let random_substrate = genome.random_gene_substrate();
+        let parameter_value = mutated_genome.get_substrate_mut(random_substrate).unwrap();
+        let mut base_substrate = f64_to_binary(*parameter_value);
+        let random_bit_index = thread_rng().gen_range(0, base_substrate.len());
+        // The unwrap should always work, since the index being in range was checked for.
+        // The clone should be cheap as a bool primitive is cloned.
+        let random_bit = base_substrate.get(random_bit_index).unwrap().clone();
+        // Flip the bit.
+        base_substrate.set(random_bit_index, random_bit ^ true);
+        *parameter_value = as_f64(&base_substrate);
+        Some(mutated_genome)
+    }
+}
+
+impl GenomeMutation<ParameterReaction, ParameterState, ParameterSubstrate> for ParameterMutation {
+    fn mutate(&self, genome: &ParameterGenome) -> Option<ParameterGenome> {
+        match self {
+            ParameterMutation::FLIP => ParameterMutation::flip(genome),
+        }
+    }
+
+    fn random() -> Self {
+        match thread_rng().gen_range(0u8, 3) {
+            0 => ParameterMutation::FLIP,
+            _ => panic!("A random number with no matching genomic mutation was created."),
+        }
+    }
+}

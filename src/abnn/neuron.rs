@@ -4,35 +4,28 @@ use parking_lot::Mutex;
 
 use crate::evolution::helper::Iteration;
 
-use super::dendrite::Dendrite;
-
-/// The base value / potential of a [`Neuron`].
-pub const NEURON_BASE_VALUE: f64 = 0.2;
-/// The threshold for triggering and activation potential.
-pub const NEURON_ACTIVATION_POTENTIAL_THRESHOLD: f64 = 0.8;
-/// The halflife time of the value / potential change of a [`Neuron`]
-/// from the base level in [`Iteration`]s when above the base level.
-pub const NEURON_VALUE_HALFLIFE: f64 = 64.0;
-/// The halflife time of the value / potential change of a [`Neuron`]
-/// from the base level in [`Iteration`]s when below the base level.
-pub const NEURON_VALUE_HALFLIFE_REFRACTORY: f64 = 4.0;
-/// The limit below which no value alterations can occur.
-pub const NEURON_REFRACTORY_LIMIT: f64 = NEURON_BASE_VALUE * 0.75;
+use super::{dendrite::Dendrite, parameters::ConfigurableParameters};
 
 /// A neuron.
 pub struct Neuron {
     value: Mutex<f64>,
     last_value_update: Mutex<Iteration>,
     dendrites: Mutex<Vec<Arc<Dendrite>>>,
+    configuration: Arc<ConfigurableParameters>,
 }
 
 impl Neuron {
     /// Creates a new `Neuron`.
-    pub fn new() -> Self {
+    /// 
+    /// # Parameters
+    /// 
+    /// * `configuration` - a set of configuration parameters
+    pub fn new(configuration: Arc<ConfigurableParameters>) -> Self {
         Self {
-            value: Mutex::new(NEURON_BASE_VALUE),
+            value: Mutex::new(configuration.neuron_base_value()),
             last_value_update: Mutex::new(Iteration::new()),
             dendrites: Mutex::new(Vec::new()),
+            configuration,
         }
     }
 
@@ -60,16 +53,16 @@ impl Neuron {
                 self.last_value_update()
             );
         } else if time_difference > 0 {
-            if current_value != NEURON_BASE_VALUE {
-                let halflife = if current_value < NEURON_BASE_VALUE {
-                    NEURON_VALUE_HALFLIFE_REFRACTORY
+            if current_value != self.configuration.neuron_base_value() {
+                let halflife = if current_value < self.configuration.neuron_base_value() {
+                    self.configuration.neuron_value_halflife_refractory()
                 } else {
-                    NEURON_VALUE_HALFLIFE
+                    self.configuration.neuron_value_halflife()
                 };
-                let value_difference: f64 = current_value - NEURON_BASE_VALUE;
+                let value_difference: f64 = current_value - self.configuration.neuron_base_value();
                 let change: f64 =
                     value_difference * 0.5f64.powf(time_difference as f64 / halflife);
-                self.set_value(NEURON_BASE_VALUE + change);
+                self.set_value(self.configuration.neuron_base_value() + change);
             }
             self.set_time(time);
         }
@@ -134,7 +127,7 @@ impl Neuron {
     ///
     /// If the specified timepoint is earlier than the last update.
     pub fn should_trigger_activation_potential(&self, time: Iteration) -> bool {
-        self.value_at_timepoint(time) >= NEURON_ACTIVATION_POTENTIAL_THRESHOLD
+        self.value_at_timepoint(time) >= self.configuration.neuron_activation_threshold()
     }
 
     /// Tries to trigger an action potential and returns the influenced dendrites if successful.
@@ -178,7 +171,7 @@ impl Neuron {
     /// If the specified timepoint is earlier than the last update.
     pub fn add_value(&self, value: f64, time: Iteration) -> bool {
         let current_value = self.value_at_timepoint(time);
-        if current_value > NEURON_REFRACTORY_LIMIT {
+        if current_value > self.configuration.neuron_refractory_limit() {
             self.set_value(current_value + value);
             false
         } else {
@@ -186,44 +179,6 @@ impl Neuron {
         }
     }
 }
-
-/*impl Clone for Neuron {
-    fn clone(&self) -> Self {
-        let cloned_value = self.value();
-        let cloned_last_value_update = self.last_value_update();
-        Self {
-            value: Mutex::new(cloned_value),
-            last_value_update: Mutex::new(cloned_last_value_update),
-            dendrites: Mutex::new(self.dendrites()),
-            last_action_potential: Mutex::new(self.last_action_potential()),
-        }
-    }
-}
-
-impl std::fmt::Debug for Neuron {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Neuron")
-            .field("value", &self.value())
-            .field("last_value_update", &self.last_value_update())
-            .field("dendrites", &self.dendrites())
-            .field("last_action_potential", &self.last_action_potential())
-            .finish()
-    }
-}
-
-impl PartialEq for Neuron {
-    fn eq(&self, other: &Self) -> bool {
-        let dendrite_equality: bool = self
-            .dendrites()
-            .into_iter()
-            .zip(other.dendrites().into_iter())
-            .all(|(a, b)| Arc::ptr_eq(&a, &b));
-        self.value() == other.value()
-            && self.last_value_update() == other.last_value_update()
-            && dendrite_equality
-            && self.last_action_potential() == other.last_action_potential()
-    }
-} */
 
 unsafe impl Send for Neuron {}
 
