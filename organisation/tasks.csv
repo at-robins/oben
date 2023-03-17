@@ -13,7 +13,7 @@ ID,Title,Category,Description,Result,Status,Date
 12,Switch mutex implementaiton to parking_lot,Feature,The parking_lot crate is the defacto standard for asynchronous types and all usages of Mutex should be replaced accordingly.,,,
 13,Add more input and output sensors for neural networks,Feature,Additional input and output sensors for neural networks should be implemented to allow broader application of those networks.,,,
 14,Implement a sole frequency based neural network,Feature,A frequency based neural network should be implemented to test the general performance of a learning simulation without genetic components.,,,
-15,,,,,,
+15,Change Nlbf64 to use generics for bounds,Feature,Nlbf64 should accept generic upper and lower bounds via const generics.,,,
 16,,,,,,
 17,,,,,,
 18,,,,,,

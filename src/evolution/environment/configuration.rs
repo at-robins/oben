@@ -451,7 +451,7 @@ impl Environment {
     pub fn generate_uuid(&self) -> Uuid {
         // It was ensured, that the UUID node is exactly 6 byte long,
         // so the creation cannot fail.
-        Uuid::new_v1(self.uuid_timestamp(), self.uuid_node()).unwrap()
+        Uuid::new_v1(self.uuid_timestamp(), self.uuid_node())
     }
 
     /// Returns the file path to the [`Genome`] with the specified UUID.

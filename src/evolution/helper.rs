@@ -382,6 +382,7 @@ impl CrossOver for Nlbf64 {
     }
 }
 
+pub mod nlgbf;
 pub mod noop;
 pub mod testing;
 #[cfg(test)]
