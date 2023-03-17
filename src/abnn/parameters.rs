@@ -3,7 +3,11 @@ use rand::{thread_rng, Rng};
 use rand_distr::{Distribution, Standard};
 use serde::{Deserialize, Serialize};
 
-use crate::evolution::{chemistry::Information, gene::CrossOver, helper::Nlbf64};
+use crate::evolution::{
+    chemistry::Information,
+    gene::CrossOver,
+    helper::{nlgbf::Nlgbf64, Nlbf64},
+};
 
 #[derive(Builder, Copy, Clone, Serialize, Deserialize, PartialEq)]
 #[builder(default)]
@@ -15,26 +19,26 @@ pub struct ConfigurableParameters {
     neuron_activation_threshold: Nlbf64,
     /// The halflife time of the value / potential change of a [`Neuron`]
     /// from the base level in [`Iteration`]s when above the base level.
-    neuron_value_halflife: Nlbf64,
+    neuron_value_halflife: Nlgbf64<1, -9, 10000, 0>,
     /// The halflife time of the value / potential change of a [`Neuron`]
     /// from the base level in [`Iteration`]s when below the base level.
-    neuron_value_halflife_refractory: Nlbf64,
+    neuron_value_halflife_refractory: Nlgbf64<1, -9, 10000, 0>,
     /// The limit below which no value alterations can occur.
     neuron_refractory_limit: Nlbf64,
     /// The value that the connection weight is reinforced if an activation coincides with
     /// an action potential in the [`Neuron`].
-    dendrite_activation_potential_reinforcement: Nlbf64,
+    dendrite_activation_potential_reinforcement: Nlgbf64<-1, 0, 1, 0>,
     /// The value that the connection weight is depressed if an activation coincides with
     /// a [`Neuron`] in the refractory state.
-    dendrite_activation_potential_depression: Nlbf64,
+    dendrite_activation_potential_depression: Nlgbf64<-1, 0, 1, 0>,
     /// The relative activity of the network where no weight scaling is performed.
     dendrite_global_activity_regulation_midpoint: Nlbf64,
     /// The exponent of relative network activity related weight scaling.
-    dendrite_global_activity_regulation_exponent: Nlbf64,
+    dendrite_global_activity_regulation_exponent: Nlgbf64<-20, 0, 20, 0>,
     /// The scaing factor applied to positive [`Dendrite`] weights.
-    dendrite_global_activity_regulation_scaling_reinforcment: Nlbf64,
+    dendrite_global_activity_regulation_scaling_reinforcment: Nlgbf64<0, 0, 1000, 0>,
     /// The scaling factor applied to negative [`Dendrite`] weights.
-    dendrite_global_activity_regulation_scaling_depression: Nlbf64,
+    dendrite_global_activity_regulation_scaling_depression: Nlgbf64<0, 0, 1000, 0>,
 }
 
 impl ConfigurableParameters {
@@ -47,11 +51,11 @@ impl ConfigurableParameters {
     }
 
     pub fn neuron_value_halflife(&self) -> f64 {
-        Self::nlbf64_to_range(self.neuron_value_halflife, 0.0000000001, 10000.0)
+        self.neuron_value_halflife.value()
     }
 
     pub fn neuron_value_halflife_refractory(&self) -> f64 {
-        Self::nlbf64_to_range(self.neuron_value_halflife_refractory, 0.0000000001, 10000.0)
+        self.neuron_value_halflife_refractory.value()
     }
 
     pub fn neuron_refractory_limit(&self) -> f64 {
@@ -59,11 +63,11 @@ impl ConfigurableParameters {
     }
 
     pub fn dendrite_activation_potential_reinforcement(&self) -> f64 {
-        Self::nlbf64_to_range(self.dendrite_activation_potential_reinforcement, -1.0, 1.0)
+        self.dendrite_activation_potential_reinforcement.value()
     }
 
     pub fn dendrite_activation_potential_depression(&self) -> f64 {
-        Self::nlbf64_to_range(self.dendrite_activation_potential_depression, -1.0, 1.0)
+        self.dendrite_activation_potential_depression.value()
     }
 
     pub fn dendrite_global_activity_regulation_midpoint(&self) -> f64 {
@@ -71,23 +75,17 @@ impl ConfigurableParameters {
     }
 
     pub fn dendrite_global_activity_regulation_exponent(&self) -> f64 {
-        Self::nlbf64_to_range(self.dendrite_global_activity_regulation_exponent, -20.0, 20.0)
+        self.dendrite_global_activity_regulation_exponent.value()
     }
 
     pub fn dendrite_global_activity_regulation_scaling_reinforcment(&self) -> f64 {
-        Self::nlbf64_to_range(
-            self.dendrite_global_activity_regulation_scaling_reinforcment,
-            0.0,
-            10000.0,
-        )
+        self.dendrite_global_activity_regulation_scaling_reinforcment
+            .value()
     }
 
     pub fn dendrite_global_activity_regulation_scaling_depression(&self) -> f64 {
-        Self::nlbf64_to_range(
-            self.dendrite_global_activity_regulation_scaling_depression,
-            0.0,
-            10000.0,
-        )
+        self.dendrite_global_activity_regulation_scaling_depression
+            .value()
     }
 
     pub fn mutate(&self) -> Self {
@@ -100,11 +98,13 @@ impl ConfigurableParameters {
             },
             2 => {
                 mutated.neuron_value_halflife =
-                    Nlbf64::flip_random_bit(mutated.neuron_value_halflife)
+                    Nlgbf64::<1, -9, 10000, 0>::flip_random_bit(mutated.neuron_value_halflife)
             },
             3 => {
                 mutated.neuron_value_halflife_refractory =
-                    Nlbf64::flip_random_bit(mutated.neuron_value_halflife_refractory)
+                    Nlgbf64::<1, -9, 10000, 0>::flip_random_bit(
+                        mutated.neuron_value_halflife_refractory,
+                    )
             },
             4 => {
                 mutated.neuron_refractory_limit =
@@ -112,11 +112,15 @@ impl ConfigurableParameters {
             },
             5 => {
                 mutated.dendrite_activation_potential_reinforcement =
-                    Nlbf64::flip_random_bit(mutated.dendrite_activation_potential_reinforcement)
+                    Nlgbf64::<-1, 0, 1, 0>::flip_random_bit(
+                        mutated.dendrite_activation_potential_reinforcement,
+                    )
             },
             6 => {
                 mutated.dendrite_activation_potential_depression =
-                    Nlbf64::flip_random_bit(mutated.dendrite_activation_potential_depression)
+                    Nlgbf64::<-1, 0, 1, 0>::flip_random_bit(
+                        mutated.dendrite_activation_potential_depression,
+                    )
             },
             7 => {
                 mutated.dendrite_global_activity_regulation_midpoint =
@@ -124,41 +128,25 @@ impl ConfigurableParameters {
             },
             8 => {
                 mutated.dendrite_global_activity_regulation_exponent =
-                    Nlbf64::flip_random_bit(mutated.dendrite_global_activity_regulation_exponent)
+                    Nlgbf64::<-20, 0, 20, 0>::flip_random_bit(
+                        mutated.dendrite_global_activity_regulation_exponent,
+                    )
             },
             9 => {
                 mutated.dendrite_global_activity_regulation_scaling_reinforcment =
-                    Nlbf64::flip_random_bit(
+                    Nlgbf64::<0, 0, 1000, 0>::flip_random_bit(
                         mutated.dendrite_global_activity_regulation_scaling_reinforcment,
                     )
             },
             10 => {
                 mutated.dendrite_global_activity_regulation_scaling_depression =
-                    Nlbf64::flip_random_bit(
+                    Nlgbf64::<0, 0, 1000, 0>::flip_random_bit(
                         mutated.dendrite_global_activity_regulation_scaling_depression,
                     )
             },
             a => panic!("Out of range: {}", a),
         }
         mutated
-    }
-
-    /// Scales the [`Nlbf64`] to the specified boundaries.
-    /// 
-    /// # Parameters
-    /// 
-    /// * `lower_bound` - the lowest possible value (inclusive)
-    /// * `upper_bound` - the highest possible value (inclusive)
-    /// 
-    /// # Panics
-    /// 
-    /// If the lower bound is greater than the upper bound.
-    fn nlbf64_to_range(value: Nlbf64, lower_bound: f64, upper_bound: f64) -> f64 {
-        if upper_bound <= lower_bound {
-            panic!("The lower bound is higher than the upper bound.");
-        }
-        let difference = upper_bound - lower_bound;
-        lower_bound + difference * value.value()
     }
 }
 
