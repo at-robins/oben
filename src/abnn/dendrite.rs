@@ -1,16 +1,17 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use parking_lot::Mutex;
 
 use crate::evolution::helper::Iteration;
 
-use super::{neuron::Neuron, parameters::ConfigurableParameters};
+use super::{network::ErrorPropagationImpulse, neuron::Neuron, parameters::ConfigurableParameters};
 
 pub struct Dendrite {
     weight: Mutex<f64>,
     target: Arc<Neuron>,
+    source: Arc<Neuron>,
     times_activated: Mutex<u64>,
-    weight_modifier: Mutex<f64>,
+    propagation_errors: Mutex<HashMap<usize, f64>>,
     inhibitory: bool,
     configuration: Arc<ConfigurableParameters>,
 }
@@ -21,11 +22,13 @@ impl Dendrite {
     /// # Parameters
     ///
     /// * `target` - the neuron targeted by this `Dendrite`
+    /// * `target` - the neuron that is the source of this `Dendrite`
     /// * `weight` - the strenght of the dendrite influence on the target neuron  
     /// * `inhibitory` - if the `Dendrite` is inhibitory
     /// * `configuration` - a set of configuration parameters
     pub fn new(
         target: Arc<Neuron>,
+        source: Arc<Neuron>,
         weight: f64,
         inhibitory: bool,
         configuration: Arc<ConfigurableParameters>,
@@ -34,8 +37,9 @@ impl Dendrite {
         Self {
             weight: Mutex::new(normalised_weight),
             target,
+            source,
             times_activated: Mutex::new(0),
-            weight_modifier: Mutex::new(0.0),
+            propagation_errors: Mutex::new(HashMap::new()),
             inhibitory,
             configuration,
         }
@@ -60,20 +64,6 @@ impl Dendrite {
         *self.weight.lock() = Self::normalise_weight(weight);
     }
 
-    /// Returns the current weight modifier of the dendrite connection.
-    pub fn weight_modifier(&self) -> f64 {
-        *self.weight_modifier.lock()
-    }
-
-    /// Sets the weight modifier of the `Dendrite` to the specified value.
-    ///
-    /// # Parameters
-    ///
-    /// * `weight_modifier` - the new weight modifier value to set
-    pub fn set_weight_modifier(&self, weight_modifier: f64) {
-        *self.weight_modifier.lock() = Self::normalise_weight(weight_modifier);
-    }
-
     /// Sets the weight of the `Dendrite` to the specified value
     /// and includes some normalisation based on the previous corrections.
     ///
@@ -81,13 +71,7 @@ impl Dendrite {
     ///
     /// * `weight` - the value to add to the weight
     pub fn add_weight_after_evaluation(&self, weight: f64) {
-        self.set_weight_modifier(self.weight_modifier() * 0.9 + weight * 0.1);
-        self.set_weight(self.weight() + self.weight_modifier());
-    }
-
-    /// Returns the target [`Neuron`].
-    pub fn target(&self) -> Arc<Neuron> {
-        Arc::clone(&self.target)
+        self.set_weight(self.weight() + weight);
     }
 
     /// Returns how often the dendrite was activated.
@@ -104,6 +88,18 @@ impl Dendrite {
         *self.times_activated.lock() = value;
     }
 
+    /// Returns the target [`Neuron`] of the dendrite.
+    pub fn target(&self) -> Arc<Neuron> {
+        // TODO: think about where to use weak references to prevent memory leaks
+        Arc::clone(&self.target)
+    }
+
+    /// Returns the source [`Neuron`] of the dendrite.
+    pub fn source(&self) -> Arc<Neuron> {
+        // TODO: think about where to use weak references to prevent memory leaks
+        Arc::clone(&self.source)
+    }
+
     /// Triggers the dendrite passing the weighted action potential on to its target [`Neuron`].
     ///
     /// # Parameters
@@ -113,7 +109,7 @@ impl Dendrite {
     /// # Panics
     ///
     /// If the specified timepoint is earlier than the last update.
-    pub fn trigger(&self, source_value: f64, network_activity: f64, time: Iteration) {
+    pub fn trigger(&self, network_activity: f64, time: Iteration) {
         let current_weight = self.weight();
         let scaling_factor = (self
             .configuration
@@ -132,13 +128,13 @@ impl Dendrite {
                 * self
                     .configuration
                     .dendrite_global_activity_regulation_scaling_reinforcment()
-                * scaling_factor
+            // * scaling_factor
         } else {
             -current_weight
                 * self
                     .configuration
                     .dendrite_global_activity_regulation_scaling_depression()
-                / scaling_factor
+            // / scaling_factor
         };
         if !self.target.add_value(scaled_weight, time) {
             self.set_weight(
@@ -149,6 +145,28 @@ impl Dendrite {
             );
         }
         self.set_times_activated(self.times_activated() + 1);
+    }
+
+    pub fn propagate_error(&self, error: ErrorPropagationImpulse, total_dendrite_activations: u64) {
+        let mut error_map = self.propagation_errors.lock();
+        if !error_map.contains_key(&error.output_id()) {
+            error_map.insert(error.output_id(), error.impact_factor() * error.error());
+            drop(error_map);
+            self.source()
+                .propagate_error(error, total_dendrite_activations);
+        }
+    }
+
+    pub fn evaluate_error_propagation(&self) {
+        let mut error_map = self.propagation_errors.lock();
+        let error_sum: f64 = error_map.values().sum();
+        // println!("{}", error_sum);
+        if self.is_inhibitory() {
+            self.set_weight(self.weight() + error_sum);
+        } else {
+            self.set_weight(self.weight() - error_sum);
+        }
+        error_map.clear();
     }
 
     fn normalise_weight(weight: f64) -> f64 {

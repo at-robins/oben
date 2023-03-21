@@ -201,15 +201,15 @@ impl Default for ConfigurableParameters {
         Self {
             neuron_base_value: 0.2.into(),
             neuron_activation_threshold: 0.95.into(),
-            neuron_value_halflife: (16000.0 / 10000.0).into(),
-            neuron_value_halflife_refractory: (4.0 / 10000.0).into(),
-            neuron_refractory_limit: 0.15.into(),
-            dendrite_activation_potential_reinforcement: 0.5005.into(),
-            dendrite_activation_potential_depression: 0.5005.into(),
-            dendrite_global_activity_regulation_midpoint: 0.5.into(),
-            dendrite_global_activity_regulation_exponent: 0.58.into(),
-            dendrite_global_activity_regulation_scaling_reinforcment: (2.0 / 10000.0).into(),
-            dendrite_global_activity_regulation_scaling_depression: (2.0 / 10000.0).into(),
+            neuron_value_halflife: 32.0.into(),
+            neuron_value_halflife_refractory: 0.00001.into(),
+            neuron_refractory_limit: 0.0.into(),
+            dendrite_activation_potential_reinforcement: 0.00.into(),
+            dendrite_activation_potential_depression: 0.00000.into(),
+            dendrite_global_activity_regulation_midpoint: 1.0.into(),
+            dendrite_global_activity_regulation_exponent: 0.0.into(),
+            dendrite_global_activity_regulation_scaling_reinforcment: 1.0.into(),
+            dendrite_global_activity_regulation_scaling_depression: 1.0.into(),
         }
     }
 }

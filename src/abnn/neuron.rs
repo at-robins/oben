@@ -4,27 +4,33 @@ use parking_lot::Mutex;
 
 use crate::evolution::helper::Iteration;
 
-use super::{dendrite::Dendrite, parameters::ConfigurableParameters};
+use super::{
+    dendrite::{self, Dendrite},
+    network::ErrorPropagationImpulse,
+    parameters::ConfigurableParameters,
+};
 
 /// A neuron.
 pub struct Neuron {
     value: Mutex<f64>,
     last_value_update: Mutex<Iteration>,
-    dendrites: Mutex<Vec<Arc<Dendrite>>>,
+    outgoing_dendrites: Mutex<Vec<Arc<Dendrite>>>,
+    ingoing_dendrites: Mutex<Vec<Arc<Dendrite>>>,
     configuration: Arc<ConfigurableParameters>,
 }
 
 impl Neuron {
     /// Creates a new `Neuron`.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `configuration` - a set of configuration parameters
     pub fn new(configuration: Arc<ConfigurableParameters>) -> Self {
         Self {
             value: Mutex::new(configuration.neuron_base_value()),
             last_value_update: Mutex::new(Iteration::new()),
-            dendrites: Mutex::new(Vec::new()),
+            outgoing_dendrites: Mutex::new(Vec::new()),
+            ingoing_dendrites: Mutex::new(Vec::new()),
             configuration,
         }
     }
@@ -60,8 +66,7 @@ impl Neuron {
                     self.configuration.neuron_value_halflife()
                 };
                 let value_difference: f64 = current_value - self.configuration.neuron_base_value();
-                let change: f64 =
-                    value_difference * 0.5f64.powf(time_difference as f64 / halflife);
+                let change: f64 = value_difference * 0.5f64.powf(time_difference as f64 / halflife);
                 self.set_value(self.configuration.neuron_base_value() + change);
             }
             self.set_time(time);
@@ -104,17 +109,30 @@ impl Neuron {
         *self.value.lock() = new_value;
     }
 
-    /// Adds a dendrite to the [`Neuron`].
+    /// Adds an outgoing dendrite to the [`Neuron`].
     ///
     /// # Parameters
     ///
     /// * `dendrite` - the dendrite to add
-    pub fn add_dendrite(&self, dendrite: Arc<Dendrite>) {
-        self.dendrites.lock().push(dendrite);
+    pub fn add_outgoing_dendrite(&self, dendrite: Arc<Dendrite>) {
+        self.outgoing_dendrites.lock().push(dendrite);
     }
 
-    pub fn dendrites(&self) -> Vec<Arc<Dendrite>> {
-        self.dendrites.lock().clone()
+    /// Adds an ingoing dendrite to the [`Neuron`].
+    ///
+    /// # Parameters
+    ///
+    /// * `dendrite` - the dendrite to add
+    pub fn add_ingoing_dendrite(&self, dendrite: Arc<Dendrite>) {
+        self.ingoing_dendrites.lock().push(dendrite);
+    }
+
+    pub fn outgoing_dendrites(&self) -> Vec<Arc<Dendrite>> {
+        self.outgoing_dendrites.lock().clone()
+    }
+
+    pub fn ingoing_dendrites(&self) -> Vec<Arc<Dendrite>> {
+        self.ingoing_dendrites.lock().clone()
     }
 
     /// Checks if the `Neuron`'s potential is high enough to trigger an activation potential.
@@ -143,7 +161,7 @@ impl Neuron {
         if self.should_trigger_activation_potential(time) {
             // Hyperpolarisation.
             self.set_value(0.0);
-            self.dendrites()
+            self.outgoing_dendrites()
         } else {
             Vec::new()
         }
@@ -158,7 +176,7 @@ impl Neuron {
         *self.last_value_update.lock() = time;
     }
 
-    /// Adds the specified value at the specified timepoint and returns 
+    /// Adds the specified value at the specified timepoint and returns
     /// `true` if the addition was successfull or `false` if the `Neuron` was hyperpolarised.
     ///
     /// # Parameters
@@ -176,6 +194,39 @@ impl Neuron {
             false
         } else {
             true
+        }
+    }
+
+    pub fn propagate_error(&self, error: ErrorPropagationImpulse, total_dendrite_activations: u64) {
+        let ingoing_dendrites = self.ingoing_dendrites();
+        let sum_of_dendrite_weights: f64 = ingoing_dendrites
+            .iter()
+            .map(|dendrite| dendrite.weight())
+            .sum();
+        let sum_of_dendrite_activations: f64 = ingoing_dendrites
+            .iter()
+            .map(|dendrite| dendrite.times_activated() as f64)
+            .sum();
+        let a: Vec<f64> = ingoing_dendrites
+            .iter()
+            .map(|dendrite| {
+                dendrite.weight() * (dendrite.times_activated() as f64)
+                    / sum_of_dendrite_activations
+            })
+            .collect();
+        let a_sum: f64 = a.iter().sum();
+        let a_rel: Vec<f64> = a.iter().map(|x| x / a_sum).collect();
+        for (i, dendrite) in ingoing_dendrites.into_iter().enumerate() {
+            let dendrite_activation_factor =
+                (dendrite.times_activated() as f64) / (sum_of_dendrite_activations as f64);
+            let dendrite_percentage = dendrite.weight() / sum_of_dendrite_weights;
+            let total_contribution_factor =
+                1.0 / (total_dendrite_activations as f64);
+            // println!("{:?}", error.with_updated_impact_factor(dendrite_activation_factor * dendrite_percentage));
+            dendrite.propagate_error(
+                error.with_updated_impact_factor(total_contribution_factor * a_rel[i]),
+                total_dendrite_activations,
+            );
         }
     }
 }
