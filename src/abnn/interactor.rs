@@ -15,6 +15,10 @@ pub trait Interactor {
 
     fn set_output_neurons(&mut self, neurons: Vec<Arc<Neuron>>);
 
+    fn input_neurons(&self) -> Vec<Arc<Neuron>>;
+
+    fn output_neurons(&self) -> Vec<Arc<Neuron>>;
+
     fn update_iteration(&mut self, time: Iteration);
 
     fn request_evaluation(&mut self) -> bool;

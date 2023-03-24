@@ -199,7 +199,7 @@ impl CrossOver for ConfigurableParameters {
 impl Default for ConfigurableParameters {
     fn default() -> Self {
         Self {
-            neuron_base_value: 0.2.into(),
+            neuron_base_value: 0.0.into(),
             neuron_activation_threshold: 0.95.into(),
             neuron_value_halflife: 32.0.into(),
             neuron_value_halflife_refractory: 0.00001.into(),

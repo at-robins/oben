@@ -1,8 +1,16 @@
-use std::{collections::VecDeque, num::NonZeroUsize, sync::Arc};
+use std::{
+    collections::{HashSet, VecDeque},
+    num::NonZeroUsize,
+    sync::Arc,
+};
 
+use by_address::ByAddress;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::{
+    iter::{IntoParallelRefIterator, ParallelIterator},
+    prelude::IntoParallelIterator,
+};
 
 use crate::evolution::helper::Iteration;
 
@@ -60,9 +68,17 @@ impl AssociationBasedNeuralNetwork {
                 );
             }
         }
-        // Add the dendrites with random targets and weights.
-        for neuron in neurons.iter() {
-            let mut available_targets: Vec<Arc<Neuron>> = neurons
+        let input_neurons: Vec<Arc<Neuron>> = interactors
+            .iter()
+            .flat_map(|interactor| interactor.lock().input_neurons())
+            .collect();
+        let output_neurons: Vec<Arc<Neuron>> = interactors
+            .iter()
+            .flat_map(|interactor| interactor.lock().output_neurons())
+            .collect();
+        // Add the dendrites with random targets and weights to every neuron except output neurons.
+        for neuron in Self::neurons_exclude(&neurons, &output_neurons).iter() {
+            let mut available_targets: Vec<Arc<Neuron>> = Self::neurons_exclude(&neurons, &input_neurons)
                 .iter()
                 .filter(|target| !Arc::ptr_eq(neuron, target))
                 .map(|target| Arc::clone(target))
@@ -104,103 +120,72 @@ impl AssociationBasedNeuralNetwork {
         }
     }
 
+    fn neurons_exclude(list: &Vec<Arc<Neuron>>, exclude: &Vec<Arc<Neuron>>) -> Vec<Arc<Neuron>> {
+        list.iter()
+            .filter(|neuron| {
+                let mut include = true;
+                for exclude_neuron in exclude.iter() {
+                    if Arc::ptr_eq(neuron, &exclude_neuron) {
+                        include = false;
+                        break;
+                    }
+                }
+                include
+            })
+            .map(|neuron| Arc::clone(neuron))
+            .collect()
+    }
+
     pub fn run_until_evaluation(&mut self) {
-        self.interactors
+        let mut update_neurons: HashSet<ByAddress<Arc<Neuron>>> = self
+            .interactors
             .par_iter()
-            .for_each(|interactor| interactor.lock().initialise_new_evaluation());
-        let mut dendrites_activated_since_last_evaluation: u64 = 0;
+            .flat_map(|interactor| {
+                let mut interactor_lock = interactor.lock();
+                interactor_lock.initialise_new_evaluation();
+                interactor_lock.input_neurons()
+            })
+            .map(|neuron| ByAddress(neuron))
+            .collect();
         let mut request_evaluation = false;
-        let mut last_activated_dendrites: Vec<Arc<Dendrite>> = Vec::new();
-        let mut network_activity: f64 = self
-            .configuration
-            .dendrite_global_activity_regulation_midpoint();
-        while !request_evaluation && self.current_time - self.last_evaluation_time < 10000 {
+        while !request_evaluation
+            && !update_neurons.is_empty()
+            && self.current_time - self.last_evaluation_time < 10000
+        {
             self.interactors
                 .par_iter()
                 .for_each(|interactor| interactor.lock().update_iteration(self.current_time));
-            let activated_dendrites: Vec<Arc<Dendrite>> = self
-                .neurons
+            // println!("Updated neurons: {}", update_neurons.len());
+            update_neurons = update_neurons
                 .par_iter()
-                .map(|neuron| (neuron, neuron.try_trigger_action_potential(self.current_time)))
-                .flat_map(|(neuron, activated_dendrites)| {
-                    // Cross-reference learning and reinforcment of dendrite weights
-                    // when an action potential is triggered.
-                    if activated_dendrites.len() > 0 {
-                        for last_activated_dendrite in last_activated_dendrites.iter() {
-                            if Arc::ptr_eq(&last_activated_dendrite.target(), neuron) {
-                                last_activated_dendrite.set_weight(
-                                    last_activated_dendrite.weight()
-                                        + self
-                                            .configuration
-                                            .dendrite_activation_potential_reinforcement(),
-                                );
-                            }
-                        }
+                .flat_map(|neuron| {
+                    if neuron.update_value() {
+                        neuron.targets()
+                    } else {
+                        Vec::new()
                     }
-                    for dendrite in activated_dendrites.iter() {
-                        dendrite.trigger(network_activity, self.current_time);
-                    }
-                    activated_dendrites
                 })
+                .map(|neuron| ByAddress(neuron))
                 .collect();
-            network_activity = activated_dendrites.len() as f64
-                / ((self.neurons.len() * self.total_number_of_dendrites) as f64);
-            dendrites_activated_since_last_evaluation += activated_dendrites.len() as u64;
-            last_activated_dendrites = activated_dendrites;
             self.current_time = self.current_time.increment();
             request_evaluation = self
                 .interactors
                 .iter()
                 .any(|interactor| interactor.lock().request_evaluation());
         }
+        let prediction_error: Vec<f64> = self
+            .interactors
+            .par_iter()
+            .filter_map(|interactor| interactor.lock().evalute_results())
+            .flat_map(|results| results)
+            .map(|(neuron, error)| {
+                neuron.propagate_error(error);
+                println!("{:?}", error);
+                error.error()
+            })
+            .collect();
+        self.update_prediction_errors(prediction_error);
 
-        // let interactor_prediction_errors: Vec<ErrorPropagationImpulse> = self
-        //     .interactors
-        //     .iter()
-        //     .filter_map(|interactor| interactor.lock().evalute_results())
-        //     .flat_map(|results| results)
-        //     .collect();
-        // let prediction_error = interactor_prediction_errors.iter().sum::<f64>()
-        //     / (interactor_prediction_errors.len() as f64);
-        // self.update_prediction_errors(prediction_error);
-
-        // let normalised_prediction_error =
-        //     if let Some(mean_prediction_error) = self.mean_prediction_error() {
-        //         prediction_error - mean_prediction_error
-        //     } else {
-        //         0.0
-        //     };
-        if dendrites_activated_since_last_evaluation > 0 {
-            // Resets the amount of times the dendrite was acitvated.
-            // self.neurons.par_iter().for_each(|neuron| {
-            //     neuron
-            //         .outgoing_dendrites()
-            //         .into_iter()
-            //         .for_each(|dendrite| {
-            //             let scaling_factor = dendrite.times_activated() as f64
-            //                 / dendrites_activated_since_last_evaluation as f64;
-            //             let updated_weight = if !dendrite.is_inhibitory() {
-            //                 -scaling_factor * normalised_prediction_error
-            //             } else {
-            //                 scaling_factor * normalised_prediction_error
-            //             };
-            //             dendrite.add_weight_after_evaluation(updated_weight);
-            //             dendrite.set_times_activated(0)
-            //         });
-            // });
-            let prediction_error: Vec<f64> = self
-                .interactors
-                .par_iter()
-                .filter_map(|interactor| interactor.lock().evalute_results())
-                .flat_map(|results| results)
-                .map(|(neuron, error)| {
-                    neuron.propagate_error(error, dendrites_activated_since_last_evaluation);
-                    println!("{:?}", error);
-                    error.error()
-                })
-                .collect();
-            self.update_prediction_errors(prediction_error);
-        }
         self.neurons
             .par_iter()
             .map(|neuron| neuron.outgoing_dendrites())
@@ -231,7 +216,10 @@ impl AssociationBasedNeuralNetwork {
                         if acc.is_empty() {
                             x.clone()
                         } else {
-                            acc.iter().zip(x.iter()).map(|(a, b)| a.abs() + b.abs()).collect()
+                            acc.iter()
+                                .zip(x.iter())
+                                .map(|(a, b)| a.abs() + b.abs())
+                                .collect()
                         }
                     })
                     .iter()
@@ -241,11 +229,11 @@ impl AssociationBasedNeuralNetwork {
         }
     }
 
-    fn reset_neurons(&mut self) {
-        for neuron in &self.neurons {
-            neuron.set_value(0.2);
-        }
-    }
+    // fn reset_neurons(&mut self) {
+    //     for neuron in &self.neurons {
+    //         neuron.set_value(0.2);
+    //     }
+    // }
 }
 
 fn remove_random<T>(values: &mut Vec<T>) -> T {
@@ -260,8 +248,8 @@ fn remove_random<T>(values: &mut Vec<T>) -> T {
 pub struct ErrorPropagationImpulse {
     /// The ID of the output neuron from which the error originates.
     output_id: usize,
-    /// The sum of consecutive dendrite weights.
-    impact_factor: f64,
+    /// The distance from the original error source / output neuron.
+    distance: u64,
     /// The initial prediciton error.
     error: f64,
 }
@@ -270,15 +258,15 @@ impl ErrorPropagationImpulse {
     pub fn new(output_id: usize, error: f64) -> Self {
         Self {
             output_id,
-            impact_factor: 1.0,
+            distance: 0,
             error,
         }
     }
 
-    pub fn with_updated_impact_factor(&self, dendrite_weight: f64) -> Self {
+    pub fn with_updated_distance(&self) -> Self {
         Self {
             output_id: self.output_id,
-            impact_factor: dendrite_weight, //self.impact_factor *
+            distance: self.distance + 1,
             error: self.error,
         }
     }
@@ -287,8 +275,8 @@ impl ErrorPropagationImpulse {
         self.output_id
     }
 
-    pub fn impact_factor(&self) -> f64 {
-        self.impact_factor
+    pub fn distance(&self) -> u64 {
+        self.distance
     }
 
     pub fn error(&self) -> f64 {
