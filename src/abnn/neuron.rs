@@ -40,9 +40,10 @@ impl Neuron {
     /// Updates the `Neuron`'s value based on its ingoing connections.
     pub fn update_value(&self) -> bool {
         let current_value = self.value();
-        self.set_value(
-            self.ingoing_dendrites
-                .lock()
+        let ingoing_dendrites_lock = self.ingoing_dendrites.lock();
+        // Exclude input neurons.
+        if ingoing_dendrites_lock.len() > 0 {
+            let new_value = (ingoing_dendrites_lock
                 .iter()
                 .map(|dendrite| {
                     dendrite
@@ -50,9 +51,17 @@ impl Neuron {
                         .expect(DENDRITE_WEAK_UPGRADE_ERROR)
                         .triggering_frequency()
                 })
-                .sum(),
-        );
-        current_value != self.value()
+                .sum::<f64>()
+                // below this value no activation happens
+                - self.configuration.neuron_activation_threshold())
+                // scale the remaining value to a range between 0 and 1
+                / (1.0 - self.configuration.neuron_activation_threshold());
+            self.set_value(new_value);
+            current_value != self.value()
+        } else {
+            // Update targets if this is an input neuron.
+            true
+        }
     }
 
     /// Sets the [`Neuron`]'s value as specified.
@@ -86,7 +95,9 @@ impl Neuron {
     ///
     /// * `dendrite` - the dendrite to add
     pub fn add_ingoing_dendrite(&self, dendrite: Arc<Dendrite>) {
-        self.ingoing_dendrites.lock().push(Arc::<Dendrite>::downgrade(&dendrite));
+        self.ingoing_dendrites
+            .lock()
+            .push(Arc::<Dendrite>::downgrade(&dendrite));
     }
 
     /// Returns the outgoing [`Dendrite`]s.
@@ -103,12 +114,11 @@ impl Neuron {
             .collect()
     }
 
-    /// Returns all [`Neuron`]s targeted by this [`Neuron`] by [`Dendrite`]s with a weight greater than `0.0`.
+    /// Returns all [`Neuron`]s targeted by this [`Neuron`] by [`Dendrite`]s.
     pub fn targets(&self) -> Vec<Arc<Neuron>> {
         self.outgoing_dendrites
             .lock()
             .iter()
-            //.filter(|dendrite| dendrite.weight().is_normal())
             .map(|dendrite| dendrite.target())
             .collect()
     }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::evolution::helper::Iteration;
 
-use super::{neuron::Neuron, network::ErrorPropagationImpulse};
+use super::{network::ErrorPropagationImpulse, neuron::Neuron};
 
 pub trait Interactor {
     fn id(&self) -> u32;
@@ -19,11 +19,13 @@ pub trait Interactor {
 
     fn output_neurons(&self) -> Vec<Arc<Neuron>>;
 
-    fn update_iteration(&mut self, time: Iteration);
+    /// Returns changed input neurons.
+    fn update_iteration(&mut self, time: Iteration, is_network_equilibrium: bool)
+        -> Vec<Arc<Neuron>>;
 
     fn request_evaluation(&mut self) -> bool;
 
-    fn evalute_results(&mut self) -> Option<Vec<(Arc<Neuron>, ErrorPropagationImpulse)>>;
+    fn evalute_results(&mut self) -> Option<ErrorPropagationImpulse>;
 
-    fn initialise_new_evaluation(&mut self);
+    fn initialise_new_evaluation(&mut self, time: Iteration);
 }

@@ -85,7 +85,6 @@ impl Dendrite {
     pub fn propagate_error(&self, error: ErrorPropagationImpulse, b: f64) {
         let mut error_map = self.propagation_errors.lock();
         if !error_map.contains_key(&error.output_id()) {
-            println!("Weighted error: {} ; error: {} ; distance: {}; b: {}", error.error() * (1.0 / b) * 0.99999f64.powi(error.distance() as i32), error.error(), error.distance(), b);
             error_map.insert(error.output_id(), error.error() * (1.0 / b) * 0.99f64.powi(error.distance() as i32));
             drop(error_map);
             self.source()
@@ -95,8 +94,7 @@ impl Dendrite {
 
     pub fn evaluate_error_propagation(&self) {
         let mut error_map = self.propagation_errors.lock();
-        let error_sum: f64 = error_map.values().sum();
-        // println!("{}", error_sum);
+        let error_sum: f64 = error_map.values().sum::<f64>();
         if self.is_inhibitory() {
             self.set_weight(self.weight() + error_sum);
         } else {

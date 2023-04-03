@@ -78,11 +78,12 @@ impl AssociationBasedNeuralNetwork {
             .collect();
         // Add the dendrites with random targets and weights to every neuron except output neurons.
         for neuron in Self::neurons_exclude(&neurons, &output_neurons).iter() {
-            let mut available_targets: Vec<Arc<Neuron>> = Self::neurons_exclude(&neurons, &input_neurons)
-                .iter()
-                .filter(|target| !Arc::ptr_eq(neuron, target))
-                .map(|target| Arc::clone(target))
-                .collect();
+            let mut available_targets: Vec<Arc<Neuron>> =
+                Self::neurons_exclude(&neurons, &input_neurons)
+                    .iter()
+                    .filter(|target| !Arc::ptr_eq(neuron, target))
+                    .map(|target| Arc::clone(target))
+                    .collect();
             for _ in 0..dendrites_per_neuron.get() {
                 let dendrite = Arc::new(Dendrite::new(
                     remove_random(&mut available_targets),
@@ -142,20 +143,26 @@ impl AssociationBasedNeuralNetwork {
             .par_iter()
             .flat_map(|interactor| {
                 let mut interactor_lock = interactor.lock();
-                interactor_lock.initialise_new_evaluation();
+                interactor_lock.initialise_new_evaluation(self.current_time);
                 interactor_lock.input_neurons()
             })
+            .flat_map(|neuron| neuron.targets())
             .map(|neuron| ByAddress(neuron))
             .collect();
         let mut request_evaluation = false;
-        while !request_evaluation
-            && !update_neurons.is_empty()
-            && self.current_time - self.last_evaluation_time < 10000
-        {
-            self.interactors
+        while !request_evaluation {
+            let updated_input_neurons: Vec<ByAddress<Arc<Neuron>>> = self
+                .interactors
                 .par_iter()
-                .for_each(|interactor| interactor.lock().update_iteration(self.current_time));
-            // println!("Updated neurons: {}", update_neurons.len());
+                .flat_map(|interactor| {
+                    interactor
+                        .lock()
+                        .update_iteration(self.current_time, update_neurons.is_empty())
+                })
+                .flat_map(|neuron| neuron.targets())
+                .map(|neuron| ByAddress(neuron))
+                .collect();
+            update_neurons.extend(updated_input_neurons);
             update_neurons = update_neurons
                 .par_iter()
                 .flat_map(|neuron| {
@@ -173,14 +180,48 @@ impl AssociationBasedNeuralNetwork {
                 .iter()
                 .any(|interactor| interactor.lock().request_evaluation());
         }
+        // for neuron in self.neurons.iter() {
+        //     let dendrite_values_out: Vec<f64> = neuron
+        //         .outgoing_dendrites()
+        //         .iter()
+        //         .map(|a| a.weight())
+        //         .collect();
+        //     let dendrite_values_in: Vec<f64> = neuron
+        //         .ingoing_dendrites()
+        //         .iter()
+        //         .map(|a| a.weight())
+        //         .collect();
+        //     println!(
+        //         "Neuron: {} ; Dendrites out: {:?} ; Dendrites in: {:?}",
+        //         neuron.value(),
+        //         dendrite_values_out,
+        //         dendrite_values_in
+        //     );
+        // }
+
+        // self.neurons
+        //     .par_iter()
+        //     .flat_map(|neuron| neuron.outgoing_dendrites())
+        //     .for_each(|dendrite| {
+        //         let diff = (dendrite.source().value() - dendrite.target().value().powi(2));
+        //         // dendrite.set_weight(dendrite.weight() * (2.0 - diff));
+        //     });
+
         let prediction_error: Vec<f64> = self
             .interactors
             .par_iter()
-            .filter_map(|interactor| interactor.lock().evalute_results())
-            .flat_map(|results| results)
-            .map(|(neuron, error)| {
-                neuron.propagate_error(error);
+            .filter_map(|interactor| {
+                let mut interactor_lock = interactor.lock();
+                interactor_lock
+                    .evalute_results()
+                    .map(|result| (interactor_lock.output_neurons(), result))
+            })
+            .map(|(neurons, error)| {
                 println!("{:?}", error);
+                // TODO: reasonable code
+                for neuron in neurons.into_iter() {
+                    neuron.propagate_error(error);
+                }
                 error.error()
             })
             .collect();
